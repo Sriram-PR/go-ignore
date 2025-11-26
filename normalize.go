@@ -60,7 +60,7 @@ func normalizeBasePath(basePath string) string {
 // It handles platform-specific encoding variations.
 //
 // Normalization steps (applied in order):
-//  1. Strip UTF-8 BOM if present (EF BB BF)
+//  1. Strip UTF-8 BOM if present (EF BB BF) - loops for idempotency
 //  2. Normalize CRLF to LF (Windows line endings)
 //  3. Normalize standalone CR to LF (old Mac format)
 //
@@ -71,7 +71,8 @@ func normalizeContent(content []byte) []byte {
 	}
 
 	// Step 1: Strip UTF-8 BOM if present (EF BB BF)
-	if len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
+	// Loop to handle edge case of multiple BOMs for idempotency
+	for len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
 		content = content[3:]
 	}
 

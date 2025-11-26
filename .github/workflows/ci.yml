@@ -5,6 +5,19 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Which job to run (all runs everything)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - test
+          - lint
+          - fuzz
+          - benchmark
 
 permissions:
   contents: read
@@ -12,6 +25,10 @@ permissions:
 jobs:
   test:
     name: Test (Go ${{ matrix.go-version }} / ${{ matrix.os }})
+    # Run this job when:
+    # - event is not a manual dispatch (push/pr) OR
+    # - event is manual dispatch and input.job is "all" or "test"
+    if: ${{ github.event_name != 'workflow_dispatch' || contains(fromJson('["all","test"]'), github.event.inputs.job) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -52,6 +69,7 @@ jobs:
 
   lint:
     name: Lint
+    if: ${{ github.event_name != 'workflow_dispatch' || contains(fromJson('["all","lint"]'), github.event.inputs.job) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -70,6 +88,7 @@ jobs:
 
   fuzz:
     name: Fuzz Tests
+    if: ${{ github.event_name != 'workflow_dispatch' || contains(fromJson('["all","fuzz"]'), github.event.inputs.job) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -91,6 +110,7 @@ jobs:
 
   benchmark:
     name: Benchmarks
+    if: ${{ github.event_name != 'workflow_dispatch' || contains(fromJson('["all","benchmark"]'), github.event.inputs.job) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

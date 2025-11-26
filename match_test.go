@@ -128,7 +128,7 @@ func TestMatchSingleSegment_CaseInsensitive(t *testing.T) {
 }
 
 func containsWildcard(s string) bool {
-	return len(s) > 0 && (s[0] == '*' || s[len(s)-1] == '*' || 
+	return len(s) > 0 && (s[0] == '*' || s[len(s)-1] == '*' ||
 		(len(s) > 1 && s != "**" && indexOf(s, '*') >= 0))
 }
 
@@ -204,10 +204,10 @@ func TestMatchGlob(t *testing.T) {
 
 func TestMatchSegments_Simple(t *testing.T) {
 	tests := []struct {
-		name     string
-		pattern  []segment
-		path     []string
-		want     bool
+		name    string
+		pattern []segment
+		path    []string
+		want    bool
 	}{
 		{
 			"empty both",
@@ -601,8 +601,8 @@ func TestSplitPath(t *testing.T) {
 		{"foo", []string{"foo"}},
 		{"foo/bar", []string{"foo", "bar"}},
 		{"foo/bar/baz", []string{"foo", "bar", "baz"}},
-		{"/foo", []string{"foo"}},       // leading slash
-		{"foo/", []string{"foo"}},       // trailing slash
+		{"/foo", []string{"foo"}},            // leading slash
+		{"foo/", []string{"foo"}},            // trailing slash
 		{"foo//bar", []string{"foo", "bar"}}, // double slash
 		{"/", []string{}},
 	}

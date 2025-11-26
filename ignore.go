@@ -6,15 +6,6 @@ import (
 
 // MatchResult provides detailed information about a match decision.
 type MatchResult struct {
-	// Ignored indicates the final decision: true if the path should be ignored.
-	// This accounts for negation rules.
-	Ignored bool
-
-	// Matched indicates whether any rule matched the path (before considering negation).
-	// If false, no rules matched and the path is not ignored (default behavior).
-	// If true, at least one rule matched; check Ignored for the final result.
-	Matched bool
-
 	// Rule is the pattern string of the last matching rule (empty if Matched == false).
 	// If multiple rules matched, this is the final decisive rule.
 	Rule string
@@ -26,6 +17,15 @@ type MatchResult struct {
 	// Line is the line number (1-indexed) in the .gitignore file.
 	// Zero if Matched == false.
 	Line int
+
+	// Ignored indicates the final decision: true if the path should be ignored.
+	// This accounts for negation rules.
+	Ignored bool
+
+	// Matched indicates whether any rule matched the path (before considering negation).
+	// If false, no rules matched and the path is not ignored (default behavior).
+	// If true, at least one rule matched; check Ignored for the final result.
+	Matched bool
 
 	// Negated indicates whether the matching rule was a negation (started with !).
 	// When Negated == true and Matched == true, the path was re-included.

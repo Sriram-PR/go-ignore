@@ -135,7 +135,7 @@ func BenchmarkMatch_DoubleStarDeep(b *testing.B) {
 	m.AddPatterns("", []byte("**/target\n"))
 
 	// Create a 20-level deep path
-	var parts []string
+	parts := make([]string, 0, 21)
 	for i := 0; i < 20; i++ {
 		parts = append(parts, fmt.Sprintf("dir%d", i))
 	}

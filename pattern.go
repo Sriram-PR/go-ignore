@@ -7,9 +7,9 @@ import (
 // ParseWarning represents a warning from parsing a .gitignore line.
 // Warnings are generated for malformed patterns that are skipped during parsing.
 type ParseWarning struct {
-	Line    int    // Line number (1-indexed)
 	Pattern string // The problematic pattern
 	Message string // Human-readable warning message
+	Line    int    // Line number (1-indexed)
 }
 
 // rule represents a single parsed gitignore pattern.
@@ -17,11 +17,11 @@ type ParseWarning struct {
 type rule struct {
 	pattern  string    // original pattern (for debugging/reporting)
 	basePath string    // directory scope (empty = root)
+	segments []segment // parsed pattern segments for matching
 	line     int       // line number in source file (1-indexed)
 	negate   bool      // true if pattern started with !
 	dirOnly  bool      // true if pattern ended with /
 	anchored bool      // true if pattern should match from basePath only
-	segments []segment // parsed pattern segments for matching
 }
 
 // segment represents one part of a pattern split by "/".

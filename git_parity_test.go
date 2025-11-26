@@ -33,9 +33,9 @@ func TestGitParity_Basic(t *testing.T) {
 			paths:     []string{"test.log", "debug.log", "test.tmp", "main.go", "readme.md"},
 		},
 		{
-			name:      "directory patterns",
-			gitignore: "build/\nnode_modules/\n",
-			paths:     []string{"build/output.js", "node_modules/lodash/index.js", "src/main.go"},
+			name:       "directory patterns",
+			gitignore:  "build/\nnode_modules/\n",
+			paths:      []string{"build/output.js", "node_modules/lodash/index.js", "src/main.go"},
 			createDirs: []string{"build", "node_modules/lodash"},
 		},
 		{
@@ -44,33 +44,33 @@ func TestGitParity_Basic(t *testing.T) {
 			paths:     []string{"test.log", "important.log", "debug.log"},
 		},
 		{
-			name:      "anchored patterns",
-			gitignore: "/root.txt\nsrc/temp\n",
-			paths:     []string{"root.txt", "sub/root.txt", "src/temp", "lib/src/temp"},
+			name:       "anchored patterns",
+			gitignore:  "/root.txt\nsrc/temp\n",
+			paths:      []string{"root.txt", "sub/root.txt", "src/temp", "lib/src/temp"},
 			createDirs: []string{"sub", "src", "lib/src"},
 		},
 		{
-			name:      "double star prefix",
-			gitignore: "**/logs\n**/temp\n",
-			paths:     []string{"logs", "src/logs", "a/b/c/logs", "temp", "x/temp"},
+			name:       "double star prefix",
+			gitignore:  "**/logs\n**/temp\n",
+			paths:      []string{"logs", "src/logs", "a/b/c/logs", "temp", "x/temp"},
 			createDirs: []string{"src", "a/b/c", "x"},
 		},
 		{
-			name:      "double star suffix",
-			gitignore: "build/**\nlogs/**\n",
-			paths:     []string{"build/out.js", "build/sub/deep.js", "logs/error.log", "src/build"},
+			name:       "double star suffix",
+			gitignore:  "build/**\nlogs/**\n",
+			paths:      []string{"build/out.js", "build/sub/deep.js", "logs/error.log", "src/build"},
 			createDirs: []string{"build/sub", "logs", "src"},
 		},
 		{
-			name:      "double star middle",
-			gitignore: "a/**/b\nsrc/**/test\n",
-			paths:     []string{"a/b", "a/x/b", "a/x/y/z/b", "src/test", "src/lib/test"},
+			name:       "double star middle",
+			gitignore:  "a/**/b\nsrc/**/test\n",
+			paths:      []string{"a/b", "a/x/b", "a/x/y/z/b", "src/test", "src/lib/test"},
 			createDirs: []string{"a/x/y/z", "src/lib"},
 		},
 		{
-			name:      "hidden files",
-			gitignore: ".env\n.env.*\n.cache/\n",
-			paths:     []string{".env", ".env.local", ".env.production", ".cache/data", "env"},
+			name:       "hidden files",
+			gitignore:  ".env\n.env.*\n.cache/\n",
+			paths:      []string{".env", ".env.local", ".env.production", ".cache/data", "env"},
 			createDirs: []string{".cache"},
 		},
 	}
@@ -95,15 +95,15 @@ func TestGitParity_EdgeCases(t *testing.T) {
 		createDirs []string
 	}{
 		{
-			name:      "trailing slash normalization",
-			gitignore: "foo/\n",
-			paths:     []string{"foo/bar.txt", "foo/sub/deep.txt", "foobar.txt"},
+			name:       "trailing slash normalization",
+			gitignore:  "foo/\n",
+			paths:      []string{"foo/bar.txt", "foo/sub/deep.txt", "foobar.txt"},
 			createDirs: []string{"foo/sub"},
 		},
 		{
-			name:      "complex negation",
-			gitignore: "logs/**\n!logs/keep/\n!logs/keep/**\n",
-			paths:     []string{"logs/error.log", "logs/keep/important.log", "logs/other/file.log"},
+			name:       "complex negation",
+			gitignore:  "logs/**\n!logs/keep/\n!logs/keep/**\n",
+			paths:      []string{"logs/error.log", "logs/keep/important.log", "logs/other/file.log"},
 			createDirs: []string{"logs/keep", "logs/other"},
 		},
 		{
@@ -112,9 +112,9 @@ func TestGitParity_EdgeCases(t *testing.T) {
 			paths:     []string{"app.min.js", "lib.min.js", "foo_test.go", "test_bar.py", "main.go"},
 		},
 		{
-			name:      "spaces in names",
-			gitignore: "my file.txt\nmy dir/\n",
-			paths:     []string{"my file.txt", "myfile.txt", "my dir/content.txt"},
+			name:       "spaces in names",
+			gitignore:  "my file.txt\nmy dir/\n",
+			paths:      []string{"my file.txt", "myfile.txt", "my dir/content.txt"},
 			createDirs: []string{"my dir"},
 		},
 	}
@@ -145,11 +145,11 @@ func compareWithGit(t *testing.T, gitignoreContent string, paths []string, creat
 	// Configure git user (required for some git versions)
 	cmd = exec.Command("git", "config", "user.email", "test@test.com")
 	cmd.Dir = tmpDir
-	cmd.Run() // Ignore errors, not all git versions require this
+	_ = cmd.Run() // Ignore errors, not all git versions require this
 
 	cmd = exec.Command("git", "config", "user.name", "Test")
 	cmd.Dir = tmpDir
-	cmd.Run()
+	_ = cmd.Run()
 
 	// Create .gitignore
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
@@ -241,7 +241,7 @@ func TestGitParity_Verbose(t *testing.T) {
 	// Initialize git repo
 	cmd := exec.Command("git", "init")
 	cmd.Dir = tmpDir
-	cmd.Run()
+	_ = cmd.Run()
 
 	gitignoreContent := `
 # Test patterns
@@ -253,12 +253,16 @@ src/**/test/
 `
 
 	// Create .gitignore
-	os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte(gitignoreContent), 0644)
+	if err := os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte(gitignoreContent), 0644); err != nil {
+		t.Fatalf("failed to write .gitignore: %v", err)
+	}
 
 	// Create test structure
 	dirs := []string{"build", "src/lib/test", "cache", "src/cache", "logs"}
 	for _, d := range dirs {
-		os.MkdirAll(filepath.Join(tmpDir, d), 0755)
+		if err := os.MkdirAll(filepath.Join(tmpDir, d), 0755); err != nil {
+			t.Fatalf("failed to create directory %s: %v", d, err)
+		}
 	}
 
 	files := []string{
@@ -267,8 +271,12 @@ src/**/test/
 		"cache/data.bin", "src/cache/temp.bin",
 	}
 	for _, f := range files {
-		os.MkdirAll(filepath.Dir(filepath.Join(tmpDir, f)), 0755)
-		os.WriteFile(filepath.Join(tmpDir, f), []byte("test"), 0644)
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(tmpDir, f)), 0755); err != nil {
+			t.Fatalf("failed to create directory for %s: %v", f, err)
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, f), []byte("test"), 0644); err != nil {
+			t.Fatalf("failed to write file %s: %v", f, err)
+		}
 	}
 
 	// Create matcher
@@ -277,8 +285,11 @@ src/**/test/
 
 	// Check each file with verbose output
 	for _, f := range files {
-		info, _ := os.Stat(filepath.Join(tmpDir, f))
-		isDir := info != nil && info.IsDir()
+		info, err := os.Stat(filepath.Join(tmpDir, f))
+		if err != nil {
+			t.Fatalf("failed to stat file %s: %v", f, err)
+		}
+		isDir := info.IsDir()
 
 		ourResult := m.MatchWithReason(f, isDir)
 		gitResult := gitCheckIgnoreVerbose(tmpDir, f)
@@ -293,8 +304,9 @@ src/**/test/
 }
 
 type gitCheckResult struct {
-	ignored bool
+	pattern string
 	rule    string
+	ignored bool
 }
 
 func gitCheckIgnoreVerbose(repoDir, path string) gitCheckResult {

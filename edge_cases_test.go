@@ -10,62 +10,62 @@ func TestEdgeCases_LineEndings(t *testing.T) {
 		name    string
 		content []byte
 		path    string
-		isDir   bool
 		want    bool
+		isDir   bool
 	}{
 		// CRLF (Windows)
 		{
 			"CRLF line endings",
 			[]byte("*.log\r\nbuild/\r\n"),
 			"test.log",
-			false,
 			true,
+			false,
 		},
 		{
 			"CRLF second pattern dir",
 			[]byte("*.log\r\nbuild/\r\n"),
 			"build",
-			true, // directory pattern needs isDir=true
 			true,
+			true, // directory pattern needs isDir=true
 		},
 		{
 			"CRLF second pattern file inside",
 			[]byte("*.log\r\nbuild/\r\n"),
 			"build/output.js",
-			false, // file inside directory
 			true,
+			false, // file inside directory
 		},
 		// CR only (old Mac)
 		{
 			"CR only line endings",
 			[]byte("*.log\rbuild/\r"),
 			"test.log",
-			false,
 			true,
+			false,
 		},
 		// Mixed line endings
 		{
 			"mixed CRLF and LF",
 			[]byte("*.log\r\n*.tmp\nbuild/\r\n"),
 			"test.tmp",
-			false,
 			true,
+			false,
 		},
 		// No trailing newline
 		{
 			"no trailing newline",
 			[]byte("*.log"),
 			"test.log",
-			false,
 			true,
+			false,
 		},
 		// Multiple blank lines
 		{
 			"multiple blank lines",
 			[]byte("*.log\n\n\n\nbuild/"),
 			"test.log",
-			false,
 			true,
+			false,
 		},
 	}
 
@@ -89,36 +89,36 @@ func TestEdgeCases_BOM(t *testing.T) {
 		name    string
 		content []byte
 		path    string
-		isDir   bool
 		want    bool
+		isDir   bool
 	}{
 		{
 			"BOM at start",
 			append(bom, []byte("*.log\n")...),
 			"test.log",
-			false,
 			true,
+			false,
 		},
 		{
 			"BOM with CRLF",
 			append(bom, []byte("*.log\r\nbuild/\r\n")...),
 			"test.log",
-			false,
 			true,
+			false,
 		},
 		{
 			"BOM only content dir",
 			append(bom, []byte("build/")...),
 			"build",
-			true, // directory pattern needs isDir=true for exact match
 			true,
+			true, // directory pattern needs isDir=true for exact match
 		},
 		{
 			"BOM only content file inside dir",
 			append(bom, []byte("build/")...),
 			"build/output.js",
-			false, // file inside directory
 			true,
+			false, // file inside directory
 		},
 	}
 
@@ -226,46 +226,46 @@ func TestEdgeCases_Whitespace(t *testing.T) {
 // TestEdgeCases_SpecialPatterns tests edge cases in pattern syntax
 func TestEdgeCases_SpecialPatterns(t *testing.T) {
 	tests := []struct {
-		name     string
-		pattern  string
-		path     string
-		isDir    bool
-		want     bool
+		name    string
+		pattern string
+		path    string
+		want    bool
+		isDir   bool
 	}{
 		// Dot files
-		{"hidden file", ".hidden", ".hidden", false, true},
-		{"hidden file nested", ".hidden", "src/.hidden", false, true},
+		{"hidden file", ".hidden", ".hidden", true, false},
+		{"hidden file nested", ".hidden", "src/.hidden", true, false},
 		{"hidden directory", ".cache/", ".cache", true, true},
-		{"hidden directory contents", ".cache/", ".cache/data.bin", false, true},
+		{"hidden directory contents", ".cache/", ".cache/data.bin", true, false},
 
 		// Double dots
-		{"dotdot pattern", "..", "..", false, true},
+		{"dotdot pattern", "..", "..", true, false},
 
 		// Single character
-		{"single char file", "a", "a", false, true},
-		{"single char nested", "a", "dir/a", false, true},
+		{"single char file", "a", "a", true, false},
+		{"single char nested", "a", "dir/a", true, false},
 
 		// Numeric names
-		{"numeric file", "123", "123", false, true},
-		{"numeric with extension", "123.txt", "123.txt", false, true},
+		{"numeric file", "123", "123", true, false},
+		{"numeric with extension", "123.txt", "123.txt", true, false},
 
 		// Stars in various positions
-		{"star only", "*", "anything", false, true},
-		{"double star only", "**", "a/b/c", false, true},
-		{"triple star", "***", "file", false, true}, // treated as wildcard
+		{"star only", "*", "anything", true, false},
+		{"double star only", "**", "a/b/c", true, false},
+		{"triple star", "***", "file", true, false}, // treated as wildcard
 
 		// Consecutive slashes in pattern (normalized)
-		{"double slash pattern", "a//b", "a/b", false, true},
+		{"double slash pattern", "a//b", "a/b", true, false},
 
 		// Pattern with dots
 		{"extension dots", "*.tar.gz", "archive.tar.gz", true, true},
-		{"multiple dots", "file.test.spec.ts", "file.test.spec.ts", false, true},
+		{"multiple dots", "file.test.spec.ts", "file.test.spec.ts", true, false},
 
 		// Wildcards at different positions
-		{"wildcard prefix", "*_test.go", "foo_test.go", false, true},
-		{"wildcard suffix", "test_*", "test_foo", false, true},
-		{"wildcard both", "*test*", "mytestfile", false, true},
-		{"wildcard middle", "a*b", "aXXXb", false, true},
+		{"wildcard prefix", "*_test.go", "foo_test.go", true, false},
+		{"wildcard suffix", "test_*", "test_foo", true, false},
+		{"wildcard both", "*test*", "mytestfile", true, false},
+		{"wildcard middle", "a*b", "aXXXb", true, false},
 	}
 
 	for _, tt := range tests {
@@ -355,11 +355,8 @@ func TestEdgeCases_Negation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := New()
 			m.AddPatterns("", []byte(tt.patterns))
-			isDir := false
 			// Check if path looks like a directory (for this test)
-			if tt.path == "build" || tt.path == "temp/important" {
-				isDir = true
-			}
+			isDir := tt.path == "build" || tt.path == "temp/important"
 			got := m.Match(tt.path, isDir)
 			if got != tt.want {
 				t.Errorf("Match(%q) = %v, want %v\npatterns:\n%s",

@@ -31,6 +31,8 @@ linters:
 
     govet:
       enable-all: true
+      disable:
+        - fieldalignment  # Disable fieldalignment globally (optional alternative)
 
     misspell:
       locale: US
@@ -49,9 +51,14 @@ linters:
       - std-error-handling
     
     rules:
+      # Exclude lll from test files
       - path: _test\.go
         linters:
           - lll
+      
+      # Exclude fieldalignment from test files (anonymous structs in tests)
+      - path: _test\.go
+        text: "fieldalignment"
 
 formatters:
   enable:

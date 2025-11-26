@@ -301,9 +301,9 @@ func TestMatch_NestedGitignore(t *testing.T) {
 		{"src/lib/test.log", true},
 
 		// src patterns only in src/
-		{"test.tmp", false},      // not in src/
-		{"src/test.tmp", true},   // in src/
-		{"src/keep.tmp", false},  // negated in src/
+		{"test.tmp", false},        // not in src/
+		{"src/test.tmp", true},     // in src/
+		{"src/keep.tmp", false},    // negated in src/
 		{"src/lib/test.tmp", true}, // inherited
 
 		// src/lib patterns only in src/lib/
@@ -459,10 +459,10 @@ func TestMatcher_ConcurrentAddAndMatch(t *testing.T) {
 	// Concurrent AddPatterns
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
-		go func(n int) {
+		go func() {
 			defer wg.Done()
 			m.AddPatterns("", []byte("*.log\n"))
-		}(i)
+		}()
 	}
 
 	// Concurrent Match while adding

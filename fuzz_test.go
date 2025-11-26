@@ -267,8 +267,8 @@ func FuzzNormalizeContent(f *testing.F) {
 	})
 }
 
-// FuzzMatchSegments fuzzes segment matching
-func FuzzMatchSegments(f *testing.F) {
+// FuzzSegmentMatching fuzzes segment matching
+func FuzzSegmentMatching(f *testing.F) {
 	// Add seeds for pattern and path combinations
 	f.Add("foo", "foo")
 	f.Add("foo/bar", "foo/bar")

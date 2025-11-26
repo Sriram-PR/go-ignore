@@ -47,7 +47,6 @@ func (ctx *matchContext) tick() bool {
 // caseInsensitive enables case-insensitive matching.
 func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInsensitive bool, maxIter int) bool {
 	// Handle basePath scoping
-	matchPath := path
 	matchSegments := pathSegments
 
 	if r.basePath != "" {
@@ -57,10 +56,9 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInse
 		}
 		// Remove basePath prefix for matching
 		if path == r.basePath {
-			matchPath = ""
 			matchSegments = []string{}
 		} else {
-			matchPath = path[len(r.basePath)+1:] // +1 for the /
+			matchPath := path[len(r.basePath)+1:] // +1 for the /
 			matchSegments = splitPath(matchPath)
 		}
 	}

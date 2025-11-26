@@ -111,22 +111,10 @@ func TestNormalizeContent(t *testing.T) {
 		{"no trailing newline", []byte("*.log"), []byte("*.log")},
 
 		// UTF-8 BOM removal
-		{
-			"with BOM",
-			[]byte{0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'},
-			[]byte("*.log"),
-		},
+		{"with BOM", []byte{0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'}, []byte("*.log")},
 		{"BOM only", []byte{0xEF, 0xBB, 0xBF}, []byte{}},
-		{
-			"BOM with newlines",
-			append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\nbuild/")...),
-			[]byte("*.log\nbuild/"),
-		},
-		{
-			"double BOM",
-			[]byte{0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'},
-			[]byte("*.log"),
-		},
+		{"BOM with newlines", append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\nbuild/")...), []byte("*.log\nbuild/")},
+		{"double BOM", []byte{0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'}, []byte("*.log")},
 
 		// CRLF normalization (Windows)
 		{"CRLF endings", []byte("*.log\r\nbuild/\r\n"), []byte("*.log\nbuild/\n")},
@@ -142,11 +130,7 @@ func TestNormalizeContent(t *testing.T) {
 		{"mixed all", []byte("a\r\nb\rc\n"), []byte("a\nb\nc\n")},
 
 		// BOM with CRLF
-		{
-			"BOM and CRLF",
-			append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\r\nbuild/\r\n")...),
-			[]byte("*.log\nbuild/\n"),
-		},
+		{"BOM and CRLF", append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\r\nbuild/\r\n")...), []byte("*.log\nbuild/\n")},
 
 		// Partial BOM (should not be removed)
 		{"partial BOM 1 byte", []byte{0xEF, 'a', 'b'}, []byte{0xEF, 'a', 'b'}},

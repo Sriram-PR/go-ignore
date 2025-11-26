@@ -72,7 +72,7 @@ Use this checklist before tagging a new release.
      - Contributors
 
 5. **Verify pkg.go.dev**
-   - Visit `https://pkg.go.dev/github.com/yourusername/go-ignore@v0.1.0`
+   - Visit `https://pkg.go.dev/github.com/Sriram-PR/go-ignore@v0.1.0`
    - Verify documentation renders correctly
 
 ## Version History

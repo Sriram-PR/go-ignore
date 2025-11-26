@@ -1,0 +1,79 @@
+# golangci-lint v2 configuration
+# See: https://golangci-lint.run/docs/configuration/
+
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  # Use standard linters as the base
+  default: standard
+  
+  # Enable additional linters
+  enable:
+    - errcheck       # Finds unchecked errors
+    - govet          # Official Go static analyzer
+    - ineffassign    # Finds useless assignments
+    - staticcheck    # Advanced static analysis
+    - unused         # Finds unused code
+    - misspell       # Catches spelling errors in comments
+    - unconvert      # Finds unnecessary type conversions
+    - unparam        # Finds unused function parameters
+    - nakedret       # Warns about naked returns in long functions
+    - prealloc       # Suggests slice preallocation
+    - copyloopvar    # Catches loop variable capture bugs (Go 1.22+)
+    - nolintlint     # Ensures //nolint comments are valid
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+      settings:
+        shadow:
+          strict: true
+
+    misspell:
+      locale: US
+
+    nakedret:
+      max-func-lines: 30
+
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: true
+
+  exclusions:
+    # Use common exclusion presets
+    presets:
+      - comments
+      - std-error-handling
+    
+    # Custom exclusion rules
+    rules:
+      # Ignore long lines in tests
+      - path: _test\.go
+        linters:
+          - lll
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/Sriram-PR/go-ignore
+
+output:
+  formats:
+    - format: colored-line-number
+  sort-order:
+    - linter
+    - file

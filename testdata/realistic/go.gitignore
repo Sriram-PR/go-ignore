@@ -1,0 +1,51 @@
+# Go typical gitignore
+
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+coverage.html
+
+# Binary output directory
+bin/
+dist/
+
+# Vendor directory (if not committed)
+# vendor/
+
+# Go workspace file
+go.work
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug files
+debug
+*.log
+
+# Air live reload
+tmp/
+
+# Local config
+*.local.yaml
+*.local.json
+.env
+.env.local
+
+# Build cache (usually not in repo)
+.cache/

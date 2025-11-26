@@ -1,0 +1,19 @@
+# Simple gitignore patterns for basic testing
+
+# Log files
+*.log
+
+# Build output
+build/
+
+# Dependencies
+node_modules/
+vendor/
+
+# IDE files
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

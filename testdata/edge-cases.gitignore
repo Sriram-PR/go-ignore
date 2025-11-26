@@ -1,0 +1,61 @@
+# Edge cases for robust testing
+
+# Patterns with spaces (valid in gitignore)
+foo bar.txt
+path with spaces/
+
+# Unicode filenames
+日本語.txt
+données/
+Ñoño.log
+
+# Hidden files and directories
+.hidden
+.secret/
+**/.dotfile
+
+# Patterns starting with dot
+.env
+.env.local
+.env.*
+
+# Consecutive stars (not double-star)
+**.log
+foo**.txt
+
+# Trailing spaces (should be trimmed)   
+test.log   
+
+# Leading ./ (should be normalized)
+./local.conf
+
+# Empty negation target (edge case)
+*.bak
+!
+
+# Pattern that looks like comment but isn't (starts with \#)
+# This is a comment
+\#not-a-comment
+
+# Double-star edge cases
+**
+**/
+/**
+/**/
+
+# Single character names
+a
+b/
+
+# Numeric patterns
+123
+456/
+*.123
+
+# Pattern ending with star
+temp*
+cache*
+
+# Multiple extensions
+*.tar.gz
+*.log.old

@@ -1,0 +1,54 @@
+# Complex gitignore patterns testing all supported syntax
+
+# Basic wildcards
+*.log
+*.tmp
+*.bak
+
+# Directory-only patterns (trailing slash)
+build/
+dist/
+out/
+
+# Anchored patterns (leading slash)
+/config.local
+/secrets.json
+
+# Anchored by containing slash
+src/generated/
+lib/vendor/
+
+# Double-star patterns
+**/logs
+**/temp
+**/.cache
+
+# Double-star suffix (everything inside)
+docs/**
+coverage/**
+
+# Double-star middle
+src/**/test
+a/**/b
+
+# Negation patterns
+*.log
+!important.log
+!keep.log
+
+build/
+!build/readme.txt
+
+# Multiple wildcards in segment
+*.min.js
+*.test.go
+test_*.py
+
+# Deep negation
+logs/**
+!logs/keep/
+!logs/keep/**
+
+# Complex combinations
+**/node_modules/**
+!**/node_modules/important/**

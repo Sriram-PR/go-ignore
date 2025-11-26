@@ -1,0 +1,72 @@
+# Binaries (Go builds these)
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of `go build` in module root
+/go-ignore
+
+# Go coverage and profiling
+coverage.out
+coverage.html
+*.prof
+cpu.prof
+mem.prof
+
+# Benchmark output
+benchmark.txt
+*.bench
+
+# Go workspace file (if using multi-module workspace)
+go.work
+go.work.sum
+
+# Dependency directories (vendoring, if used)
+/vendor/
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+.project
+.classpath
+.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Fuzz test corpus and cache
+testdata/fuzz/
+**/testdata/fuzz/
+
+# Generated test fixtures (created by fixtures_gen.go)
+testdata/crlf.gitignore
+testdata/with-bom.gitignore
+testdata/pathological.gitignore
+testdata/realistic/large.gitignore
+
+# Build output directories
+/bin/
+/dist/
+/out/
+
+# Local development
+.env
+.env.local
+*.local

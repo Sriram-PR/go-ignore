@@ -145,11 +145,13 @@ func compareWithGit(t *testing.T, gitignoreContent string, paths []string, creat
 	// Configure git user (required for some git versions)
 	cmd = exec.Command("git", "config", "user.email", "test@test.com")
 	cmd.Dir = tmpDir
-	_ = cmd.Run() // Ignore errors, not all git versions require this
+	//nolint:errcheck // optional config, not all git versions require this
+	cmd.Run()
 
 	cmd = exec.Command("git", "config", "user.name", "Test")
 	cmd.Dir = tmpDir
-	_ = cmd.Run()
+	//nolint:errcheck // optional config
+	cmd.Run()
 
 	// Create .gitignore
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
@@ -241,7 +243,8 @@ func TestGitParity_Verbose(t *testing.T) {
 	// Initialize git repo
 	cmd := exec.Command("git", "init")
 	cmd.Dir = tmpDir
-	_ = cmd.Run()
+	//nolint:errcheck // best effort for verbose test
+	cmd.Run()
 
 	gitignoreContent := `
 # Test patterns
@@ -304,7 +307,6 @@ src/**/test/
 }
 
 type gitCheckResult struct {
-	pattern string
 	rule    string
 	ignored bool
 }

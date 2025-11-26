@@ -12,7 +12,7 @@ import (
 // Normalization steps (applied in order):
 //  1. Convert backslashes to forward slashes (Windows compatibility)
 //  2. Collapse consecutive slashes
-//  3. Remove leading "./" prefix
+//  3. Remove leading "./" prefix (all occurrences for idempotency)
 //  4. Remove trailing slash
 //
 // This function is applied to both patterns (during parsing) and input paths
@@ -26,8 +26,10 @@ func normalizePath(p string) string {
 		p = strings.ReplaceAll(p, "//", "/")
 	}
 
-	// Step 3: Remove leading ./
-	p = strings.TrimPrefix(p, "./")
+	// Step 3: Remove leading ./ (all occurrences for idempotency)
+	for strings.HasPrefix(p, "./") {
+		p = p[2:]
+	}
 
 	// Step 4: Remove trailing slash
 	p = strings.TrimSuffix(p, "/")

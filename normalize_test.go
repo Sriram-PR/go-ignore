@@ -26,7 +26,7 @@ func TestNormalizePath(t *testing.T) {
 		{"leading dot slash", "./foo", "foo"},
 		{"leading dot slash nested", "./foo/bar", "foo/bar"},
 		{"dot slash only", "./", ""},
-		{"multiple leading dot slash", "././foo", "./foo"}, // Only first ./ removed
+		{"multiple leading dot slash", "././foo", "foo"}, // All ./ removed for idempotency
 
 		// Trailing slash removal
 		{"trailing slash", "foo/", "foo"},
@@ -204,6 +204,8 @@ func TestNormalizePathIdempotent(t *testing.T) {
 		"foo/",
 		"foo//bar",
 		".\\foo\\\\bar/",
+		"././foo",
+		"./././bar",
 	}
 
 	for _, p := range paths {

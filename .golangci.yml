@@ -27,7 +27,7 @@ linters:
   settings:
     errcheck:
       check-type-assertions: true
-      check-blank: true
+      check-blank: false  # _ = err is intentional acknowledgment
 
     govet:
       enable-all: true

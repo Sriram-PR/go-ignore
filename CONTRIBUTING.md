@@ -6,11 +6,11 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/go-ignore.git
+   git clone https://github.com/Sriram-PR/go-ignore.git
    cd go-ignore
    ```
 
-2. **Ensure Go 1.21+ is installed**
+2. **Ensure Go 1.25+ is installed**
    ```bash
    go version
    ```

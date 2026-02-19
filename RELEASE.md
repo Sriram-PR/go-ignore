@@ -80,9 +80,9 @@ Use this checklist before tagging a new release.
 ### v0.1.0 (Initial Release)
 
 - Core gitignore pattern matching
-- Support for `*`, `**`, `!`, `/`, trailing `/`
+- Support for `*`, `?`, `**`, `!`, `/`, trailing `/`, `\` escapes
 - Nested .gitignore file support
-- Cross-platform path normalization
+- Platform-aware path normalization (Windows backslash conversion, Unix-correct literal backslash)
 - Thread-safe concurrent access
 - Parse warning diagnostics
 - Match debugging with `MatchWithReason`
@@ -91,4 +91,4 @@ Use this checklist before tagging a new release.
 - Comprehensive test suite
 - Fuzz testing
 - Git parity tests
-- Requires Go 1.24+
+- Requires Go 1.25+

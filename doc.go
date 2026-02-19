@@ -44,15 +44,16 @@
 //   - Leading /: "/debug.log" matches only at base path
 //   - Trailing /: "build/" matches directories only
 //   - Single star: "*.log" matches any .log file
+//   - Question mark: "?.txt" matches any single-character name
 //   - Double star: "**/logs" matches at any depth
 //   - Negation: "!important.log" re-includes a file
+//   - Escapes: "\*", "\?", "\#", "\!" for literal matching
 //
 // # Unsupported Features
 //
 // The following are intentionally not supported:
 //
 //   - Character classes: [abc], [0-9]
-//   - Escape sequences: \!, \#
 //   - .git/info/exclude
 //   - Global gitignore (~/.config/git/ignore)
 //
@@ -60,12 +61,15 @@
 //
 // Input paths are automatically normalized:
 //
-//   - Backslashes converted to forward slashes
+//   - Backslashes converted to forward slashes (Windows only)
 //   - Leading ./ removed
 //   - Trailing / removed
 //   - Consecutive slashes collapsed
 //
-// This means Windows-style paths work correctly:
+// On Windows, backslash paths work transparently:
 //
-//	m.Match("src\\main.go", false)  // works as expected
+//	m.Match("src\\main.go", false)  // works on Windows
+//
+// On Linux/macOS, backslashes are valid filename characters and are not
+// converted. Always use forward slashes for portable code.
 package ignore

@@ -9,9 +9,9 @@ A minimal, zero-dependency Go library for matching file paths against `.gitignor
 ## Features
 
 - **Zero dependencies** — stdlib only
-- **Common gitignore syntax** — `*`, `**`, `!`, `/`, trailing `/`
+- **Common gitignore syntax** — `*`, `?`, `**`, `!`, `/`, trailing `/`, `\` escapes
 - **Nested .gitignore support** — scoped base paths
-- **Cross-platform** — Windows/Unix path normalization
+- **Cross-platform** — Windows backslash normalization, Unix-correct literal backslash
 - **Automatic encoding handling** — UTF-8 BOM, CRLF/CR/LF line endings
 - **Thread-safe** — concurrent access supported
 - **Parse warnings** — malformed pattern diagnostics
@@ -24,7 +24,7 @@ A minimal, zero-dependency Go library for matching file paths against `.gitignor
 go get github.com/Sriram-PR/go-ignore
 ```
 
-Requires Go 1.24 or later.
+Requires Go 1.25 or later.
 
 ## Quick Start
 
@@ -165,14 +165,20 @@ m.AddPatterns("src", srcContent) // warnings include "src" as basePath
 
 ### Windows Path Support
 
+On Windows, backslashes in paths are automatically normalized to forward slashes.
+On Linux/macOS, backslashes are treated as literal filename characters (matching Git's behavior).
+
 ```go
 m := ignore.New()
 m.AddPatterns("", []byte("src/build/\n*.log\n"))
 
-// Backslashes are automatically normalized
-m.Match("src\\build\\output.exe", false)  // true
-m.Match("src\\main.go", false)            // false
-m.Match(".\\test.log", false)             // true
+// On Windows: backslashes are converted to forward slashes
+m.Match("src\\build\\output.exe", false)  // true on Windows
+m.Match("src\\main.go", false)            // false on Windows
+
+// On all platforms: forward slashes always work
+m.Match("src/build/output.exe", false)    // true
+m.Match("src/main.go", false)             // false
 ```
 
 ### Concurrent Usage
@@ -210,6 +216,9 @@ wg.Wait()
 | `!pattern` | Negate previous | Re-includes matched files |
 | `#comment` | Comment line | Ignored |
 | `\#file` | Literal # | Matches `#file` |
+| `\!file` | Literal ! | Matches `!file` |
+| `?.txt` | Single char | `a.txt`, `b.txt` (not `ab.txt`) |
+| `\*` | Literal * | Matches `*` (escaped wildcard) |
 
 ### Pattern Anchoring
 
@@ -224,7 +233,6 @@ wg.Wait()
 The following features are intentionally **not supported**:
 
 - Character classes: `[abc]`, `[0-9]`
-- Escape sequences: `\!`, `\#` (except `\#` at line start)
 - `.git/info/exclude`
 - Global gitignore (`~/.config/git/ignore`)
 
@@ -271,18 +279,22 @@ func (m *Matcher) Match(path string, isDir bool) bool
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult
 func (m *Matcher) SetWarningHandler(fn WarningHandler)
 func (m *Matcher) Warnings() []ParseWarning
+func (m *Matcher) RuleCount() int
 ```
 
 ## Performance
 
-Typical performance on modern hardware:
+Benchmarked on Intel i9-14900HX (Go 1.24, linux/amd64):
 
-| Operation | Time |
-|-----------|------|
-| Simple match | < 500ns |
-| Match with ** pattern | < 5µs |
-| Match against 100 rules | < 10µs |
-| Pathological ** (bounded) | < 1ms |
+| Operation | Time | Allocs |
+|-----------|------|--------|
+| Simple match | ~130–274ns | 2 |
+| Match with `**` (shallow) | ~155ns | 2 |
+| Match with `**` (deep path) | ~785ns | 2 |
+| Match against 100 rules | ~7–12µs | 2 |
+| Pathological `**` (bounded) | ~500–710ns | 2 |
+| Glob matching (no alloc) | ~31–90ns | 0 |
+| Path normalization | ~26ns | 0 |
 
 The library includes backtrack protection (default 10,000 iterations) to prevent pathological patterns from causing excessive CPU usage.
 

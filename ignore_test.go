@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -48,6 +49,28 @@ func TestNewWithOptions_DefaultBacktrack(t *testing.T) {
 	if m.opts.MaxBacktrackIterations != DefaultMaxBacktrackIterations {
 		t.Errorf("MaxBacktrackIterations = %d, want %d (default)",
 			m.opts.MaxBacktrackIterations, DefaultMaxBacktrackIterations)
+	}
+}
+
+func TestMatchWithReason_SharedBacktrackBudget(t *testing.T) {
+	// Verify that all rules share a single backtrack budget per Match call.
+	// With a low limit and many complex rules, the budget should be exhausted
+	// across rules, not reset per rule.
+	m := NewWithOptions(MatcherOptions{
+		MaxBacktrackIterations: 100,
+	})
+
+	// Add many pathological patterns — each would consume significant budget
+	for i := 0; i < 50; i++ {
+		m.AddPatterns("", []byte("*a*a*a*a*b\n"))
+	}
+
+	// Match against a string that won't match but requires backtracking.
+	// With shared budget of 100, this should terminate quickly.
+	// With per-rule budget of 100 * 50 rules = 5000, it would take much longer.
+	result := m.MatchWithReason("aaaaaaaaaa", false)
+	if result.Ignored {
+		t.Error("expected no match for pathological patterns")
 	}
 }
 
@@ -224,6 +247,10 @@ func TestMatch_Basic(t *testing.T) {
 }
 
 func TestMatch_WindowsPaths(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("backslash-to-slash conversion only applies on Windows")
+	}
+
 	m := New()
 	m.AddPatterns("", []byte("*.log\nsrc/build/\n"))
 

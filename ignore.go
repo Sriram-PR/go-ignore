@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"strings"
 	"sync"
 )
 
@@ -22,9 +23,9 @@ type MatchResult struct {
 	// This accounts for negation rules.
 	Ignored bool
 
-	// Matched indicates whether any rule matched the path (before considering negation).
+	// Matched indicates whether any rule matched the path (regardless of negation).
 	// If false, no rules matched and the path is not ignored (default behavior).
-	// If true, at least one rule matched; check Ignored for the final result.
+	// If true, at least one rule matched (including negation rules); check Ignored for the final result.
 	Matched bool
 
 	// Negated indicates whether the matching rule was a negation (started with !).
@@ -106,6 +107,9 @@ func (m *Matcher) SetWarningHandler(fn WarningHandler) {
 //   - CRLF and CR line endings are normalized to LF
 //   - Trailing whitespace on each line is trimmed
 //
+// Both nil and empty content produce no rules. Nil content returns immediately
+// without acquiring locks; empty content goes through parsing (which yields nothing).
+//
 // Returns warnings for malformed patterns. Warnings are only returned if no
 // WarningHandler was set via SetWarningHandler; otherwise warnings go to the handler.
 //
@@ -118,8 +122,26 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 		return nil
 	}
 
+	// Normalize basePath for consistent reporting (parseLines also normalizes
+	// internally for rule scoping; we normalize here so the handler receives
+	// the same basePath that rules store).
+	normalizedBase := normalizeBasePath(basePath)
+
 	// Parse rules (this doesn't need the lock)
 	newRules, parseWarnings := parseLines(basePath, content)
+
+	// Pre-lowercase pattern segment values for case-insensitive matching.
+	// This avoids calling strings.ToLower on every match call.
+	if m.opts.CaseInsensitive {
+		for i := range newRules {
+			for j := range newRules[i].segments {
+				seg := &newRules[i].segments[j]
+				if !seg.doubleStar {
+					seg.value = strings.ToLower(seg.value)
+				}
+			}
+		}
+	}
 
 	// Acquire write lock to add rules and handle warnings
 	m.mu.Lock()
@@ -130,9 +152,9 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 
 	// Handle warnings
 	if m.handler != nil {
-		// Send to handler
+		// Send to handler with normalized basePath (consistent with rule.basePath)
 		for _, w := range parseWarnings {
-			m.handler(basePath, w)
+			m.handler(normalizedBase, w)
 		}
 		return nil
 	}
@@ -158,9 +180,10 @@ func (m *Matcher) Warnings() []ParseWarning {
 }
 
 // Match returns true if the path should be ignored.
-// path should be relative to repository root. Forward slashes are preferred,
-// but backslashes are automatically normalized to forward slashes for safety
-// (Windows compatibility).
+// path should be relative to repository root using forward slashes.
+// On Windows, backslashes are automatically normalized to forward slashes.
+// On Linux/macOS, backslashes are treated as literal filename characters
+// (matching Git's behavior).
 // isDir indicates whether the path is a directory.
 // Thread-safe: can be called concurrently.
 func (m *Matcher) Match(path string, isDir bool) bool {
@@ -191,11 +214,16 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 
 	var result MatchResult
 
+	// Single shared backtrack budget for the entire Match call.
+	// This prevents pathological patterns across many rules from causing
+	// excessive CPU usage — previously each rule got a fresh budget.
+	ctx := newMatchContext(m.opts.MaxBacktrackIterations)
+
 	// Evaluate rules in order (last match wins)
 	for i := range m.rules {
 		r := &m.rules[i]
 
-		if matchRule(r, path, pathSegments, isDir, m.opts.CaseInsensitive, m.opts.MaxBacktrackIterations) {
+		if matchRule(r, path, pathSegments, isDir, m.opts.CaseInsensitive, ctx) {
 			result.Matched = true
 			result.Rule = r.pattern
 			result.BasePath = r.basePath

@@ -79,17 +79,20 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 	// Store original for warning messages
 	original := line
 
-	// Step 4: Handle escaped # at start (\# means literal #)
-	// Note: We only support \# escape, not general escape sequences
-	if strings.HasPrefix(line, "\\#") {
-		line = line[1:] // Remove the backslash, keep the #
-	}
-
-	// Step 5: Check for negation
+	// Step 4: Handle negation and \! escape
+	// \! at start escapes the bang, treating it as literal (not negation).
+	// Must check \! before ! to prevent misinterpreting escaped bangs.
 	negate := false
-	if strings.HasPrefix(line, "!") {
+	if strings.HasPrefix(line, "\\!") {
+		line = line[1:] // Remove backslash, keep literal !
+	} else if strings.HasPrefix(line, "!") {
 		negate = true
 		line = line[1:]
+	}
+
+	// Step 5: Handle \# escape (after negation to support !\#foo)
+	if strings.HasPrefix(line, "\\#") {
+		line = line[1:] // Remove backslash, keep literal #
 	}
 
 	// Step 6: Check for directory-only (trailing /)
@@ -99,8 +102,9 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 		line = strings.TrimSuffix(line, "/")
 	}
 
-	// Step 7: Normalize ./ prefix (Git treats ./foo as foo)
-	line = strings.TrimPrefix(line, "./")
+	// Step 7: No ./ prefix stripping.
+	// Git does NOT normalize ./ in patterns — ./foo matches nothing in git.
+	// Users should not use ./ in patterns; if they do, it will be treated literally.
 
 	// Step 8: Check if pattern is empty after stripping
 	if line == "" {
@@ -108,6 +112,22 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 			Line:    lineNum,
 			Pattern: original,
 			Message: "pattern is empty after processing",
+		}
+	}
+
+	// Step 8b: Trailing backslash is an invalid pattern (per spec, never matches).
+	// Count consecutive trailing backslashes: odd means a lone trailing \.
+	if strings.HasSuffix(line, "\\") {
+		bs := 0
+		for i := len(line) - 1; i >= 0 && line[i] == '\\'; i-- {
+			bs++
+		}
+		if bs%2 == 1 {
+			return nil, &ParseWarning{
+				Line:    lineNum,
+				Pattern: original,
+				Message: "trailing backslash is invalid (pattern never matches)",
+			}
 		}
 	}
 
@@ -165,7 +185,9 @@ func parseSegments(pattern string) []segment {
 		if part == "**" {
 			seg.doubleStar = true
 			seg.value = ""
-		} else if strings.Contains(part, "*") {
+		} else if strings.Contains(part, "*") || strings.Contains(part, "?") || strings.Contains(part, "\\") {
+			// Segments with *, ?, or \ all require glob matching.
+			// Backslash escapes (e.g., \* for literal *) are resolved during matching.
 			seg.wildcard = true
 		}
 
@@ -173,21 +195,6 @@ func parseSegments(pattern string) []segment {
 	}
 
 	return segments
-}
-
-// isDoubleStar checks if a segment is a ** pattern.
-func (s *segment) isDoubleStar() bool {
-	return s.doubleStar
-}
-
-// isWildcard checks if a segment contains wildcards (but is not **).
-func (s *segment) isWildcard() bool {
-	return s.wildcard && !s.doubleStar
-}
-
-// isLiteral checks if a segment is a plain literal (no wildcards).
-func (s *segment) isLiteral() bool {
-	return !s.wildcard && !s.doubleStar
 }
 
 // String returns a debug representation of a rule.
@@ -216,17 +223,3 @@ func (r *rule) String() string {
 	return r.pattern + flagStr + baseStr
 }
 
-// segmentsString returns a debug representation of segments.
-func segmentsString(segs []segment) string {
-	var parts []string
-	for _, s := range segs {
-		if s.doubleStar {
-			parts = append(parts, "**")
-		} else if s.wildcard {
-			parts = append(parts, s.value+"(wild)")
-		} else {
-			parts = append(parts, s.value)
-		}
-	}
-	return strings.Join(parts, "/")
-}

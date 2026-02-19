@@ -1,8 +1,37 @@
 package ignore
 
 import (
+	"strings"
 	"testing"
 )
+
+// Test-only helpers for segment inspection.
+
+func (s *segment) isDoubleStar() bool {
+	return s.doubleStar
+}
+
+func (s *segment) isWildcard() bool {
+	return s.wildcard && !s.doubleStar
+}
+
+func (s *segment) isLiteral() bool {
+	return !s.wildcard && !s.doubleStar
+}
+
+func segmentsString(segs []segment) string {
+	var parts []string
+	for _, s := range segs {
+		if s.doubleStar {
+			parts = append(parts, "**")
+		} else if s.wildcard {
+			parts = append(parts, s.value+"(wild)")
+		} else {
+			parts = append(parts, s.value)
+		}
+	}
+	return strings.Join(parts, "/")
+}
 
 func TestParseLine_Comments(t *testing.T) {
 	tests := []struct {
@@ -195,7 +224,76 @@ func TestParseLine_EscapedHash(t *testing.T) {
 	}
 }
 
+func TestParseLine_EscapedBang(t *testing.T) {
+	tests := []struct {
+		name       string
+		line       string
+		wantNegate bool
+		wantNil    bool
+	}{
+		{"escaped bang", "\\!important.txt", false, false},  // \! = literal !, not negation
+		{"normal negation", "!foo.log", true, false},        // ! = negation
+		{"negated escaped hash", "!\\#foo", true, false},    // ! negation, \# escaped hash
+		{"double bang", "!!foo", true, false},               // First ! is negation
+		{"escaped bang only", "\\!", false, false},            // \! becomes literal "!" — valid pattern
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, w := parseLine(tt.line, 1, "")
+			if tt.wantNil {
+				if r != nil {
+					t.Errorf("parseLine(%q) returned rule, want nil", tt.line)
+				}
+				return
+			}
+			if r == nil {
+				if w != nil {
+					return // warning expected for some edge cases
+				}
+				t.Fatalf("parseLine(%q) returned nil rule", tt.line)
+			}
+			if r.negate != tt.wantNegate {
+				t.Errorf("parseLine(%q).negate = %v, want %v", tt.line, r.negate, tt.wantNegate)
+			}
+		})
+	}
+}
+
+func TestParseLine_EscapedBangMatching(t *testing.T) {
+	// \!important.txt should match a file named "!important.txt"
+	r, _ := parseLine("\\!important.txt", 1, "")
+	if r == nil {
+		t.Fatal("parseLine returned nil")
+	}
+	if r.negate {
+		t.Error("escaped bang should not be treated as negation")
+	}
+	// The segments should contain "!important.txt" (literal)
+	if len(r.segments) != 1 || r.segments[0].value != "!important.txt" {
+		t.Errorf("expected segment '!important.txt', got %v", r.segments)
+	}
+}
+
+func TestParseLine_NegatedEscapedHash(t *testing.T) {
+	// !\#foo should negate the pattern for file "#foo"
+	r, _ := parseLine("!\\#foo", 1, "")
+	if r == nil {
+		t.Fatal("parseLine returned nil")
+	}
+	if !r.negate {
+		t.Error("!\\#foo should be a negation pattern")
+	}
+	// The segments should contain "#foo" (literal hash after escape)
+	if len(r.segments) != 1 || r.segments[0].value != "#foo" {
+		t.Errorf("expected segment '#foo', got %v", r.segments)
+	}
+}
+
 func TestParseLine_DotSlashPrefix(t *testing.T) {
+	// Git does NOT strip ./ from patterns. ./foo in .gitignore matches nothing.
+	// Patterns with ./ are treated literally, which means ./ introduces a / that
+	// triggers anchoring.
 	tests := []struct {
 		name         string
 		line         string
@@ -203,19 +301,16 @@ func TestParseLine_DotSlashPrefix(t *testing.T) {
 		wantSegments int
 		wantDirOnly  bool
 	}{
-		{"dot slash prefix", "./foo", false, 1, false},       // ./ stripped, "foo" not anchored
-		{"dot slash nested", "./foo/bar", true, 2, false},    // ./ stripped, "foo/bar" anchored by /
-		{"no dot slash", "foo", false, 1, false},             // Same as ./foo
-		{"dot slash with leading", "/./foo", true, 2, false}, // / makes it anchored
+		{"dot slash prefix", "./foo", true, 2, false},        // ./ NOT stripped, contains / so anchored, segments: [".", "foo"]
+		{"dot slash nested", "./foo/bar", true, 3, false},    // ./ NOT stripped, anchored by /
+		{"no dot slash", "foo", false, 1, false},             // Plain name, not anchored
+		{"dot slash with leading", "/./foo", true, 2, false}, // / makes it anchored, segments: [".", "foo"]
 
-		// Edge cases - these produce valid (if unusual) patterns
-		// "./" becomes "." after stripping trailing /, then ./ strip doesn't apply
-		// "." is a valid pattern matching a file/directory literally named "."
-		{"dot slash only", "./", false, 1, true}, // becomes "." (dirOnly)
+		// "./" becomes "." after stripping trailing / (dirOnly), "." is a valid pattern
+		{"dot slash only", "./", false, 1, true}, // becomes "." (dirOnly, trailing / stripped)
 
-		// "././foo" -> strip trailing / (none) -> strip ./ -> "./foo"
-		// "./foo" contains "/" so it's anchored, segments: [".", "foo"]
-		{"double dot slash", "././foo", true, 2, false}, // anchored because ./foo contains /
+		// "././foo" contains / so anchored, segments: [".", ".", "foo"]
+		{"double dot slash", "././foo", true, 3, false},
 	}
 
 	for _, tt := range tests {
@@ -287,6 +382,13 @@ func TestParseLine_Warnings(t *testing.T) {
 		{"dot slash only", "./", false},
 		{"negation with slash only", "!/", true},
 		{"valid negation", "!important.log", false},
+		// Trailing backslash is an invalid pattern (per spec)
+		{"trailing backslash", "foo\\", true},
+		{"trailing backslash only", "\\", true},
+		// Double backslash is valid (escaped backslash)
+		{"escaped backslash", "foo\\\\", false},
+		// Triple backslash: \\\\ is \\+\, trailing lone \ is invalid
+		{"triple backslash", "foo\\\\\\", true},
 	}
 
 	for _, tt := range tests {
@@ -404,6 +506,16 @@ func TestParseSegments(t *testing.T) {
 			"consecutive stars not double",
 			"***.log",
 			[]segment{{value: "***.log", wildcard: true}}, // Not a double-star
+		},
+		{
+			"question mark",
+			"?.txt",
+			[]segment{{value: "?.txt", wildcard: true}},
+		},
+		{
+			"question mark mixed",
+			"*?.go",
+			[]segment{{value: "*?.go", wildcard: true}},
 		},
 	}
 

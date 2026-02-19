@@ -2,58 +2,63 @@ package ignore
 
 import (
 	"bytes"
+	"runtime"
 	"testing"
 )
 
 func TestNormalizePath(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  string
+		name        string
+		input       string
+		want        string
+		windowsOnly bool // Skip on non-Windows (backslash is valid on Linux)
 	}{
 		// Basic cases
-		{"empty string", "", ""},
-		{"simple path", "foo/bar", "foo/bar"},
-		{"single file", "file.txt", "file.txt"},
+		{"empty string", "", "", false},
+		{"simple path", "foo/bar", "foo/bar", false},
+		{"single file", "file.txt", "file.txt", false},
 
-		// Backslash conversion (Windows)
-		{"windows backslash", "foo\\bar", "foo/bar"},
-		{"mixed slashes", "foo\\bar/baz", "foo/bar/baz"},
-		{"multiple backslashes", "foo\\bar\\baz", "foo/bar/baz"},
-		{"deep windows path", "a\\b\\c\\d\\e", "a/b/c/d/e"},
+		// Backslash conversion (Windows only — on Linux, \ is a valid filename char)
+		{"windows backslash", "foo\\bar", "foo/bar", true},
+		{"mixed slashes", "foo\\bar/baz", "foo/bar/baz", true},
+		{"multiple backslashes", "foo\\bar\\baz", "foo/bar/baz", true},
+		{"deep windows path", "a\\b\\c\\d\\e", "a/b/c/d/e", true},
 
 		// Leading ./ removal
-		{"leading dot slash", "./foo", "foo"},
-		{"leading dot slash nested", "./foo/bar", "foo/bar"},
-		{"dot slash only", "./", ""},
-		{"multiple leading dot slash", "././foo", "foo"}, // All ./ removed for idempotency
+		{"leading dot slash", "./foo", "foo", false},
+		{"leading dot slash nested", "./foo/bar", "foo/bar", false},
+		{"dot slash only", "./", "", false},
+		{"multiple leading dot slash", "././foo", "foo", false}, // All ./ removed for idempotency
 
 		// Trailing slash removal
-		{"trailing slash", "foo/", "foo"},
-		{"trailing slash nested", "foo/bar/", "foo/bar"},
-		{"only slash", "/", ""},
+		{"trailing slash", "foo/", "foo", false},
+		{"trailing slash nested", "foo/bar/", "foo/bar", false},
+		{"only slash", "/", "", false},
 
 		// Double slash collapse
-		{"double slash", "foo//bar", "foo/bar"},
-		{"triple slash", "foo///bar", "foo/bar"},
-		{"multiple double slashes", "foo//bar//baz", "foo/bar/baz"},
-		{"leading double slash", "//foo", "/foo"},
+		{"double slash", "foo//bar", "foo/bar", false},
+		{"triple slash", "foo///bar", "foo/bar", false},
+		{"multiple double slashes", "foo//bar//baz", "foo/bar/baz", false},
+		{"leading double slash", "//foo", "/foo", false},
 
-		// Combined cases
-		{"windows with trailing", "foo\\bar\\", "foo/bar"},
-		{"dot slash with backslash", ".\\foo\\bar", "foo/bar"},
-		{"all combined", ".\\foo\\\\bar/baz//qux/", "foo/bar/baz/qux"},
+		// Combined cases (Windows only due to backslash conversion)
+		{"windows with trailing", "foo\\bar\\", "foo/bar", true},
+		{"dot slash with backslash", ".\\foo\\bar", "foo/bar", true},
+		{"all combined", ".\\foo\\\\bar/baz//qux/", "foo/bar/baz/qux", true},
 
 		// Edge cases
-		{"just dot", ".", "."},
-		{"dot dot", "..", ".."},
-		{"dot in middle", "foo/./bar", "foo/./bar"}, // Only leading ./ is removed
-		{"hidden file", ".gitignore", ".gitignore"},
-		{"hidden dir", ".git/config", ".git/config"},
+		{"just dot", ".", ".", false},
+		{"dot dot", "..", "..", false},
+		{"dot in middle", "foo/./bar", "foo/./bar", false}, // Only leading ./ is removed
+		{"hidden file", ".gitignore", ".gitignore", false},
+		{"hidden dir", ".git/config", ".git/config", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.windowsOnly && runtime.GOOS != "windows" {
+				t.Skip("backslash conversion only applies on Windows")
+			}
 			got := normalizePath(tt.input)
 			if got != tt.want {
 				t.Errorf("normalizePath(%q) = %q, want %q", tt.input, got, tt.want)
@@ -64,30 +69,34 @@ func TestNormalizePath(t *testing.T) {
 
 func TestNormalizeBasePath(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  string
+		name        string
+		input       string
+		want        string
+		windowsOnly bool
 	}{
 		// Empty is repository root
-		{"empty string", "", ""},
+		{"empty string", "", "", false},
 
 		// Basic normalization
-		{"simple path", "src", "src"},
-		{"nested path", "src/lib", "src/lib"},
+		{"simple path", "src", "src", false},
+		{"nested path", "src/lib", "src/lib", false},
 
 		// Trailing slash removed
-		{"trailing slash", "src/", "src"},
+		{"trailing slash", "src/", "src", false},
 
-		// Backslash conversion
-		{"windows path", "src\\lib", "src/lib"},
-		{"windows with trailing", "src\\lib\\", "src/lib"},
+		// Backslash conversion (Windows only)
+		{"windows path", "src\\lib", "src/lib", true},
+		{"windows with trailing", "src\\lib\\", "src/lib", true},
 
 		// Leading ./ removed
-		{"leading dot slash", "./src", "src"},
+		{"leading dot slash", "./src", "src", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.windowsOnly && runtime.GOOS != "windows" {
+				t.Skip("backslash conversion only applies on Windows")
+			}
 			got := normalizeBasePath(tt.input)
 			if got != tt.want {
 				t.Errorf("normalizeBasePath(%q) = %q, want %q", tt.input, got, tt.want)
@@ -184,6 +193,14 @@ func TestTrimTrailingWhitespace(t *testing.T) {
 		// Only whitespace
 		{"only spaces", "   ", ""},
 		{"only tabs", "\t\t", ""},
+
+		// Backslash-escaped trailing spaces (git spec)
+		{"escaped trailing space", "foo\\ ", "foo "},          // \<space> preserved, backslash removed
+		{"escaped space then more", "foo\\   ", "foo "},       // \<space> preserved, extra spaces stripped
+		{"double backslash space", "foo\\\\ ", "foo\\\\"},     // \\ = literal \, trailing space unescaped
+		{"triple backslash space", "foo\\\\\\ ", "foo\\\\ "}, // \\\ = literal \ + escaped space
+		{"backslash no space", "foo\\", "foo\\"},              // No trailing space, nothing to do
+		{"backslash tab", "foo\\\t", "foo\\"},                 // Backslash before tab doesn't escape
 	}
 
 	for _, tt := range tests {
@@ -200,13 +217,16 @@ func TestTrimTrailingWhitespace(t *testing.T) {
 func TestNormalizePathIdempotent(t *testing.T) {
 	paths := []string{
 		"foo/bar",
-		"foo\\bar",
 		"./foo",
 		"foo/",
 		"foo//bar",
-		".\\foo\\\\bar/",
 		"././foo",
 		"./././bar",
+	}
+
+	// Backslash paths are only meaningful on Windows
+	if runtime.GOOS == "windows" {
+		paths = append(paths, "foo\\bar", ".\\foo\\\\bar/")
 	}
 
 	for _, p := range paths {

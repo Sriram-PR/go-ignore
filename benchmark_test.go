@@ -300,17 +300,17 @@ src/**/test/
 func BenchmarkMatchGlob(b *testing.B) {
 	b.Run("simple", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			matchGlob("*.log", "test.log")
+			matchGlob("*.log", "test.log", newMatchContext(0))
 		}
 	})
 	b.Run("prefix", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			matchGlob("test_*", "test_foo_bar")
+			matchGlob("test_*", "test_foo_bar", newMatchContext(0))
 		}
 	})
 	b.Run("complex", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			matchGlob("*test*spec*", "my_test_file_spec_v2")
+			matchGlob("*test*spec*", "my_test_file_spec_v2", newMatchContext(0))
 		}
 	})
 }

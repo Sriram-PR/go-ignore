@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"runtime"
 	"testing"
 )
 
@@ -164,7 +165,7 @@ func FuzzGlob(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, pattern, s string) {
 		// Should never panic
-		_ = matchGlob(pattern, s)
+		_ = matchGlob(pattern, s, newMatchContext(0))
 	})
 }
 
@@ -201,10 +202,13 @@ func FuzzNormalizePath(f *testing.F) {
 			t.Errorf("normalizePath not idempotent: %q -> %q -> %q", path, result, result2)
 		}
 
-		// Result should not contain backslashes
-		for i := 0; i < len(result); i++ {
-			if result[i] == '\\' {
-				t.Errorf("result contains backslash at position %d", i)
+		// On Windows, result should not contain backslashes (they get converted).
+		// On Linux, backslashes are valid and preserved.
+		if runtime.GOOS == "windows" {
+			for i := 0; i < len(result); i++ {
+				if result[i] == '\\' {
+					t.Errorf("result contains backslash at position %d", i)
+				}
 			}
 		}
 
@@ -284,7 +288,7 @@ func FuzzSegmentMatching(f *testing.F) {
 
 		// Should never panic
 		ctx := newMatchContext(1000) // Limit iterations for fuzzing
-		_ = matchSegments_(segments, pathSegs, ctx, false)
+		_ = matchSegmentsExact(segments, pathSegs, ctx, false)
 	})
 }
 

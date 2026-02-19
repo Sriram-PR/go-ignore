@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"runtime"
 	"testing"
 )
 
@@ -503,20 +504,24 @@ func TestEdgeCases_RuleOrder(t *testing.T) {
 // TestEdgeCases_BasePathNormalization tests basePath handling
 func TestEdgeCases_BasePathNormalization(t *testing.T) {
 	tests := []struct {
-		name     string
-		basePath string
-		pattern  string
-		path     string
-		want     bool
+		name        string
+		basePath    string
+		pattern     string
+		path        string
+		want        bool
+		windowsOnly bool
 	}{
-		{"basePath with trailing slash", "src/", "*.log", "src/test.log", true},
-		{"basePath with backslash", "src\\lib", "*.log", "src/lib/test.log", true},
-		{"basePath with leading dot-slash", "./src", "*.log", "src/test.log", true},
-		{"empty basePath", "", "*.log", "test.log", true},
+		{"basePath with trailing slash", "src/", "*.log", "src/test.log", true, false},
+		{"basePath with backslash", "src\\lib", "*.log", "src/lib/test.log", true, true},
+		{"basePath with leading dot-slash", "./src", "*.log", "src/test.log", true, false},
+		{"empty basePath", "", "*.log", "test.log", true, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.windowsOnly && runtime.GOOS != "windows" {
+				t.Skip("backslash conversion only applies on Windows")
+			}
 			m := New()
 			m.AddPatterns(tt.basePath, []byte(tt.pattern+"\n"))
 			got := m.Match(tt.path, false)

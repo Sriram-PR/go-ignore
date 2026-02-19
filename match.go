@@ -4,12 +4,11 @@ import (
 	"strings"
 )
 
-// DefaultMaxBacktrackIterations is the default limit for ** pattern matching.
+// DefaultMaxBacktrackIterations is the default limit for pattern matching iterations.
 // This prevents pathological patterns from causing excessive CPU usage.
+// The budget is shared across all rules for a single Match call and covers both
+// segment-level ** matching and character-level glob matching (*, ?).
 // Can be overridden via MatcherOptions.
-//
-// Note: This is a global limit, not scaled by pattern complexity. Patterns with
-// multiple ** segments (e.g., a/**/b/**/c/**/d) may hit this limit on deep trees.
 const DefaultMaxBacktrackIterations = 10000
 
 // matchContext tracks state during matching to prevent runaway backtracking.
@@ -45,7 +44,13 @@ func (ctx *matchContext) tick() bool {
 // pathSegments is the path split by "/".
 // isDir indicates whether the path is a directory.
 // caseInsensitive enables case-insensitive matching.
-func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInsensitive bool, maxIter int) bool {
+// ctx is the shared backtrack budget for the entire Match call.
+func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInsensitive bool, ctx *matchContext) bool {
+	// Check if we've already exhausted the budget
+	if !ctx.tick() {
+		return false
+	}
+
 	// Handle basePath scoping
 	matchSegments := pathSegments
 
@@ -78,16 +83,14 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInse
 	// Handle anchored vs floating patterns
 	if r.anchored {
 		// Anchored: must match from the start
-		ctx := newMatchContext(maxIter)
 		if prefixMatch {
 			return matchSegmentsPrefix(r.segments, matchSegments, ctx, caseInsensitive)
 		}
-		return matchSegments_(r.segments, matchSegments, ctx, caseInsensitive)
+		return matchSegmentsExact(r.segments, matchSegments, ctx, caseInsensitive)
 	}
 
 	// Floating: can match at any position in path
 	// Try matching starting from each position
-	ctx := newMatchContext(maxIter)
 	maxStart := len(matchSegments) - len(r.segments)
 	if prefixMatch {
 		// For prefix matching, we can start later since we don't need exact length
@@ -97,35 +100,32 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInse
 		if !ctx.tick() {
 			return false // Limit exceeded
 		}
-		subCtx := newMatchContext(maxIter - ctx.iterations)
 		if prefixMatch {
-			if matchSegmentsPrefix(r.segments, matchSegments[i:], subCtx, caseInsensitive) {
+			if matchSegmentsPrefix(r.segments, matchSegments[i:], ctx, caseInsensitive) {
 				return true
 			}
 		} else {
-			if matchSegments_(r.segments, matchSegments[i:], subCtx, caseInsensitive) {
+			if matchSegmentsExact(r.segments, matchSegments[i:], ctx, caseInsensitive) {
 				return true
 			}
 		}
-		ctx.iterations += subCtx.iterations
 	}
 
 	// Special case: pattern with ** can match even if more segments than path
 	// e.g., pattern "**/foo" with 1 segment can match path "foo" with 1 segment
 	if len(r.segments) > 0 && r.segments[0].doubleStar {
-		ctx := newMatchContext(maxIter)
 		if prefixMatch {
 			return matchSegmentsPrefix(r.segments, matchSegments, ctx, caseInsensitive)
 		}
-		return matchSegments_(r.segments, matchSegments, ctx, caseInsensitive)
+		return matchSegmentsExact(r.segments, matchSegments, ctx, caseInsensitive)
 	}
 
 	return false
 }
 
-// matchSegments_ recursively matches pattern segments against path segments.
+// matchSegmentsExact recursively matches pattern segments against path segments.
 // This is the core matching algorithm with ** support.
-func matchSegments_(pattern []segment, path []string, ctx *matchContext, caseInsensitive bool) bool {
+func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, caseInsensitive bool) bool {
 	// Check iteration limit
 	if !ctx.tick() {
 		return false
@@ -143,7 +143,7 @@ func matchSegments_(pattern []segment, path []string, ctx *matchContext, caseIns
 		// ** can match zero or more path segments
 		// Try matching remaining pattern against path starting at each position
 		for i := 0; i <= len(path); i++ {
-			if matchSegments_(pattern[1:], path[i:], ctx, caseInsensitive) {
+			if matchSegmentsExact(pattern[1:], path[i:], ctx, caseInsensitive) {
 				return true
 			}
 			if !ctx.tick() {
@@ -159,16 +159,16 @@ func matchSegments_(pattern []segment, path []string, ctx *matchContext, caseIns
 	}
 
 	// Match current segment
-	if !matchSingleSegment(seg, path[0], caseInsensitive) {
+	if !matchSingleSegment(seg, path[0], caseInsensitive, ctx) {
 		return false
 	}
 
 	// Recurse for remaining segments
-	return matchSegments_(pattern[1:], path[1:], ctx, caseInsensitive)
+	return matchSegmentsExact(pattern[1:], path[1:], ctx, caseInsensitive)
 }
 
 // matchSegmentsPrefix matches pattern as a PREFIX of path.
-// Unlike matchSegments_, this allows the path to have additional segments
+// Unlike matchSegmentsExact, this allows the path to have additional segments
 // after the pattern is fully matched. Used for directory patterns matching
 // files inside the directory.
 func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, caseInsensitive bool) bool {
@@ -207,7 +207,7 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, ca
 	}
 
 	// Match current segment
-	if !matchSingleSegment(seg, path[0], caseInsensitive) {
+	if !matchSingleSegment(seg, path[0], caseInsensitive, ctx) {
 		return false
 	}
 
@@ -216,16 +216,19 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, ca
 }
 
 // matchSingleSegment matches a single pattern segment against a path segment.
-// Handles literal strings and * wildcards.
-func matchSingleSegment(seg segment, pathSeg string, caseInsensitive bool) bool {
+// Handles literal strings, * wildcards, ? wildcards, and \ escapes.
+// The matchContext is shared with the caller so glob-level backtracking
+// counts against the same budget as segment-level matching.
+func matchSingleSegment(seg segment, pathSeg string, caseInsensitive bool, ctx *matchContext) bool {
 	if seg.doubleStar {
-		// ** shouldn't reach here; handled in matchSegments_
+		// ** shouldn't reach here; handled in matchSegmentsExact
 		return true
 	}
 
 	pattern := seg.value
 	if caseInsensitive {
-		pattern = strings.ToLower(pattern)
+		// Pattern values are pre-lowercased at AddPatterns time,
+		// so only the path segment needs lowering here.
 		pathSeg = strings.ToLower(pathSeg)
 	}
 
@@ -234,16 +237,18 @@ func matchSingleSegment(seg segment, pathSeg string, caseInsensitive bool) bool 
 		return pattern == pathSeg
 	}
 
-	// Wildcard matching (glob-style *)
-	return matchGlob(pattern, pathSeg)
+	// Wildcard matching (glob-style *, ?, \)
+	return matchGlob(pattern, pathSeg, ctx)
 }
 
 // matchGlob matches a glob pattern against a string.
-// Supports * as "match zero or more characters".
-// Does not support ? or character classes.
-func matchGlob(pattern, s string) bool {
-	// Fast path: no wildcards
-	if !strings.Contains(pattern, "*") {
+// Supports * as "match zero or more characters" and ? as "match exactly one character".
+// Backtracking is bounded by the shared matchContext.
+func matchGlob(pattern, s string, ctx *matchContext) bool {
+	hasWild := strings.ContainsAny(pattern, "*?\\")
+
+	// Fast path: no wildcards or escapes
+	if !hasWild {
 		return pattern == s
 	}
 
@@ -252,26 +257,38 @@ func matchGlob(pattern, s string) bool {
 		return true
 	}
 
-	// Fast path: prefix* pattern
-	if strings.Count(pattern, "*") == 1 && strings.HasSuffix(pattern, "*") {
-		prefix := pattern[:len(pattern)-1]
-		return strings.HasPrefix(s, prefix)
-	}
+	// Fast paths only apply when there are no ? wildcards and no \ escapes
+	hasEscape := strings.Contains(pattern, "\\")
+	hasQuestion := strings.Contains(pattern, "?")
+	if !hasQuestion && !hasEscape {
+		// Fast path: prefix* pattern
+		if strings.Count(pattern, "*") == 1 && strings.HasSuffix(pattern, "*") {
+			prefix := pattern[:len(pattern)-1]
+			return strings.HasPrefix(s, prefix)
+		}
 
-	// Fast path: *suffix pattern
-	if strings.Count(pattern, "*") == 1 && strings.HasPrefix(pattern, "*") {
-		suffix := pattern[1:]
-		return strings.HasSuffix(s, suffix)
+		// Fast path: *suffix pattern
+		if strings.Count(pattern, "*") == 1 && strings.HasPrefix(pattern, "*") {
+			suffix := pattern[1:]
+			return strings.HasSuffix(s, suffix)
+		}
 	}
 
 	// General case: use recursive matching
-	return matchGlobRecursive(pattern, s)
+	return matchGlobRecursive(pattern, s, ctx)
 }
 
 // matchGlobRecursive performs recursive glob matching.
-// This handles patterns with multiple * wildcards like "foo*bar*baz".
-func matchGlobRecursive(pattern, s string) bool {
+// This handles patterns with * (zero or more chars), ? (exactly one char),
+// and \ (escape next character for literal matching).
+// Backtracking is bounded by the shared matchContext to prevent pathological
+// patterns (e.g., *a*a*a*a*b) from causing excessive CPU usage.
+func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 	for len(pattern) > 0 {
+		if !ctx.tick() {
+			return false // Backtrack limit exceeded
+		}
+
 		if pattern[0] == '*' {
 			// Skip consecutive stars
 			for len(pattern) > 0 && pattern[0] == '*' {
@@ -283,11 +300,30 @@ func matchGlobRecursive(pattern, s string) bool {
 			}
 			// Try matching * with increasing number of characters
 			for i := 0; i <= len(s); i++ {
-				if matchGlobRecursive(pattern, s[i:]) {
+				if matchGlobRecursive(pattern, s[i:], ctx) {
 					return true
+				}
+				if !ctx.tick() {
+					return false
 				}
 			}
 			return false
+		}
+
+		if pattern[0] == '?' {
+			// ? matches exactly one character
+			if len(s) == 0 {
+				return false
+			}
+			pattern = pattern[1:]
+			s = s[1:]
+			continue
+		}
+
+		if pattern[0] == '\\' && len(pattern) > 1 {
+			// Backslash escapes the next character (literal match)
+			pattern = pattern[1:] // skip the backslash
+			// Fall through to literal character comparison below
 		}
 
 		// No more string to match

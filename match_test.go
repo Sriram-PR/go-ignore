@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -23,7 +24,7 @@ func TestMatchSingleSegment_Literal(t *testing.T) {
 
 	for _, tt := range tests {
 		seg := segment{value: tt.pattern, wildcard: false}
-		got := matchSingleSegment(seg, tt.input, false)
+		got := matchSingleSegment(seg, tt.input, false, newMatchContext(0))
 		if got != tt.want {
 			t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
 				tt.pattern, tt.input, got, tt.want)
@@ -84,7 +85,7 @@ func TestMatchSingleSegment_Wildcard(t *testing.T) {
 
 	for _, tt := range tests {
 		seg := segment{value: tt.pattern, wildcard: true}
-		got := matchSingleSegment(seg, tt.input, false)
+		got := matchSingleSegment(seg, tt.input, false, newMatchContext(0))
 		if got != tt.want {
 			t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
 				tt.pattern, tt.input, got, tt.want)
@@ -118,8 +119,13 @@ func TestMatchSingleSegment_CaseInsensitive(t *testing.T) {
 
 	for _, tt := range tests {
 		wildcard := containsWildcard(tt.pattern)
-		seg := segment{value: tt.pattern, wildcard: wildcard}
-		got := matchSingleSegment(seg, tt.input, tt.caseInsensitive)
+		value := tt.pattern
+		if tt.caseInsensitive {
+			// Simulate AddPatterns pre-lowercasing
+			value = strings.ToLower(value)
+		}
+		seg := segment{value: value, wildcard: wildcard}
+		got := matchSingleSegment(seg, tt.input, tt.caseInsensitive, newMatchContext(0))
 		if got != tt.want {
 			t.Errorf("matchSingleSegment(%q, %q, caseInsensitive=%v) = %v, want %v",
 				tt.pattern, tt.input, tt.caseInsensitive, got, tt.want)
@@ -191,10 +197,48 @@ func TestMatchGlob(t *testing.T) {
 		{"a*b*c", "abc", true},
 		{"a*b*c", "aXbYc", true},
 		{"a*b*c", "aXbYcZ", false},
+
+		// ? wildcard (matches exactly one character)
+		{"?", "a", true},
+		{"?", "", false},
+		{"?", "ab", false},
+		{"?.txt", "a.txt", true},
+		{"?.txt", "ab.txt", false},
+		{"?.txt", ".txt", false},
+		{"foo?", "foob", true},
+		{"foo?", "foo", false},
+		{"f?o", "fao", true},
+		{"f?o", "fo", false},
+		{"f?o", "fabo", false},
+		{"???", "abc", true},
+		{"???", "ab", false},
+		{"???", "abcd", false},
+
+		// Mixed * and ?
+		{"*?.log", "a.log", true},
+		{"*?.log", "abc.log", true},
+		{"*?.log", ".log", false},    // ? requires at least one char
+		{"?*", "a", true},            // ? matches one, * matches zero
+		{"?*", "abc", true},          // ? matches one, * matches two
+		{"?*", "", false},            // ? requires at least one char
+		{"?*?", "ab", true},         // ? matches one each side, * matches zero
+		{"?*?", "a", false},         // Need at least 2 chars
+
+		// Backslash escaping
+		{"\\*", "*", true},           // \* matches literal *
+		{"\\*", "a", false},          // \* does not match regular char
+		{"\\?", "?", true},           // \? matches literal ?
+		{"\\?", "a", false},          // \? does not match regular char
+		{"\\\\", "\\", true},         // \\ matches literal backslash
+		{"\\\\", "a", false},         // \\ does not match regular char
+		{"foo\\*bar", "foo*bar", true},  // Escaped * in middle
+		{"foo\\*bar", "fooXbar", false}, // Escaped * is literal, not wildcard
+		{"\\*.txt", "*.txt", true},      // Escaped * then literal
+		{"\\*.txt", "a.txt", false},     // Escaped * is literal
 	}
 
 	for _, tt := range tests {
-		got := matchGlob(tt.pattern, tt.s)
+		got := matchGlob(tt.pattern, tt.s, newMatchContext(0))
 		if got != tt.want {
 			t.Errorf("matchGlob(%q, %q) = %v, want %v",
 				tt.pattern, tt.s, got, tt.want)
@@ -268,9 +312,9 @@ func TestMatchSegments_Simple(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newMatchContext(0)
-			got := matchSegments_(tt.pattern, tt.path, ctx, false)
+			got := matchSegmentsExact(tt.pattern, tt.path, ctx, false)
 			if got != tt.want {
-				t.Errorf("matchSegments_() = %v, want %v", got, tt.want)
+				t.Errorf("matchSegmentsExact() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -398,9 +442,9 @@ func TestMatchSegments_DoubleStar(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := newMatchContext(0)
-			got := matchSegments_(tt.pattern, tt.path, ctx, false)
+			got := matchSegmentsExact(tt.pattern, tt.path, ctx, false)
 			if got != tt.want {
-				t.Errorf("matchSegments_() = %v, want %v", got, tt.want)
+				t.Errorf("matchSegmentsExact() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -459,7 +503,7 @@ func TestMatchRule_Basic(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, false, 0)
+			got := matchRule(r, path, pathSegs, tt.isDir, false, newMatchContext(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q, isDir=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.isDir, got, tt.want)
@@ -503,7 +547,7 @@ func TestMatchRule_BasePath(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, false, false, 0)
+			got := matchRule(r, path, pathSegs, false, false, newMatchContext(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, basePath=%q, path=%q) = %v, want %v",
 					tt.pattern, tt.basePath, tt.path, got, tt.want)
@@ -553,9 +597,27 @@ func TestMatchRule_PathologicalPattern(t *testing.T) {
 	pathSegs := splitPath(path)
 
 	// Should complete without hanging (due to backtrack limit)
-	got := matchRule(r, path, pathSegs, false, false, 1000)
+	got := matchRule(r, path, pathSegs, false, false, newMatchContext(1000))
 	if got {
 		t.Error("expected no match for pathological pattern")
+	}
+}
+
+func TestMatchGlob_PathologicalPattern(t *testing.T) {
+	// Pathological glob pattern that causes exponential backtracking without limits.
+	// Pattern *a*a*a*a*b against a string of only 'a's has no match but
+	// requires exploring an exponential number of branches.
+	pattern := "*a*a*a*a*a*a*b"
+	s := "aaaaaaaaaaaaaaaaaaaaaaaa" // 24 a's, no b — no match possible
+
+	ctx := newMatchContext(500) // Low limit to verify it terminates
+	got := matchGlob(pattern, s, ctx)
+	if got {
+		t.Error("expected no match for pathological glob pattern")
+	}
+	// Verify the limit was actually hit (not just a fast rejection)
+	if ctx.iterations < 100 {
+		t.Errorf("expected significant iteration count, got %d", ctx.iterations)
 	}
 }
 
@@ -581,9 +643,17 @@ func TestMatchRule_CaseInsensitive(t *testing.T) {
 			if r == nil {
 				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
 			}
+			// Simulate AddPatterns pre-lowercasing
+			if tt.caseInsensitive {
+				for i := range r.segments {
+					if !r.segments[i].doubleStar {
+						r.segments[i].value = strings.ToLower(r.segments[i].value)
+					}
+				}
+			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, false, tt.caseInsensitive, 0)
+			got := matchRule(r, path, pathSegs, false, tt.caseInsensitive, newMatchContext(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q, caseInsensitive=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.caseInsensitive, got, tt.want)
@@ -670,10 +740,46 @@ func TestMatchRule_DirectoryContents(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, false, 0)
+			got := matchRule(r, path, pathSegs, tt.isDir, false, newMatchContext(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q, isDir=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.isDir, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestMatchRule_EscapedWildcards tests that escaped wildcards match literally
+func TestMatchRule_EscapedWildcards(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+		path    string
+		want    bool
+	}{
+		// \* matches literal asterisk in filename
+		{"escaped star matches", "\\*.txt", "*.txt", true},
+		{"escaped star no wildcard", "\\*.txt", "foo.txt", false},
+		// \? matches literal question mark
+		{"escaped question matches", "\\?.txt", "?.txt", true},
+		{"escaped question no single", "\\?.txt", "a.txt", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, w := parseLine(tt.pattern, 1, "")
+			if w != nil {
+				t.Fatalf("parseLine(%q) warning: %v", tt.pattern, w)
+			}
+			if r == nil {
+				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
+			}
+			path := normalizePath(tt.path)
+			pathSegs := splitPath(path)
+			got := matchRule(r, path, pathSegs, false, false, newMatchContext(0))
+			if got != tt.want {
+				t.Errorf("matchRule(%q, %q) = %v, want %v",
+					tt.pattern, tt.path, got, tt.want)
 			}
 		})
 	}
@@ -732,7 +838,7 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, false, 0)
+			got := matchRule(r, path, pathSegs, tt.isDir, false, newMatchContext(0))
 			if got != tt.want {
 				t.Errorf("pattern %q, path %q: got %v, want %v",
 					tt.pattern, tt.path, got, tt.want)
@@ -743,13 +849,13 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 
 func BenchmarkMatchGlob_Simple(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		matchGlob("*.log", "test.log")
+		matchGlob("*.log", "test.log", newMatchContext(0))
 	}
 }
 
 func BenchmarkMatchGlob_Complex(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		matchGlob("*test*spec*.go", "my_test_spec_file.go")
+		matchGlob("*test*spec*.go", "my_test_spec_file.go", newMatchContext(0))
 	}
 }
 
@@ -759,7 +865,7 @@ func BenchmarkMatchSegments_Simple(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ctx := newMatchContext(0)
-		matchSegments_(pattern, path, ctx, false)
+		matchSegmentsExact(pattern, path, ctx, false)
 	}
 }
 
@@ -769,6 +875,6 @@ func BenchmarkMatchSegments_DoubleStar(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ctx := newMatchContext(0)
-		matchSegments_(pattern, path, ctx, false)
+		matchSegmentsExact(pattern, path, ctx, false)
 	}
 }

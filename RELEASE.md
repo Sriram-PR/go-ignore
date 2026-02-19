@@ -77,6 +77,15 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.2.5
+
+- Global gitignore support via `AddGlobalPatterns()` — resolves `core.excludesFile`, `$XDG_CONFIG_HOME/git/ignore`, or `~/.config/git/ignore`
+
+### v0.2.0
+
+- Spec compliance fixes and backtrack protection improvements
+- Documentation and CI updates for Go 1.25+
+
 ### v0.1.0 (Initial Release)
 
 - Core gitignore pattern matching

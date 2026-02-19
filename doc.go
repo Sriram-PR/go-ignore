@@ -49,13 +49,22 @@
 //   - Negation: "!important.log" re-includes a file
 //   - Escapes: "\*", "\?", "\#", "\!" for literal matching
 //
+// # Global Gitignore
+//
+// Load the user's global gitignore file (core.excludesFile or
+// ~/.config/git/ignore) with a single call:
+//
+//	m := ignore.New()
+//	if err := m.AddGlobalPatterns(); err != nil {
+//	    log.Fatal(err)
+//	}
+//
 // # Unsupported Features
 //
 // The following are intentionally not supported:
 //
 //   - Character classes: [abc], [0-9]
 //   - .git/info/exclude
-//   - Global gitignore (~/.config/git/ignore)
 //
 // # Path Normalization
 //

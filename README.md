@@ -201,6 +201,27 @@ for _, path := range paths {
 wg.Wait()
 ```
 
+### Global Gitignore
+
+Load the user's global gitignore file (`core.excludesFile` or `~/.config/git/ignore`) with a single call:
+
+```go
+m := ignore.New()
+
+// Load global patterns (core.excludesFile → $XDG_CONFIG_HOME/git/ignore → ~/.config/git/ignore)
+if err := m.AddGlobalPatterns(); err != nil {
+    log.Fatal(err)
+}
+
+// Then load repo-level .gitignore as usual
+content, _ := os.ReadFile(".gitignore")
+m.AddPatterns("", content)
+
+m.Match("debug.log", false) // may be ignored by global patterns
+```
+
+If the global gitignore file does not exist, `AddGlobalPatterns` returns nil (no error).
+
 ## Supported Syntax
 
 | Pattern | Meaning | Example Matches |
@@ -234,7 +255,6 @@ The following features are intentionally **not supported**:
 
 - Character classes: `[abc]`, `[0-9]`
 - `.git/info/exclude`
-- Global gitignore (`~/.config/git/ignore`)
 
 The library does **not** automatically ignore `.git/` — add it explicitly if needed.
 
@@ -275,6 +295,7 @@ func New() *Matcher
 func NewWithOptions(opts MatcherOptions) *Matcher
 
 func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning
+func (m *Matcher) AddGlobalPatterns() error
 func (m *Matcher) Match(path string, isDir bool) bool
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult
 func (m *Matcher) SetWarningHandler(fn WarningHandler)

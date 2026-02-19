@@ -58,8 +58,8 @@ Use this checklist before tagging a new release.
 3. **Create and push tag**
 
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
    ```
 
 4. **Create GitHub release**
@@ -72,7 +72,7 @@ Use this checklist before tagging a new release.
      - Contributors
 
 5. **Verify pkg.go.dev**
-   - Visit `https://pkg.go.dev/github.com/Sriram-PR/go-ignore@v0.1.0`
+   - Visit `https://pkg.go.dev/github.com/Sriram-PR/go-ignore@vX.Y.Z`
    - Verify documentation renders correctly
 
 ## Version History

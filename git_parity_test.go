@@ -85,8 +85,8 @@ func TestGitParity_Basic(t *testing.T) {
 		},
 		{
 			name:      "character class ranges",
-			gitignore: "[a-f].txt\n[A-Z]akefile\n",
-			paths:     []string{"a.txt", "f.txt", "g.txt", "Makefile", "makefile"},
+			gitignore: "[a-f].txt\n[a-z]akefile\n",
+			paths:     []string{"a.txt", "f.txt", "g.txt", "makefile", "Makefile"},
 		},
 	}
 

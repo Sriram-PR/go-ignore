@@ -153,7 +153,7 @@ func BenchmarkMatch_ManyRules(b *testing.B) {
 	m := New()
 	var sb strings.Builder
 	for i := 0; i < 200; i++ {
-		sb.WriteString(fmt.Sprintf("*.ext%d\n", i))
+		fmt.Fprintf(&sb, "*.ext%d\n", i)
 	}
 	m.AddPatterns("", []byte(sb.String()))
 
@@ -168,7 +168,7 @@ func BenchmarkMatch_ManyRulesHit(b *testing.B) {
 	m := New()
 	var sb strings.Builder
 	for i := 0; i < 199; i++ {
-		sb.WriteString(fmt.Sprintf("*.ext%d\n", i))
+		fmt.Fprintf(&sb, "*.ext%d\n", i)
 	}
 	sb.WriteString("*.target\n")
 	m.AddPatterns("", []byte(sb.String()))

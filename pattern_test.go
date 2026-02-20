@@ -231,11 +231,11 @@ func TestParseLine_EscapedBang(t *testing.T) {
 		wantNegate bool
 		wantNil    bool
 	}{
-		{"escaped bang", "\\!important.txt", false, false},  // \! = literal !, not negation
-		{"normal negation", "!foo.log", true, false},        // ! = negation
-		{"negated escaped hash", "!\\#foo", true, false},    // ! negation, \# escaped hash
-		{"double bang", "!!foo", true, false},               // First ! is negation
-		{"escaped bang only", "\\!", false, false},            // \! becomes literal "!" — valid pattern
+		{"escaped bang", "\\!important.txt", false, false}, // \! = literal !, not negation
+		{"normal negation", "!foo.log", true, false},       // ! = negation
+		{"negated escaped hash", "!\\#foo", true, false},   // ! negation, \# escaped hash
+		{"double bang", "!!foo", true, false},              // First ! is negation
+		{"escaped bang only", "\\!", false, false},         // \! becomes literal "!" — valid pattern
 	}
 
 	for _, tt := range tests {
@@ -516,6 +516,21 @@ func TestParseSegments(t *testing.T) {
 			"question mark mixed",
 			"*?.go",
 			[]segment{{value: "*?.go", wildcard: true}},
+		},
+		{
+			"character class",
+			"[abc].txt",
+			[]segment{{value: "[abc].txt", wildcard: true}},
+		},
+		{
+			"character class with range",
+			"[a-z]*.go",
+			[]segment{{value: "[a-z]*.go", wildcard: true}},
+		},
+		{
+			"character class nested",
+			"src/[Mm]akefile",
+			[]segment{{value: "src"}, {value: "[Mm]akefile", wildcard: true}},
 		},
 	}
 

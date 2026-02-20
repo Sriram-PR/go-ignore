@@ -185,7 +185,7 @@ func parseSegments(pattern string) []segment {
 		if part == "**" {
 			seg.doubleStar = true
 			seg.value = ""
-		} else if strings.Contains(part, "*") || strings.Contains(part, "?") || strings.Contains(part, "\\") {
+		} else if strings.Contains(part, "*") || strings.Contains(part, "?") || strings.Contains(part, "\\") || strings.Contains(part, "[") {
 			// Segments with *, ?, or \ all require glob matching.
 			// Backslash escapes (e.g., \* for literal *) are resolved during matching.
 			seg.wildcard = true
@@ -222,4 +222,3 @@ func (r *rule) String() string {
 
 	return r.pattern + flagStr + baseStr
 }
-

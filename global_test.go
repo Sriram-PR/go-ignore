@@ -236,7 +236,7 @@ func TestAddGlobalPatterns_ReadPermissionError(t *testing.T) {
 		t.Fatalf("chmod: %v", err)
 	}
 	t.Cleanup(func() {
-		os.Chmod(ignorePath, 0o644) // restore for cleanup
+		_ = os.Chmod(ignorePath, 0o644) // restore for cleanup
 	})
 
 	m := New()

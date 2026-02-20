@@ -66,9 +66,9 @@ Thumbs.db
 func BenchmarkAddPatterns_Large(b *testing.B) {
 	var sb strings.Builder
 	for i := 0; i < 100; i++ {
-		sb.WriteString(fmt.Sprintf("*.ext%d\n", i))
-		sb.WriteString(fmt.Sprintf("dir%d/\n", i))
-		sb.WriteString(fmt.Sprintf("**/cache%d/\n", i))
+		fmt.Fprintf(&sb, "*.ext%d\n", i)
+		fmt.Fprintf(&sb, "dir%d/\n", i)
+		fmt.Fprintf(&sb, "**/cache%d/\n", i)
 	}
 	content := []byte(sb.String())
 	b.ResetTimer()
@@ -311,6 +311,30 @@ func BenchmarkMatchGlob(b *testing.B) {
 	b.Run("complex", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			matchGlob("*test*spec*", "my_test_file_spec_v2", newMatchContext(0))
+		}
+	})
+}
+
+// BenchmarkMatchGlob_CharClass measures character class matching
+func BenchmarkMatchGlob_CharClass(b *testing.B) {
+	b.Run("simple", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			matchGlob("[abc]", "b", newMatchContext(0))
+		}
+	})
+	b.Run("range", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			matchGlob("[a-z]", "m", newMatchContext(0))
+		}
+	})
+	b.Run("negated", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			matchGlob("[!0-9]", "a", newMatchContext(0))
+		}
+	})
+	b.Run("combined", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			matchGlob("*.[ch]", "main.c", newMatchContext(0))
 		}
 	})
 }

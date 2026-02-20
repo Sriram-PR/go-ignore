@@ -157,6 +157,12 @@ func FuzzGlob(f *testing.F) {
 		{"*", ""},
 		{"**", "test"},
 		{"***", "test"},
+		{"[abc].txt", "a.txt"},
+		{"[a-z]*.go", "main.go"},
+		{"[!abc].txt", "d.txt"},
+		{"[[:alpha:]]", "a"},
+		{"[unclosed", "x"},
+		{"[]abc]", "]"},
 	}
 
 	for _, seed := range seeds {

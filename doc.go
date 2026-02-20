@@ -47,6 +47,10 @@
 //   - Question mark: "?.txt" matches any single-character name
 //   - Double star: "**/logs" matches at any depth
 //   - Negation: "!important.log" re-includes a file
+//   - Character classes: "[abc]" matches one of a, b, or c
+//   - Ranges: "[a-z]", "[0-9]" match character ranges
+//   - Negated classes: "[!abc]" matches any character except a, b, or c
+//   - POSIX classes: "[[:alpha:]]", "[[:digit:]]" and 10 more
 //   - Escapes: "\*", "\?", "\#", "\!" for literal matching
 //
 // # Global Gitignore
@@ -63,7 +67,6 @@
 //
 // The following are intentionally not supported:
 //
-//   - Character classes: [abc], [0-9]
 //   - .git/info/exclude
 //
 // # Path Normalization

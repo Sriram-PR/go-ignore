@@ -9,7 +9,7 @@ A minimal, zero-dependency Go library for matching file paths against `.gitignor
 ## Features
 
 - **Zero dependencies** — stdlib only
-- **Common gitignore syntax** — `*`, `?`, `**`, `!`, `/`, trailing `/`, `\` escapes
+- **Common gitignore syntax** — `*`, `?`, `**`, `!`, `/`, trailing `/`, `\` escapes, `[abc]`, `[a-z]`
 - **Nested .gitignore support** — scoped base paths
 - **Cross-platform** — Windows backslash normalization, Unix-correct literal backslash
 - **Automatic encoding handling** — UTF-8 BOM, CRLF/CR/LF line endings
@@ -239,6 +239,10 @@ If the global gitignore file does not exist, `AddGlobalPatterns` returns nil (no
 | `\#file` | Literal # | Matches `#file` |
 | `\!file` | Literal ! | Matches `!file` |
 | `?.txt` | Single char | `a.txt`, `b.txt` (not `ab.txt`) |
+| `[abc]` | Character class | `a`, `b`, or `c` |
+| `[a-z]` | Character range | Any lowercase letter |
+| `[!abc]` | Negated class | Any char except `a`, `b`, `c` |
+| `[[:alpha:]]` | POSIX class | Any letter |
 | `\*` | Literal * | Matches `*` (escaped wildcard) |
 
 ### Pattern Anchoring
@@ -253,7 +257,6 @@ If the global gitignore file does not exist, `AddGlobalPatterns` returns nil (no
 
 The following features are intentionally **not supported**:
 
-- Character classes: `[abc]`, `[0-9]`
 - `.git/info/exclude`
 
 The library does **not** automatically ignore `.git/` — add it explicitly if needed.

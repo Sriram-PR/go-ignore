@@ -73,6 +73,21 @@ func TestGitParity_Basic(t *testing.T) {
 			paths:      []string{".env", ".env.local", ".env.production", ".cache/data", "env"},
 			createDirs: []string{".cache"},
 		},
+		{
+			name:      "character classes",
+			gitignore: "[abc].txt\n*.[ch]\n[0-9]*.log\n",
+			paths:     []string{"a.txt", "b.txt", "d.txt", "foo.c", "foo.h", "foo.o", "1debug.log", "debug.log"},
+		},
+		{
+			name:      "negated character classes",
+			gitignore: "[!abc].txt\n",
+			paths:     []string{"a.txt", "d.txt", "z.txt"},
+		},
+		{
+			name:      "character class ranges",
+			gitignore: "[a-f].txt\n[A-Z]akefile\n",
+			paths:     []string{"a.txt", "f.txt", "g.txt", "Makefile", "makefile"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -357,13 +372,6 @@ func TestGitParity_KnownDifferences(t *testing.T) {
 		ourBehavior string
 		gitBehavior string
 	}{
-		{
-			description: "Character classes not supported",
-			gitignore:   "[abc].txt",
-			path:        "a.txt",
-			ourBehavior: "No match (literal [abc].txt)",
-			gitBehavior: "Matches (character class)",
-		},
 		{
 			description: "Escape sequences not fully supported",
 			gitignore:   "\\!important.txt",

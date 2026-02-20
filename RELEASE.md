@@ -77,6 +77,11 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### vX.Y.Z
+
+- Character class support: `[abc]`, `[a-z]`, `[!abc]`, `[[:alpha:]]` and all 12 POSIX classes
+- Unclosed `[` treated as literal (matches Git behavior)
+
 ### v0.2.5
 
 - Global gitignore support via `AddGlobalPatterns()` — resolves `core.excludesFile`, `$XDG_CONFIG_HOME/git/ignore`, or `~/.config/git/ignore`

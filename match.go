@@ -242,10 +242,11 @@ func matchSingleSegment(seg segment, pathSeg string, caseInsensitive bool, ctx *
 }
 
 // matchGlob matches a glob pattern against a string.
-// Supports * as "match zero or more characters" and ? as "match exactly one character".
+// Supports * as "match zero or more characters", ? as "match exactly one character",
+// [...] as character classes, and \ as escape.
 // Backtracking is bounded by the shared matchContext.
 func matchGlob(pattern, s string, ctx *matchContext) bool {
-	hasWild := strings.ContainsAny(pattern, "*?\\")
+	hasWild := strings.ContainsAny(pattern, "*?\\[")
 
 	// Fast path: no wildcards or escapes
 	if !hasWild {
@@ -257,10 +258,11 @@ func matchGlob(pattern, s string, ctx *matchContext) bool {
 		return true
 	}
 
-	// Fast paths only apply when there are no ? wildcards and no \ escapes
+	// Fast paths only apply when there are no ?, \, or [ characters
+	hasBracket := strings.Contains(pattern, "[")
 	hasEscape := strings.Contains(pattern, "\\")
 	hasQuestion := strings.Contains(pattern, "?")
-	if !hasQuestion && !hasEscape {
+	if !hasQuestion && !hasEscape && !hasBracket {
 		// Fast path: prefix* pattern
 		if strings.Count(pattern, "*") == 1 && strings.HasSuffix(pattern, "*") {
 			prefix := pattern[:len(pattern)-1]
@@ -320,6 +322,27 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 			continue
 		}
 
+		if pattern[0] == '[' {
+			// Character class
+			if len(s) == 0 {
+				return false
+			}
+			// '/' never matches a character class (FNM_PATHNAME)
+			if s[0] == '/' {
+				return false
+			}
+			matched, newPos, valid := matchCharClass(pattern, 0, s[0])
+			if valid {
+				if !matched {
+					return false
+				}
+				pattern = pattern[newPos:]
+				s = s[1:]
+				continue
+			}
+			// Invalid (unclosed bracket) — treat '[' as literal, fall through
+		}
+
 		if pattern[0] == '\\' && len(pattern) > 1 {
 			// Backslash escapes the next character (literal match)
 			pattern = pattern[1:] // skip the backslash
@@ -341,6 +364,171 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 	}
 
 	return len(s) == 0
+}
+
+// matchCharClass checks if ch matches a character class starting at pattern[pos].
+// pattern[pos] must be '['.
+// Returns (matched, newPos, valid):
+//   - matched: whether ch is in the class
+//   - newPos: position after the closing ']'
+//   - valid: whether the class was well-formed (has closing ']')
+//
+// If valid is false, the caller should treat '[' as a literal character.
+func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int, valid bool) {
+	// pos points at '['
+	i := pos + 1
+	if i >= len(pattern) {
+		return false, 0, false // unclosed
+	}
+
+	// Check for negation
+	negate := false
+	if i < len(pattern) && (pattern[i] == '!' || pattern[i] == '^') {
+		negate = true
+		i++
+	}
+
+	// ']' as first member (or first after negation) is literal
+	first := true
+	inClass := false
+
+	for i < len(pattern) {
+		c := pattern[i]
+
+		if c == ']' && !first {
+			// End of class
+			result := inClass
+			if negate {
+				result = !inClass
+			}
+			return result, i + 1, true
+		}
+
+		first = false
+
+		// POSIX class like [:alpha:]
+		if c == '[' && i+1 < len(pattern) && pattern[i+1] == ':' {
+			end := strings.Index(pattern[i+2:], ":]")
+			if end >= 0 {
+				name := pattern[i+2 : i+2+end]
+				pred := posixClass(name)
+				if pred != nil {
+					if pred(ch) {
+						inClass = true
+					}
+					i = i + 2 + end + 2 // skip past ":]"
+					continue
+				}
+				// Invalid POSIX name: '[' and ':' treated as literals
+				// Just treat '[' as a literal member
+				if ch == '[' {
+					inClass = true
+				}
+				i++
+				continue
+			}
+			// No closing ":]" — treat '[' as literal member
+			if ch == '[' {
+				inClass = true
+			}
+			i++
+			continue
+		}
+
+		// Backslash escape inside class
+		if c == '\\' && i+1 < len(pattern) {
+			i++ // skip backslash
+			c = pattern[i]
+			// Check for range: \x-y
+			if i+2 < len(pattern) && pattern[i+1] == '-' && pattern[i+2] != ']' {
+				lo := c
+				hi := pattern[i+2]
+				// Check for escaped hi: \x-\y
+				if hi == '\\' && i+3 < len(pattern) {
+					hi = pattern[i+3]
+					i += 4
+				} else {
+					i += 3
+				}
+				if lo <= hi && ch >= lo && ch <= hi {
+					inClass = true
+				}
+				continue
+			}
+			if ch == c {
+				inClass = true
+			}
+			i++
+			continue
+		}
+
+		// Check for range: a-z
+		// '-' is literal if first, last, or adjacent to ']'
+		if i+2 < len(pattern) && pattern[i+1] == '-' && pattern[i+2] != ']' {
+			lo := c
+			hi := pattern[i+2]
+			// Escaped hi in range: a-\z
+			if hi == '\\' && i+3 < len(pattern) {
+				hi = pattern[i+3]
+				i += 4
+			} else {
+				i += 3
+			}
+			// Invalid range (reversed): matches nothing
+			if lo <= hi && ch >= lo && ch <= hi {
+				inClass = true
+			}
+			continue
+		}
+
+		// Literal character
+		if ch == c {
+			inClass = true
+		}
+		i++
+	}
+
+	// Reached end of pattern without ']' — unclosed bracket
+	return false, 0, false
+}
+
+// posixClass returns a predicate for the named POSIX character class,
+// or nil if the name is not recognized.
+func posixClass(name string) func(byte) bool {
+	switch name {
+	case "alpha":
+		return func(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
+	case "digit":
+		return func(c byte) bool { return c >= '0' && c <= '9' }
+	case "alnum":
+		return func(c byte) bool {
+			return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+		}
+	case "upper":
+		return func(c byte) bool { return c >= 'A' && c <= 'Z' }
+	case "lower":
+		return func(c byte) bool { return c >= 'a' && c <= 'z' }
+	case "space":
+		return func(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v' }
+	case "blank":
+		return func(c byte) bool { return c == ' ' || c == '\t' }
+	case "print":
+		return func(c byte) bool { return c >= 0x20 && c <= 0x7E }
+	case "graph":
+		return func(c byte) bool { return c > 0x20 && c <= 0x7E }
+	case "punct":
+		return func(c byte) bool {
+			return (c >= '!' && c <= '/') || (c >= ':' && c <= '@') || (c >= '[' && c <= '`') || (c >= '{' && c <= '~')
+		}
+	case "cntrl":
+		return func(c byte) bool { return c < 0x20 || c == 0x7F }
+	case "xdigit":
+		return func(c byte) bool {
+			return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+		}
+	default:
+		return nil
+	}
 }
 
 // splitPath splits a normalized path into segments.

@@ -195,12 +195,12 @@ func TestTrimTrailingWhitespace(t *testing.T) {
 		{"only tabs", "\t\t", ""},
 
 		// Backslash-escaped trailing spaces (git spec)
-		{"escaped trailing space", "foo\\ ", "foo "},          // \<space> preserved, backslash removed
-		{"escaped space then more", "foo\\   ", "foo "},       // \<space> preserved, extra spaces stripped
-		{"double backslash space", "foo\\\\ ", "foo\\\\"},     // \\ = literal \, trailing space unescaped
+		{"escaped trailing space", "foo\\ ", "foo "},         // \<space> preserved, backslash removed
+		{"escaped space then more", "foo\\   ", "foo "},      // \<space> preserved, extra spaces stripped
+		{"double backslash space", "foo\\\\ ", "foo\\\\"},    // \\ = literal \, trailing space unescaped
 		{"triple backslash space", "foo\\\\\\ ", "foo\\\\ "}, // \\\ = literal \ + escaped space
-		{"backslash no space", "foo\\", "foo\\"},              // No trailing space, nothing to do
-		{"backslash tab", "foo\\\t", "foo\\"},                 // Backslash before tab doesn't escape
+		{"backslash no space", "foo\\", "foo\\"},             // No trailing space, nothing to do
+		{"backslash tab", "foo\\\t", "foo\\"},                // Backslash before tab doesn't escape
 	}
 
 	for _, tt := range tests {

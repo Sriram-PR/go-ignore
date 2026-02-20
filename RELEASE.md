@@ -77,7 +77,7 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
-### vX.Y.Z
+### v0.3.0
 
 - Character class support: `[abc]`, `[a-z]`, `[!abc]`, `[[:alpha:]]` and all 12 POSIX classes
 - Unclosed `[` treated as literal (matches Git behavior)

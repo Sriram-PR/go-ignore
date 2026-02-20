@@ -7,9 +7,10 @@ import (
 // ParseWarning represents a warning from parsing a .gitignore line.
 // Warnings are generated for malformed patterns that are skipped during parsing.
 type ParseWarning struct {
-	Pattern string // The problematic pattern
-	Message string // Human-readable warning message
-	Line    int    // Line number (1-indexed)
+	Pattern  string // The problematic pattern
+	Message  string // Human-readable warning message
+	Line     int    // Line number (1-indexed)
+	BasePath string // Directory containing the .gitignore (empty for root)
 }
 
 // rule represents a single parsed gitignore pattern.
@@ -49,6 +50,7 @@ func parseLines(basePath string, content []byte) ([]rule, []ParseWarning) {
 
 		r, warning := parseLine(line, lineNum, basePath)
 		if warning != nil {
+			warning.BasePath = basePath
 			warnings = append(warnings, *warning)
 		}
 		if r != nil {

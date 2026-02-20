@@ -324,7 +324,7 @@ func (m *Matcher) RuleCount() int
 
 ## Performance
 
-Benchmarked on Intel i9-14900HX (Go 1.24, linux/amd64):
+Benchmarked on Intel i9-14900HX (Go 1.25, linux/amd64):
 
 | Operation | Time | Allocs |
 |-----------|------|--------|

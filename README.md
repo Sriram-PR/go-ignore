@@ -328,13 +328,13 @@ Benchmarked on Intel i9-14900HX (Go 1.25, linux/amd64):
 
 | Operation | Time | Allocs |
 |-----------|------|--------|
-| Simple match | ~130–274ns | 2 |
-| Match with `**` (shallow) | ~155ns | 2 |
-| Match with `**` (deep path) | ~785ns | 2 |
-| Match against 100 rules | ~7–12µs | 2 |
-| Pathological `**` (bounded) | ~500–710ns | 2 |
-| Glob matching (no alloc) | ~31–90ns | 0 |
-| Path normalization | ~26ns | 0 |
+| Simple match | ~130–302ns | 2 |
+| Match with `**` (shallow) | ~208ns | 2 |
+| Match with `**` (deep path) | ~955ns | 2 |
+| Match against 100 rules | ~8–14µs | 2 |
+| Pathological `**` (bounded) | ~678–786ns | 2 |
+| Glob matching (no alloc) | ~37–91ns | 0 |
+| Path normalization | ~25ns | 0 |
 
 The library includes backtrack protection (default 10,000 iterations) to prevent pathological patterns from causing excessive CPU usage.
 

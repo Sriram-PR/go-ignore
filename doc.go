@@ -63,11 +63,13 @@
 //	    log.Fatal(err)
 //	}
 //
-// # Unsupported Features
+// # Repository Exclude File
 //
-// The following are intentionally not supported:
+// Load the repository's .git/info/exclude file:
 //
-//   - .git/info/exclude
+//	if err := m.AddExcludePatterns(".git"); err != nil {
+//	    log.Fatal(err)
+//	}
 //
 // # Path Normalization
 //

@@ -222,6 +222,25 @@ m.Match("debug.log", false) // may be ignored by global patterns
 
 If the global gitignore file does not exist, `AddGlobalPatterns` returns nil (no error).
 
+### Repository Exclude File
+
+Load the repository's `.git/info/exclude` file:
+
+```go
+m := ignore.New()
+
+// Load .git/info/exclude patterns
+if err := m.AddExcludePatterns(".git"); err != nil {
+    log.Fatal(err)
+}
+
+// Then load repo-level .gitignore as usual
+content, _ := os.ReadFile(".gitignore")
+m.AddPatterns("", content)
+```
+
+If the exclude file does not exist, `AddExcludePatterns` returns nil (no error).
+
 ## Supported Syntax
 
 | Pattern | Meaning | Example Matches |
@@ -254,10 +273,6 @@ If the global gitignore file does not exist, `AddGlobalPatterns` returns nil (no
 - **`**/` prefix** → floats (not anchored): `**/temp` matches anywhere
 
 ## Limitations
-
-The following features are intentionally **not supported**:
-
-- `.git/info/exclude`
 
 The library does **not** automatically ignore `.git/` — add it explicitly if needed.
 
@@ -299,6 +314,7 @@ func NewWithOptions(opts MatcherOptions) *Matcher
 
 func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning
 func (m *Matcher) AddGlobalPatterns() error
+func (m *Matcher) AddExcludePatterns(gitDir string) error
 func (m *Matcher) Match(path string, isDir bool) bool
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult
 func (m *Matcher) SetWarningHandler(fn WarningHandler)

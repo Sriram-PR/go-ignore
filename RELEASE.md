@@ -77,6 +77,11 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.3.1
+
+- `.git/info/exclude` support via `AddExcludePatterns()` — completes all three gitignore sources
+- Removed outdated known-difference documentation (`\!` escape works correctly)
+
 ### v0.3.0
 
 - Character class support: `[abc]`, `[a-z]`, `[!abc]`, `[[:alpha:]]` and all 12 POSIX classes

@@ -213,6 +213,78 @@ func TestAddGlobalPatterns_WithWarningHandler(t *testing.T) {
 	}
 }
 
+func TestAddExcludePatterns_WithFile(t *testing.T) {
+	tmp := t.TempDir()
+	infoDir := filepath.Join(tmp, "info")
+	if err := os.MkdirAll(infoDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	content := []byte("*.log\nbuild/\n!important.log\n")
+	if err := os.WriteFile(filepath.Join(infoDir, "exclude"), content, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	m := New()
+	if err := m.AddExcludePatterns(tmp); err != nil {
+		t.Fatalf("AddExcludePatterns: %v", err)
+	}
+
+	if n := m.RuleCount(); n != 3 {
+		t.Errorf("RuleCount = %d, want 3", n)
+	}
+
+	tests := []struct {
+		path  string
+		isDir bool
+		want  bool
+	}{
+		{"debug.log", false, true},
+		{"important.log", false, false},
+		{"build", true, true},
+		{"src/main.go", false, false},
+	}
+	for _, tt := range tests {
+		if got := m.Match(tt.path, tt.isDir); got != tt.want {
+			t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
+		}
+	}
+}
+
+func TestAddExcludePatterns_NoFile(t *testing.T) {
+	tmp := t.TempDir()
+	// No info/exclude file created — should return nil with 0 rules
+
+	m := New()
+	if err := m.AddExcludePatterns(tmp); err != nil {
+		t.Fatalf("AddExcludePatterns: %v", err)
+	}
+
+	if n := m.RuleCount(); n != 0 {
+		t.Errorf("RuleCount = %d, want 0", n)
+	}
+}
+
+func TestAddExcludePatterns_EmptyFile(t *testing.T) {
+	tmp := t.TempDir()
+	infoDir := filepath.Join(tmp, "info")
+	if err := os.MkdirAll(infoDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(infoDir, "exclude"), []byte{}, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	m := New()
+	if err := m.AddExcludePatterns(tmp); err != nil {
+		t.Fatalf("AddExcludePatterns: %v", err)
+	}
+
+	if n := m.RuleCount(); n != 0 {
+		t.Errorf("RuleCount = %d, want 0", n)
+	}
+}
+
 func TestAddGlobalPatterns_ReadPermissionError(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")

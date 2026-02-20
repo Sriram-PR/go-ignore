@@ -362,30 +362,8 @@ func gitCheckIgnoreVerbose(repoDir, path string) gitCheckResult {
 
 // TestGitParity_KnownDifferences documents known differences from git behavior
 func TestGitParity_KnownDifferences(t *testing.T) {
-	// Document known differences between our implementation and git
-	// These are intentional simplifications or edge cases we handle differently
-
-	differences := []struct {
-		description string
-		gitignore   string
-		path        string
-		ourBehavior string
-		gitBehavior string
-	}{
-		{
-			description: "Escape sequences not fully supported",
-			gitignore:   "\\!important.txt",
-			path:        "!important.txt",
-			ourBehavior: "Only \\# at start is supported",
-			gitBehavior: "Matches literal !important.txt",
-		},
-	}
-
-	t.Log("Known differences from git behavior:")
-	for _, d := range differences {
-		t.Logf("  - %s", d.description)
-		t.Logf("    Pattern: %q, Path: %q", d.gitignore, d.path)
-		t.Logf("    Our behavior: %s", d.ourBehavior)
-		t.Logf("    Git behavior: %s", d.gitBehavior)
-	}
+	// Document known differences between our implementation and git.
+	// Currently there are no known differences — all previously documented
+	// cases (e.g. \! escape at pattern start) have been resolved.
+	t.Log("No known differences from git behavior")
 }

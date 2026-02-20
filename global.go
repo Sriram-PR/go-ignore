@@ -45,6 +45,32 @@ func (m *Matcher) AddGlobalPatterns() error {
 	return nil
 }
 
+// AddExcludePatterns loads patterns from the repository's .git/info/exclude
+// file and adds them to the matcher. The gitDir parameter is the path to the
+// .git directory (e.g., ".git" or an absolute path).
+//
+// If the exclude file does not exist, AddExcludePatterns returns nil (no error).
+// Only real read failures are returned as errors.
+//
+// Patterns are added with an empty basePath (root scope), matching Git's
+// behavior where exclude patterns apply to all paths.
+//
+// Thread-safe: can be called concurrently with Match.
+func (m *Matcher) AddExcludePatterns(gitDir string) error {
+	path := filepath.Join(gitDir, "info", "exclude")
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+
+	m.AddPatterns("", content)
+	return nil
+}
+
 // resolveGlobalIgnorePath determines the path to the global gitignore file.
 // It tries git config first, then falls back to XDG conventions.
 // Returns an empty string if no path can be determined.

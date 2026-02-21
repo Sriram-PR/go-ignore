@@ -351,67 +351,41 @@ func TestMatchWithReason_Basic(t *testing.T) {
 	m := New()
 	m.AddPatterns("", []byte("*.log\n!important.log\nbuild/\n"))
 
-	// Test regular ignore
-	result := m.MatchWithReason("debug.log", false)
-	if !result.Matched {
-		t.Error("debug.log should match")
-	}
-	if !result.Ignored {
-		t.Error("debug.log should be ignored")
-	}
-	if result.Rule != "*.log" {
-		t.Errorf("Rule = %q, want %q", result.Rule, "*.log")
-	}
-	if result.Line != 1 {
-		t.Errorf("Line = %d, want 1", result.Line)
-	}
-	if result.Negated {
-		t.Error("Negated should be false")
+	tests := []struct {
+		name    string
+		path    string
+		isDir   bool
+		matched bool
+		ignored bool
+		rule    string
+		line    int
+		negated bool
+	}{
+		{"regular ignore", "debug.log", false, true, true, "*.log", 1, false},
+		{"negation", "important.log", false, true, false, "!important.log", 2, true},
+		{"no match", "main.go", false, false, false, "", 0, false},
+		{"directory", "build", true, true, true, "build/", 3, false},
 	}
 
-	// Test negation
-	result = m.MatchWithReason("important.log", false)
-	if !result.Matched {
-		t.Error("important.log should match")
-	}
-	if result.Ignored {
-		t.Error("important.log should NOT be ignored (negated)")
-	}
-	if result.Rule != "!important.log" {
-		t.Errorf("Rule = %q, want %q", result.Rule, "!important.log")
-	}
-	if result.Line != 2 {
-		t.Errorf("Line = %d, want 2", result.Line)
-	}
-	if !result.Negated {
-		t.Error("Negated should be true")
-	}
-
-	// Test no match
-	result = m.MatchWithReason("main.go", false)
-	if result.Matched {
-		t.Error("main.go should not match")
-	}
-	if result.Ignored {
-		t.Error("main.go should not be ignored")
-	}
-	if result.Rule != "" {
-		t.Errorf("Rule should be empty, got %q", result.Rule)
-	}
-	if result.Line != 0 {
-		t.Errorf("Line should be 0, got %d", result.Line)
-	}
-
-	// Test directory
-	result = m.MatchWithReason("build", true)
-	if !result.Matched {
-		t.Error("build/ should match")
-	}
-	if !result.Ignored {
-		t.Error("build/ should be ignored")
-	}
-	if result.Rule != "build/" {
-		t.Errorf("Rule = %q, want %q", result.Rule, "build/")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := m.MatchWithReason(tt.path, tt.isDir)
+			if result.Matched != tt.matched {
+				t.Errorf("Matched = %v, want %v", result.Matched, tt.matched)
+			}
+			if result.Ignored != tt.ignored {
+				t.Errorf("Ignored = %v, want %v", result.Ignored, tt.ignored)
+			}
+			if result.Rule != tt.rule {
+				t.Errorf("Rule = %q, want %q", result.Rule, tt.rule)
+			}
+			if result.Line != tt.line {
+				t.Errorf("Line = %d, want %d", result.Line, tt.line)
+			}
+			if result.Negated != tt.negated {
+				t.Errorf("Negated = %v, want %v", result.Negated, tt.negated)
+			}
+		})
 	}
 }
 

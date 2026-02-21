@@ -134,26 +134,12 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 	}
 
 	// Step 9: Determine anchoring
-	// A pattern is anchored if:
-	//   - It starts with / (explicit anchor)
-	//   - It contains / anywhere except trailing (implicit anchor)
-	// Exception: Patterns starting with **/ are NOT anchored (they float)
-	anchored := false
-	if strings.HasPrefix(line, "/") {
-		anchored = true
-		line = strings.TrimPrefix(line, "/")
-		// Check again after removing /
-		if line == "" {
-			return nil, &ParseWarning{
-				Line:    lineNum,
-				Pattern: original,
-				Message: "pattern is empty after removing leading slash",
-			}
-		}
-	} else if strings.Contains(line, "/") {
-		// Contains slash, but check for **/ prefix which makes it float
-		if !strings.HasPrefix(line, "**/") {
-			anchored = true
+	anchored, line, emptyAfterSlash := determineAnchoring(line)
+	if emptyAfterSlash {
+		return nil, &ParseWarning{
+			Line:    lineNum,
+			Pattern: original,
+			Message: "pattern is empty after removing leading slash",
 		}
 	}
 
@@ -169,6 +155,24 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 		anchored: anchored,
 		segments: segments,
 	}, nil
+}
+
+// determineAnchoring resolves the anchoring state of a pattern line.
+// A pattern is anchored if it starts with / or contains / (except **/ prefix).
+// Returns the anchored flag, the trimmed line, and whether the line became empty
+// after removing a leading slash.
+func determineAnchoring(line string) (anchored bool, trimmed string, emptyAfterSlash bool) {
+	if strings.HasPrefix(line, "/") {
+		line = line[1:]
+		if line == "" {
+			return true, "", true
+		}
+		return true, line, false
+	}
+	if strings.Contains(line, "/") && !strings.HasPrefix(line, "**/") {
+		return true, line, false
+	}
+	return false, line, false
 }
 
 // parseSegments splits a pattern by "/" and classifies each segment.

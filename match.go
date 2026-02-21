@@ -51,21 +51,9 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInse
 		return false
 	}
 
-	// Handle basePath scoping
-	matchSegments := pathSegments
-
-	if r.basePath != "" {
-		// Path must be under basePath
-		if !strings.HasPrefix(path, r.basePath+"/") && path != r.basePath {
-			return false
-		}
-		// Remove basePath prefix for matching
-		if path == r.basePath {
-			matchSegments = []string{}
-		} else {
-			matchPath := path[len(r.basePath)+1:] // +1 for the /
-			matchSegments = splitPath(matchPath)
-		}
+	matchSegments := resolveMatchSegments(r, path, pathSegments)
+	if matchSegments == nil {
+		return false // path not under basePath
 	}
 
 	// Empty path after basePath stripping
@@ -82,23 +70,41 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInse
 
 	// Handle anchored vs floating patterns
 	if r.anchored {
-		// Anchored: must match from the start
 		if prefixMatch {
 			return matchSegmentsPrefix(r.segments, matchSegments, ctx, caseInsensitive)
 		}
 		return matchSegmentsExact(r.segments, matchSegments, ctx, caseInsensitive)
 	}
 
-	// Floating: can match at any position in path
-	// Try matching starting from each position
+	return matchFloating(r, matchSegments, prefixMatch, caseInsensitive, ctx)
+}
+
+// resolveMatchSegments applies basePath scoping and returns the segments to match against.
+// Returns nil if path is not under the rule's basePath.
+func resolveMatchSegments(r *rule, path string, pathSegments []string) []string {
+	if r.basePath == "" {
+		return pathSegments
+	}
+	// Path must be under basePath
+	if !strings.HasPrefix(path, r.basePath+"/") && path != r.basePath {
+		return nil
+	}
+	if path == r.basePath {
+		return []string{}
+	}
+	matchPath := path[len(r.basePath)+1:] // +1 for the /
+	return splitPath(matchPath)
+}
+
+// matchFloating tries to match a floating (unanchored) pattern at any position in the path.
+func matchFloating(r *rule, matchSegments []string, prefixMatch, caseInsensitive bool, ctx *matchContext) bool {
 	maxStart := len(matchSegments) - len(r.segments)
 	if prefixMatch {
-		// For prefix matching, we can start later since we don't need exact length
 		maxStart = len(matchSegments) - 1
 	}
 	for i := 0; i <= maxStart; i++ {
 		if !ctx.tick() {
-			return false // Limit exceeded
+			return false
 		}
 		if prefixMatch {
 			if matchSegmentsPrefix(r.segments, matchSegments[i:], ctx, caseInsensitive) {
@@ -112,7 +118,6 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInse
 	}
 
 	// Special case: pattern with ** can match even if more segments than path
-	// e.g., pattern "**/foo" with 1 segment can match path "foo" with 1 segment
 	if len(r.segments) > 0 && r.segments[0].doubleStar {
 		if prefixMatch {
 			return matchSegmentsPrefix(r.segments, matchSegments, ctx, caseInsensitive)
@@ -292,24 +297,7 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 		}
 
 		if pattern[0] == '*' {
-			// Skip consecutive stars
-			for len(pattern) > 0 && pattern[0] == '*' {
-				pattern = pattern[1:]
-			}
-			// Trailing * matches rest of string
-			if len(pattern) == 0 {
-				return true
-			}
-			// Try matching * with increasing number of characters
-			for i := 0; i <= len(s); i++ {
-				if matchGlobRecursive(pattern, s[i:], ctx) {
-					return true
-				}
-				if !ctx.tick() {
-					return false
-				}
-			}
-			return false
+			return matchGlobStar(pattern, s, ctx)
 		}
 
 		if pattern[0] == '?' {
@@ -366,6 +354,30 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 	return len(s) == 0
 }
 
+// matchGlobStar handles the * wildcard branch of glob matching.
+// It skips consecutive stars, then tries matching the remaining pattern
+// against increasingly longer consumed prefixes of s.
+func matchGlobStar(pattern, s string, ctx *matchContext) bool {
+	// Skip consecutive stars
+	for len(pattern) > 0 && pattern[0] == '*' {
+		pattern = pattern[1:]
+	}
+	// Trailing * matches rest of string
+	if len(pattern) == 0 {
+		return true
+	}
+	// Try matching * with increasing number of characters
+	for i := 0; i <= len(s); i++ {
+		if matchGlobRecursive(pattern, s[i:], ctx) {
+			return true
+		}
+		if !ctx.tick() {
+			return false
+		}
+	}
+	return false
+}
+
 // matchCharClass checks if ch matches a character class starting at pattern[pos].
 // pattern[pos] must be '['.
 // Returns (matched, newPos, valid):
@@ -408,30 +420,11 @@ func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int,
 
 		// POSIX class like [:alpha:]
 		if c == '[' && i+1 < len(pattern) && pattern[i+1] == ':' {
-			end := strings.Index(pattern[i+2:], ":]")
-			if end >= 0 {
-				name := pattern[i+2 : i+2+end]
-				pred := posixClass(name)
-				if pred != nil {
-					if pred(ch) {
-						inClass = true
-					}
-					i = i + 2 + end + 2 // skip past ":]"
-					continue
-				}
-				// Invalid POSIX name: '[' and ':' treated as literals
-				// Just treat '[' as a literal member
-				if ch == '[' {
-					inClass = true
-				}
-				i++
-				continue
-			}
-			// No closing ":]" — treat '[' as literal member
-			if ch == '[' {
+			matched, advance := matchCharClassPosix(pattern, i, ch)
+			if matched {
 				inClass = true
 			}
-			i++
+			i += advance
 			continue
 		}
 
@@ -439,45 +432,22 @@ func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int,
 		if c == '\\' && i+1 < len(pattern) {
 			i++ // skip backslash
 			c = pattern[i]
-			// Check for range: \x-y
-			if i+2 < len(pattern) && pattern[i+1] == '-' && pattern[i+2] != ']' {
-				lo := c
-				hi := pattern[i+2]
-				// Check for escaped hi: \x-\y
-				if hi == '\\' && i+3 < len(pattern) {
-					hi = pattern[i+3]
-					i += 4
-				} else {
-					i += 3
-				}
-				if lo <= hi && ch >= lo && ch <= hi {
-					inClass = true
-				}
-				continue
-			}
-			if ch == c {
+			matched, advance := matchCharClassRange(pattern, i, c, ch)
+			if matched {
 				inClass = true
 			}
-			i++
+			i += advance
 			continue
 		}
 
 		// Check for range: a-z
 		// '-' is literal if first, last, or adjacent to ']'
 		if i+2 < len(pattern) && pattern[i+1] == '-' && pattern[i+2] != ']' {
-			lo := c
-			hi := pattern[i+2]
-			// Escaped hi in range: a-\z
-			if hi == '\\' && i+3 < len(pattern) {
-				hi = pattern[i+3]
-				i += 4
-			} else {
-				i += 3
-			}
-			// Invalid range (reversed): matches nothing
-			if lo <= hi && ch >= lo && ch <= hi {
+			matched, advance := matchCharClassRange(pattern, i, c, ch)
+			if matched {
 				inClass = true
 			}
+			i += advance
 			continue
 		}
 
@@ -492,43 +462,60 @@ func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int,
 	return false, 0, false
 }
 
+// matchCharClassPosix handles [:name:] POSIX class parsing inside a character class.
+// Returns whether ch matched and how many bytes to advance past this element.
+func matchCharClassPosix(pattern string, i int, ch byte) (matched bool, advance int) {
+	end := strings.Index(pattern[i+2:], ":]")
+	if end >= 0 {
+		name := pattern[i+2 : i+2+end]
+		pred := posixClass(name)
+		if pred != nil {
+			return pred(ch), 2 + end + 2 // skip past ":]"
+		}
+		// Invalid POSIX name: treat '[' as a literal member
+		return ch == '[', 1
+	}
+	// No closing ":]" — treat '[' as literal member
+	return ch == '[', 1
+}
+
+// matchCharClassRange handles range (a-z, \x-y) and literal matching inside a character class.
+// lo is the already-resolved start character at pattern[i].
+// Returns whether ch matched and how many bytes to advance.
+func matchCharClassRange(pattern string, i int, lo byte, ch byte) (matched bool, advance int) {
+	if i+2 < len(pattern) && pattern[i+1] == '-' && pattern[i+2] != ']' {
+		hi := pattern[i+2]
+		if hi == '\\' && i+3 < len(pattern) {
+			hi = pattern[i+3]
+			return lo <= hi && ch >= lo && ch <= hi, 4
+		}
+		return lo <= hi && ch >= lo && ch <= hi, 3
+	}
+	return ch == lo, 1
+}
+
+// posixClasses maps POSIX character class names to their predicates.
+var posixClasses = map[string]func(byte) bool{
+	"alpha": func(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') },
+	"digit": func(c byte) bool { return c >= '0' && c <= '9' },
+	"alnum": func(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') },
+	"upper": func(c byte) bool { return c >= 'A' && c <= 'Z' },
+	"lower": func(c byte) bool { return c >= 'a' && c <= 'z' },
+	"space": func(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v' },
+	"blank": func(c byte) bool { return c == ' ' || c == '\t' },
+	"print": func(c byte) bool { return c >= 0x20 && c <= 0x7E },
+	"graph": func(c byte) bool { return c > 0x20 && c <= 0x7E },
+	"punct": func(c byte) bool {
+		return (c >= '!' && c <= '/') || (c >= ':' && c <= '@') || (c >= '[' && c <= '`') || (c >= '{' && c <= '~')
+	},
+	"cntrl":  func(c byte) bool { return c < 0x20 || c == 0x7F },
+	"xdigit": func(c byte) bool { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') },
+}
+
 // posixClass returns a predicate for the named POSIX character class,
 // or nil if the name is not recognized.
 func posixClass(name string) func(byte) bool {
-	switch name {
-	case "alpha":
-		return func(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
-	case "digit":
-		return func(c byte) bool { return c >= '0' && c <= '9' }
-	case "alnum":
-		return func(c byte) bool {
-			return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-		}
-	case "upper":
-		return func(c byte) bool { return c >= 'A' && c <= 'Z' }
-	case "lower":
-		return func(c byte) bool { return c >= 'a' && c <= 'z' }
-	case "space":
-		return func(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v' }
-	case "blank":
-		return func(c byte) bool { return c == ' ' || c == '\t' }
-	case "print":
-		return func(c byte) bool { return c >= 0x20 && c <= 0x7E }
-	case "graph":
-		return func(c byte) bool { return c > 0x20 && c <= 0x7E }
-	case "punct":
-		return func(c byte) bool {
-			return (c >= '!' && c <= '/') || (c >= ':' && c <= '@') || (c >= '[' && c <= '`') || (c >= '{' && c <= '~')
-		}
-	case "cntrl":
-		return func(c byte) bool { return c < 0x20 || c == 0x7F }
-	case "xdigit":
-		return func(c byte) bool {
-			return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-		}
-	default:
-		return nil
-	}
+	return posixClasses[name]
 }
 
 // splitPath splits a normalized path into segments.

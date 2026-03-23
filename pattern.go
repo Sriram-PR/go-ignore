@@ -30,9 +30,14 @@ type rule struct {
 // segment represents one part of a pattern split by "/".
 // Each segment can be a literal string, contain wildcards, or be a double-star.
 type segment struct {
-	value      string // literal or pattern text (empty for **)
-	wildcard   bool   // contains * (but not **) - requires glob matching
-	doubleStar bool   // is ** - matches zero or more directories
+	value        string // literal or pattern text (empty for **)
+	wildcard     bool   // contains * (but not **) - requires glob matching
+	doubleStar   bool   // is ** - matches zero or more directories
+	hasStar      bool   // contains * (not **) — pre-computed at parse time
+	hasQuestion  bool   // contains ?
+	hasEscape    bool   // contains backslash
+	hasCharClass bool   // contains [ (character class or literal bracket)
+	starCount    int    // number of * characters
 }
 
 // parseLines parses gitignore content into rules.
@@ -212,6 +217,11 @@ func parseSegments(pattern string) []segment {
 			// Segments with *, ?, or \ all require glob matching.
 			// Backslash escapes (e.g., \* for literal *) are resolved during matching.
 			seg.wildcard = true
+			seg.hasStar = strings.Contains(part, "*")
+			seg.hasQuestion = strings.Contains(part, "?")
+			seg.hasEscape = strings.Contains(part, "\\")
+			seg.hasCharClass = strings.Contains(part, "[")
+			seg.starCount = strings.Count(part, "*")
 		}
 
 		segments = append(segments, seg)

@@ -261,7 +261,36 @@ func matchSingleSegment(seg segment, pathSeg string, caseInsensitive bool, ctx *
 	}
 
 	// Wildcard matching (glob-style *, ?, \)
-	return matchGlob(pattern, pathSeg, ctx)
+	return matchGlobSeg(&seg, pathSeg, ctx)
+}
+
+// matchGlobSeg matches a glob pattern against a string using pre-computed segment flags.
+// This is the fast path used by matchSingleSegment.
+func matchGlobSeg(seg *segment, s string, ctx *matchContext) bool {
+	pattern := seg.value
+
+	// Fast path: single * matches everything
+	if pattern == "*" {
+		return true
+	}
+
+	// Fast paths only apply when there are no ?, \, or [ characters
+	if !seg.hasQuestion && !seg.hasEscape && !seg.hasCharClass {
+		// Fast path: prefix* pattern
+		if seg.starCount == 1 && strings.HasSuffix(pattern, "*") {
+			prefix := pattern[:len(pattern)-1]
+			return strings.HasPrefix(s, prefix)
+		}
+
+		// Fast path: *suffix pattern
+		if seg.starCount == 1 && strings.HasPrefix(pattern, "*") {
+			suffix := pattern[1:]
+			return strings.HasSuffix(s, suffix)
+		}
+	}
+
+	// General case: use recursive matching
+	return matchGlobRecursive(pattern, s, ctx)
 }
 
 // matchGlob matches a glob pattern against a string.

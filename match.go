@@ -494,28 +494,45 @@ func matchCharClassRange(pattern string, i int, lo byte, ch byte) (matched bool,
 	return ch == lo, 1
 }
 
-// posixClasses maps POSIX character class names to their predicates.
-var posixClasses = map[string]func(byte) bool{
-	"alpha": func(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') },
-	"digit": func(c byte) bool { return c >= '0' && c <= '9' },
-	"alnum": func(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') },
-	"upper": func(c byte) bool { return c >= 'A' && c <= 'Z' },
-	"lower": func(c byte) bool { return c >= 'a' && c <= 'z' },
-	"space": func(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v' },
-	"blank": func(c byte) bool { return c == ' ' || c == '\t' },
-	"print": func(c byte) bool { return c >= 0x20 && c <= 0x7E },
-	"graph": func(c byte) bool { return c > 0x20 && c <= 0x7E },
-	"punct": func(c byte) bool {
-		return (c >= '!' && c <= '/') || (c >= ':' && c <= '@') || (c >= '[' && c <= '`') || (c >= '{' && c <= '~')
-	},
-	"cntrl":  func(c byte) bool { return c < 0x20 || c == 0x7F },
-	"xdigit": func(c byte) bool { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') },
-}
-
 // posixClass returns a predicate for the named POSIX character class,
 // or nil if the name is not recognized.
 func posixClass(name string) func(byte) bool {
-	return posixClasses[name]
+	switch name {
+	case "alpha":
+		return func(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
+	case "digit":
+		return func(c byte) bool { return c >= '0' && c <= '9' }
+	case "alnum":
+		return func(c byte) bool {
+			return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+		}
+	case "upper":
+		return func(c byte) bool { return c >= 'A' && c <= 'Z' }
+	case "lower":
+		return func(c byte) bool { return c >= 'a' && c <= 'z' }
+	case "space":
+		return func(c byte) bool {
+			return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'
+		}
+	case "blank":
+		return func(c byte) bool { return c == ' ' || c == '\t' }
+	case "print":
+		return func(c byte) bool { return c >= 0x20 && c <= 0x7E }
+	case "graph":
+		return func(c byte) bool { return c > 0x20 && c <= 0x7E }
+	case "punct":
+		return func(c byte) bool {
+			return (c >= '!' && c <= '/') || (c >= ':' && c <= '@') || (c >= '[' && c <= '`') || (c >= '{' && c <= '~')
+		}
+	case "cntrl":
+		return func(c byte) bool { return c < 0x20 || c == 0x7F }
+	case "xdigit":
+		return func(c byte) bool {
+			return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+		}
+	default:
+		return nil
+	}
 }
 
 // splitPath splits a normalized path into segments.

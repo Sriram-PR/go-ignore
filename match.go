@@ -90,13 +90,13 @@ func resolveMatchSegments(r *rule, path string, pathSegments []string) []string 
 		return pathSegments
 	}
 	// Path must be under basePath
-	if !strings.HasPrefix(path, r.basePath+"/") && path != r.basePath {
+	if !strings.HasPrefix(path, r.basePathSlash) && path != r.basePath {
 		return nil
 	}
 	if path == r.basePath {
 		return []string{}
 	}
-	matchPath := path[len(r.basePath)+1:] // +1 for the /
+	matchPath := path[len(r.basePathSlash):] // skip basePath + "/"
 	return splitPath(matchPath)
 }
 

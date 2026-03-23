@@ -16,13 +16,14 @@ type ParseWarning struct {
 // rule represents a single parsed gitignore pattern.
 // Rules are evaluated in order; later rules can override earlier ones.
 type rule struct {
-	pattern  string    // original pattern (for debugging/reporting)
-	basePath string    // directory scope (empty = root)
-	segments []segment // parsed pattern segments for matching
-	line     int       // line number in source file (1-indexed)
-	negate   bool      // true if pattern started with !
-	dirOnly  bool      // true if pattern ended with /
-	anchored bool      // true if pattern should match from basePath only
+	pattern       string    // original pattern (for debugging/reporting)
+	basePath      string    // directory scope (empty = root)
+	basePathSlash string    // basePath + "/" (pre-computed, empty if basePath is empty)
+	segments      []segment // parsed pattern segments for matching
+	line          int       // line number in source file (1-indexed)
+	negate        bool      // true if pattern started with !
+	dirOnly       bool      // true if pattern ended with /
+	anchored      bool      // true if pattern should match from basePath only
 }
 
 // segment represents one part of a pattern split by "/".
@@ -156,7 +157,7 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 	// Step 10: Parse into segments
 	segments := parseSegments(line)
 
-	return &rule{
+	r := &rule{
 		pattern:  original,
 		basePath: basePath,
 		line:     lineNum,
@@ -164,7 +165,11 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 		dirOnly:  dirOnly,
 		anchored: anchored,
 		segments: segments,
-	}, nil
+	}
+	if basePath != "" {
+		r.basePathSlash = basePath + "/"
+	}
+	return r, nil
 }
 
 // determineAnchoring resolves the anchoring state of a pattern line.

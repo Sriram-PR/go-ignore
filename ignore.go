@@ -36,6 +36,19 @@ type MatchResult struct {
 // WarningHandler is called for each parse warning if set.
 type WarningHandler func(basePath string, warning ParseWarning)
 
+// Default resource limits for pattern parsing.
+const (
+	// DefaultMaxPatterns is the maximum number of rules a Matcher will hold.
+	// Excess rules are silently dropped with a warning.
+	// Set MaxPatterns to 0 to use this default, or -1 for unlimited.
+	DefaultMaxPatterns = 100_000
+
+	// DefaultMaxPatternLength is the maximum length of a single pattern line.
+	// Lines exceeding this are skipped with a warning.
+	// Set MaxPatternLength to 0 to use this default, or -1 for unlimited.
+	DefaultMaxPatternLength = 4096
+)
+
 // MatcherOptions configures Matcher behavior.
 type MatcherOptions struct {
 	// MaxBacktrackIterations limits ** pattern matching iterations.
@@ -47,6 +60,15 @@ type MatcherOptions struct {
 	// Default: false (case-sensitive, matching Git's default behavior).
 	// Note: This affects pattern matching only, not filesystem behavior.
 	CaseInsensitive bool
+
+	// MaxPatterns limits the total number of rules a Matcher can hold.
+	// Default: DefaultMaxPatterns (100000). Set to -1 for unlimited.
+	MaxPatterns int
+
+	// MaxPatternLength limits the length of individual pattern lines.
+	// Lines exceeding this limit are skipped with a parse warning.
+	// Default: DefaultMaxPatternLength (4096). Set to -1 for unlimited.
+	MaxPatternLength int
 }
 
 // Matcher holds compiled gitignore rules.
@@ -70,6 +92,8 @@ func New() *Matcher {
 	return &Matcher{
 		opts: MatcherOptions{
 			MaxBacktrackIterations: DefaultMaxBacktrackIterations,
+			MaxPatterns:            DefaultMaxPatterns,
+			MaxPatternLength:       DefaultMaxPatternLength,
 		},
 	}
 }
@@ -78,6 +102,12 @@ func New() *Matcher {
 func NewWithOptions(opts MatcherOptions) *Matcher {
 	if opts.MaxBacktrackIterations == 0 {
 		opts.MaxBacktrackIterations = DefaultMaxBacktrackIterations
+	}
+	if opts.MaxPatterns == 0 {
+		opts.MaxPatterns = DefaultMaxPatterns
+	}
+	if opts.MaxPatternLength == 0 {
+		opts.MaxPatternLength = DefaultMaxPatternLength
 	}
 	return &Matcher{
 		opts: opts,
@@ -121,7 +151,7 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 	normalizedBase := normalizeBasePath(basePath)
 
 	// Parse rules (this doesn't need the lock)
-	newRules, parseWarnings := parseLines(normalizedBase, content)
+	newRules, parseWarnings := parseLines(normalizedBase, content, m.opts.MaxPatternLength)
 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
 	// This avoids calling strings.ToLower on every match call.
@@ -138,6 +168,27 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 
 	// Acquire write lock to add rules and capture handler ref
 	m.mu.Lock()
+
+	// Enforce max patterns limit
+	if m.opts.MaxPatterns >= 0 {
+		remaining := m.opts.MaxPatterns - len(m.rules)
+		if remaining <= 0 {
+			parseWarnings = append(parseWarnings, ParseWarning{
+				Pattern:  "",
+				Message:  "maximum pattern count reached, new patterns skipped",
+				BasePath: normalizedBase,
+			})
+			newRules = nil
+		} else if len(newRules) > remaining {
+			parseWarnings = append(parseWarnings, ParseWarning{
+				Pattern:  "",
+				Message:  "maximum pattern count reached, excess patterns truncated",
+				BasePath: normalizedBase,
+			})
+			newRules = newRules[:remaining]
+		}
+	}
+
 	m.rules = append(m.rules, newRules...)
 	handler := m.handler
 	if handler == nil {

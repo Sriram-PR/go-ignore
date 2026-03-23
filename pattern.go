@@ -35,8 +35,9 @@ type segment struct {
 
 // parseLines parses gitignore content into rules.
 // It normalizes content (BOM, line endings) and processes each line.
+// maxPatternLength limits individual line length (-1 for unlimited).
 // Returns parsed rules and any warnings for malformed patterns.
-func parseLines(basePath string, content []byte) ([]rule, []ParseWarning) {
+func parseLines(basePath string, content []byte, maxPatternLength int) ([]rule, []ParseWarning) {
 	// Normalize content (BOM, CRLF)
 	content = normalizeContent(content)
 
@@ -46,6 +47,16 @@ func parseLines(basePath string, content []byte) ([]rule, []ParseWarning) {
 
 	for i, line := range lines {
 		lineNum := i + 1 // 1-indexed
+
+		if maxPatternLength >= 0 && len(line) > maxPatternLength {
+			warnings = append(warnings, ParseWarning{
+				Line:     lineNum,
+				Pattern:  line,
+				Message:  "pattern exceeds maximum length, skipped",
+				BasePath: basePath,
+			})
+			continue
+		}
 
 		r, warning := parseLine(line, lineNum, basePath)
 		if warning != nil {

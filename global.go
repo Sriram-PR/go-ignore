@@ -23,6 +23,14 @@ import (
 // Patterns are added with an empty basePath (root scope), matching Git's
 // behavior where global patterns apply to all paths.
 //
+// Parse warnings are reported through the standard warning mechanism:
+// via the WarningHandler callback if set, otherwise collected and available
+// through Warnings().
+//
+// Trust model: this function trusts the file path returned by "git config"
+// and reads its contents. It should only be called in environments where
+// the git configuration is trusted.
+//
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddGlobalPatterns() error {
 	path, err := resolveGlobalIgnorePath()
@@ -54,6 +62,14 @@ func (m *Matcher) AddGlobalPatterns() error {
 //
 // Patterns are added with an empty basePath (root scope), matching Git's
 // behavior where exclude patterns apply to all paths.
+//
+// Parse warnings are reported through the standard warning mechanism:
+// via the WarningHandler callback if set, otherwise collected and available
+// through Warnings().
+//
+// Trust model: this function trusts the caller-provided gitDir path and
+// reads the file at gitDir/info/exclude. Callers should ensure gitDir
+// points to a trusted .git directory.
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddExcludePatterns(gitDir string) error {

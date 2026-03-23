@@ -16,6 +16,9 @@ import (
 //  3. Remove leading "./" prefix (all occurrences for idempotency)
 //  4. Remove trailing slash
 //
+// Note: ".." components are NOT resolved. Callers should use filepath.Clean
+// if the input may contain ".." segments.
+//
 // This function is applied to input paths (in Match/MatchWithReason) and base
 // paths (in parseLines). It is NOT applied to patterns during parsing — patterns
 // are parsed as-is and matched with their original escape sequences intact.

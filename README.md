@@ -299,9 +299,10 @@ type MatchResult struct {
 }
 
 type ParseWarning struct {
-    Line    int
-    Pattern string
-    Message string
+    Pattern  string
+    Message  string
+    Line     int
+    BasePath string
 }
 
 type WarningHandler func(basePath string, warning ParseWarning)

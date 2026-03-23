@@ -44,14 +44,17 @@
 //   - Leading /: "/debug.log" matches only at base path
 //   - Trailing /: "build/" matches directories only
 //   - Single star: "*.log" matches any .log file
-//   - Question mark: "?.txt" matches any single-character name
+//   - Question mark: "?.txt" matches any single byte (not Unicode code point)
 //   - Double star: "**/logs" matches at any depth
 //   - Negation: "!important.log" re-includes a file
-//   - Character classes: "[abc]" matches one of a, b, or c
+//   - Character classes: "[abc]" matches one byte: a, b, or c
 //   - Ranges: "[a-z]", "[0-9]" match character ranges
 //   - Negated classes: "[!abc]" matches any character except a, b, or c
 //   - POSIX classes: "[[:alpha:]]", "[[:digit:]]" and 10 more
 //   - Escapes: "\*", "\?", "\#", "\!" for literal matching
+//
+// Note: ? and [...] operate on raw bytes, not Unicode code points,
+// consistent with Git's behavior.
 //
 // # Global Gitignore
 //

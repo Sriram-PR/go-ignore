@@ -116,6 +116,7 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 
 // SetWarningHandler sets a callback for parse warnings.
 // If set, warnings are reported via callback instead of being collected.
+// Passing nil resets to collection mode (warnings available via Warnings()).
 // IMPORTANT: Must be called before AddPatterns for the handler to receive warnings.
 // If called after AddPatterns, only subsequent AddPatterns calls will use the handler.
 func (m *Matcher) SetWarningHandler(fn WarningHandler) {

@@ -646,6 +646,7 @@ build/
 }
 
 func BenchmarkMatch_Simple(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("*.log\n*.tmp\nbuild/\nnode_modules/\n"))
 	b.ResetTimer()

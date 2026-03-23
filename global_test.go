@@ -99,6 +99,47 @@ func TestXdgGlobalIgnorePath(t *testing.T) {
 	})
 }
 
+func TestGitConfigExcludesFile_Success(t *testing.T) {
+	tmp := t.TempDir()
+
+	// Create a gitignore file
+	ignoreFile := filepath.Join(tmp, "my-global-ignore")
+	if err := os.WriteFile(ignoreFile, []byte("*.log\nbuild/\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Create a .gitconfig pointing core.excludesFile at it
+	gitconfig := filepath.Join(tmp, ".gitconfig")
+	configContent := "[core]\n\texcludesFile = " + ignoreFile + "\n"
+	if err := os.WriteFile(gitconfig, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Point GIT_CONFIG_GLOBAL at our fake config
+	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
+	// Prevent XDG fallback from interfering
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "nonexistent-xdg"))
+
+	m := New()
+	if err := m.AddGlobalPatterns(); err != nil {
+		t.Fatalf("AddGlobalPatterns: %v", err)
+	}
+
+	if n := m.RuleCount(); n != 2 {
+		t.Errorf("RuleCount = %d, want 2", n)
+	}
+
+	if !m.Match("debug.log", false) {
+		t.Error("expected *.log to match debug.log")
+	}
+	if !m.Match("build", true) {
+		t.Error("expected build/ to match build dir")
+	}
+	if m.Match("main.go", false) {
+		t.Error("expected main.go not to match")
+	}
+}
+
 func TestAddGlobalPatterns_WithXDGFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmp)

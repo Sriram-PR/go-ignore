@@ -379,6 +379,9 @@ func TestEdgeCases_PathVariations(t *testing.T) {
 		want  bool
 	}{
 		// Windows paths
+		// Note: On Linux, backslash is a literal filename character, so
+		// "src\lib\test.log" is treated as a single path segment. The *.log
+		// pattern still matches because it floats and glob-matches the segment.
 		{"windows backslash", "test.log", false, true},
 		{"windows deep path", "src\\lib\\test.log", false, true},
 		{"windows dir", "build", true, true},

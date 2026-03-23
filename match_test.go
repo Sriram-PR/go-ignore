@@ -230,6 +230,11 @@ func TestMatchGlob(t *testing.T) {
 		{"?*?", "ab", true},       // ? matches one each side, * matches zero
 		{"?*?", "a", false},       // Need at least 2 chars
 
+		// ? with multi-byte Unicode (? matches one byte, not one rune)
+		{"?", "é", false},  // é is 2 bytes, ? matches 1 byte
+		{"??", "é", true},  // 2 bytes, ?? matches both
+		{"???", "é", false}, // too many ?s for 2-byte char
+
 		// Backslash escaping
 		{"\\*", "*", true},              // \* matches literal *
 		{"\\*", "a", false},             // \* does not match regular char
@@ -333,6 +338,14 @@ func TestMatchGlob_CharClass(t *testing.T) {
 		{"?[0-9]", "a5", true},
 		{"?[0-9]", "ab", false},
 		{"?[0-9]", "55", true},
+
+		// Escaped range endpoints
+		{"[\\a-z]", "m", true},
+		{"[\\a-z]", "a", true},
+		{"[\\a-z]", "z", true},
+		{"[a-\\z]", "m", true},
+		{"[a-\\z]", "a", true},
+		{"[a-\\z]", "z", true},
 
 		// Invalid range (reversed) — matches nothing
 		{"[z-a]", "m", false},
@@ -1004,18 +1017,21 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 }
 
 func BenchmarkMatchGlob_Simple(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		matchGlob("*.log", "test.log", testCtx(0))
 	}
 }
 
 func BenchmarkMatchGlob_Complex(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		matchGlob("*test*spec*.go", "my_test_spec_file.go", testCtx(0))
 	}
 }
 
 func BenchmarkMatchSegments_Simple(b *testing.B) {
+	b.ReportAllocs()
 	pattern := []segment{{value: "src"}, {value: "*.go", wildcard: true}}
 	path := []string{"src", "main.go"}
 	b.ResetTimer()
@@ -1026,6 +1042,7 @@ func BenchmarkMatchSegments_Simple(b *testing.B) {
 }
 
 func BenchmarkMatchSegments_DoubleStar(b *testing.B) {
+	b.ReportAllocs()
 	pattern := []segment{{doubleStar: true}, {value: "test"}, {doubleStar: true}, {value: "*.go", wildcard: true}}
 	path := []string{"src", "lib", "test", "unit", "foo_test.go"}
 	b.ResetTimer()

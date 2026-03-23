@@ -8,6 +8,7 @@ import (
 
 // BenchmarkNew measures Matcher creation overhead
 func BenchmarkNew(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		_ = New()
 	}
@@ -15,6 +16,7 @@ func BenchmarkNew(b *testing.B) {
 
 // BenchmarkAddPatterns_Small measures adding a small gitignore
 func BenchmarkAddPatterns_Small(b *testing.B) {
+	b.ReportAllocs()
 	content := []byte("*.log\nbuild/\nnode_modules/\n")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -25,6 +27,7 @@ func BenchmarkAddPatterns_Small(b *testing.B) {
 
 // BenchmarkAddPatterns_Medium measures adding a medium gitignore
 func BenchmarkAddPatterns_Medium(b *testing.B) {
+	b.ReportAllocs()
 	content := []byte(`
 # Dependencies
 node_modules/
@@ -64,6 +67,7 @@ Thumbs.db
 
 // BenchmarkAddPatterns_Large measures adding a large gitignore
 func BenchmarkAddPatterns_Large(b *testing.B) {
+	b.ReportAllocs()
 	var sb strings.Builder
 	for i := 0; i < 100; i++ {
 		fmt.Fprintf(&sb, "*.ext%d\n", i)
@@ -80,6 +84,7 @@ func BenchmarkAddPatterns_Large(b *testing.B) {
 
 // BenchmarkMatch_Miss measures matching a non-ignored path
 func BenchmarkMatch_Miss(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("*.log\nbuild/\nnode_modules/\n"))
 	b.ResetTimer()
@@ -90,6 +95,7 @@ func BenchmarkMatch_Miss(b *testing.B) {
 
 // BenchmarkMatch_Hit measures matching an ignored path
 func BenchmarkMatch_Hit(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("*.log\nbuild/\nnode_modules/\n"))
 	b.ResetTimer()
@@ -100,6 +106,7 @@ func BenchmarkMatch_Hit(b *testing.B) {
 
 // BenchmarkMatch_DirPattern measures matching inside ignored directory
 func BenchmarkMatch_DirPattern(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("node_modules/\n"))
 	b.ResetTimer()
@@ -110,6 +117,7 @@ func BenchmarkMatch_DirPattern(b *testing.B) {
 
 // BenchmarkMatch_DeepPath measures matching with deep paths
 func BenchmarkMatch_DeepPath(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("*.log\n**/temp/\n"))
 	path := "a/b/c/d/e/f/g/h/i/j/k/l/m/n/test.log"
@@ -121,6 +129,7 @@ func BenchmarkMatch_DeepPath(b *testing.B) {
 
 // BenchmarkMatch_DoubleStar measures ** pattern performance
 func BenchmarkMatch_DoubleStar(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("**/logs/**\n"))
 	b.ResetTimer()
@@ -131,6 +140,7 @@ func BenchmarkMatch_DoubleStar(b *testing.B) {
 
 // BenchmarkMatch_DoubleStarDeep measures ** on very deep paths
 func BenchmarkMatch_DoubleStarDeep(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("**/target\n"))
 
@@ -150,6 +160,7 @@ func BenchmarkMatch_DoubleStarDeep(b *testing.B) {
 
 // BenchmarkMatch_ManyRules measures matching against many rules
 func BenchmarkMatch_ManyRules(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	var sb strings.Builder
 	for i := 0; i < 200; i++ {
@@ -165,6 +176,7 @@ func BenchmarkMatch_ManyRules(b *testing.B) {
 
 // BenchmarkMatch_ManyRulesHit measures hitting a late rule
 func BenchmarkMatch_ManyRulesHit(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	var sb strings.Builder
 	for i := 0; i < 199; i++ {
@@ -181,6 +193,7 @@ func BenchmarkMatch_ManyRulesHit(b *testing.B) {
 
 // BenchmarkMatch_Negation measures negation pattern performance
 func BenchmarkMatch_Negation(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("*.log\n!important.log\n"))
 	b.ResetTimer()
@@ -191,6 +204,7 @@ func BenchmarkMatch_Negation(b *testing.B) {
 
 // BenchmarkMatch_NestedGitignore measures with multiple gitignore files
 func BenchmarkMatch_NestedGitignore(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("*.log\n"))
 	m.AddPatterns("src", []byte("*.tmp\n"))
@@ -205,6 +219,7 @@ func BenchmarkMatch_NestedGitignore(b *testing.B) {
 
 // BenchmarkMatch_Pathological tests worst-case ** patterns
 func BenchmarkMatch_Pathological(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("a/**/b/**/c/**/d\n"))
 
@@ -219,6 +234,7 @@ func BenchmarkMatch_Pathological(b *testing.B) {
 
 // BenchmarkMatch_PathologicalNoMatch tests backtracking with no match
 func BenchmarkMatch_PathologicalNoMatch(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("a/**/b/**/c/**/d\n"))
 
@@ -233,6 +249,7 @@ func BenchmarkMatch_PathologicalNoMatch(b *testing.B) {
 
 // BenchmarkMatchWithReason measures MatchWithReason overhead
 func BenchmarkMatchWithReason(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("*.log\nbuild/\n"))
 	b.ResetTimer()
@@ -243,6 +260,7 @@ func BenchmarkMatchWithReason(b *testing.B) {
 
 // BenchmarkMatch_Concurrent measures concurrent access
 func BenchmarkMatch_Concurrent(b *testing.B) {
+	b.ReportAllocs()
 	m := New()
 	m.AddPatterns("", []byte("*.log\nbuild/\n**/node_modules/**\n"))
 
@@ -258,6 +276,7 @@ func BenchmarkMatch_Concurrent(b *testing.B) {
 
 // BenchmarkMatch_CaseInsensitive measures case-insensitive overhead
 func BenchmarkMatch_CaseInsensitive(b *testing.B) {
+	b.ReportAllocs()
 	m := NewWithOptions(MatcherOptions{CaseInsensitive: true})
 	m.AddPatterns("", []byte("*.LOG\nBUILD/\n"))
 	b.ResetTimer()
@@ -268,6 +287,7 @@ func BenchmarkMatch_CaseInsensitive(b *testing.B) {
 
 // BenchmarkNormalizePath measures path normalization overhead
 func BenchmarkNormalizePath(b *testing.B) {
+	b.ReportAllocs()
 	paths := []string{
 		"src/main.go",
 		"src\\lib\\file.go",
@@ -282,6 +302,7 @@ func BenchmarkNormalizePath(b *testing.B) {
 
 // BenchmarkParseLines measures parsing overhead
 func BenchmarkParseLines(b *testing.B) {
+	b.ReportAllocs()
 	content := []byte(`
 *.log
 *.tmp
@@ -299,16 +320,19 @@ src/**/test/
 // BenchmarkMatchGlob measures glob matching
 func BenchmarkMatchGlob(b *testing.B) {
 	b.Run("simple", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			matchGlob("*.log", "test.log", testCtx(0))
 		}
 	})
 	b.Run("prefix", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			matchGlob("test_*", "test_foo_bar", testCtx(0))
 		}
 	})
 	b.Run("complex", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			matchGlob("*test*spec*", "my_test_file_spec_v2", testCtx(0))
 		}
@@ -318,21 +342,25 @@ func BenchmarkMatchGlob(b *testing.B) {
 // BenchmarkMatchGlob_CharClass measures character class matching
 func BenchmarkMatchGlob_CharClass(b *testing.B) {
 	b.Run("simple", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			matchGlob("[abc]", "b", testCtx(0))
 		}
 	})
 	b.Run("range", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			matchGlob("[a-z]", "m", testCtx(0))
 		}
 	})
 	b.Run("negated", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			matchGlob("[!0-9]", "a", testCtx(0))
 		}
 	})
 	b.Run("combined", func(b *testing.B) {
+		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			matchGlob("*.[ch]", "main.c", testCtx(0))
 		}

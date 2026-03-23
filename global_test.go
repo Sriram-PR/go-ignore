@@ -117,16 +117,23 @@ func TestGitConfigExcludesFile_Success(t *testing.T) {
 
 	// Point GIT_CONFIG_GLOBAL at our fake config
 	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
-	// Prevent XDG fallback from interfering
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "nonexistent-xdg"))
 
-	// Verify the precondition: git must actually read our config.
-	// On some platforms (e.g., Windows CI), GIT_CONFIG_GLOBAL may not
-	// be respected by the installed git version.
+	// Step 1: Verify gitConfigExcludesFile reads the path correctly
 	path, err := gitConfigExcludesFile()
-	if err != nil || path == "" {
-		t.Skip("git config does not respect GIT_CONFIG_GLOBAL on this platform")
+	if err != nil {
+		t.Fatalf("gitConfigExcludesFile: %v", err)
 	}
+	if path == "" {
+		// Git didn't return a path — likely GIT_CONFIG_GLOBAL isn't
+		// supported by this git version (e.g., older git on Windows).
+		t.Skip("git does not respect GIT_CONFIG_GLOBAL on this platform")
+	}
+	if path != ignoreFile {
+		t.Errorf("gitConfigExcludesFile = %q, want %q", path, ignoreFile)
+	}
+
+	// Step 2: Verify the full AddGlobalPatterns flow loads the patterns
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "nonexistent-xdg"))
 
 	m := New()
 	if err := m.AddGlobalPatterns(); err != nil {

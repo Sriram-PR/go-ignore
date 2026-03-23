@@ -224,25 +224,28 @@ func TestMatch_Basic(t *testing.T) {
 	m.AddPatterns("", []byte("*.log\nbuild/\n!important.log\n"))
 
 	tests := []struct {
+		name  string
 		path  string
 		isDir bool
 		want  bool
 	}{
-		{"test.log", false, true},
-		{"debug.log", false, true},
-		{"important.log", false, false}, // negated
-		{"main.go", false, false},
-		{"build", true, true},
-		{"build", false, false}, // not a dir
-		{"src/test.log", false, true},
-		{"src/build", true, true},
+		{"test.log file", "test.log", false, true},
+		{"debug.log file", "debug.log", false, true},
+		{"important.log negated", "important.log", false, false}, // negated
+		{"main.go no match", "main.go", false, false},
+		{"build dir", "build", true, true},
+		{"build not a dir", "build", false, false}, // not a dir
+		{"src/test.log nested", "src/test.log", false, true},
+		{"src/build nested dir", "src/build", true, true},
 	}
 
 	for _, tt := range tests {
-		got := m.Match(tt.path, tt.isDir)
-		if got != tt.want {
-			t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.Match(tt.path, tt.isDir)
+			if got != tt.want {
+				t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -255,20 +258,23 @@ func TestMatch_WindowsPaths(t *testing.T) {
 	m.AddPatterns("", []byte("*.log\nsrc/build/\n"))
 
 	tests := []struct {
+		name  string
 		path  string
 		isDir bool
 		want  bool
 	}{
-		{"src\\test.log", false, true},
-		{"src\\build", true, true},
-		{"src\\lib\\debug.log", false, true},
+		{"src\\test.log file", "src\\test.log", false, true},
+		{"src\\build dir", "src\\build", true, true},
+		{"src\\lib\\debug.log nested", "src\\lib\\debug.log", false, true},
 	}
 
 	for _, tt := range tests {
-		got := m.Match(tt.path, tt.isDir)
-		if got != tt.want {
-			t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.Match(tt.path, tt.isDir)
+			if got != tt.want {
+				t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -286,23 +292,26 @@ func TestMatch_CaseInsensitive(t *testing.T) {
 	m.AddPatterns("", []byte("BUILD/\n*.LOG\n"))
 
 	tests := []struct {
+		name  string
 		path  string
 		isDir bool
 		want  bool
 	}{
-		{"BUILD", true, true},
-		{"build", true, true},
-		{"Build", true, true},
-		{"test.LOG", false, true},
-		{"test.log", false, true},
-		{"test.Log", false, true},
+		{"BUILD uppercase dir", "BUILD", true, true},
+		{"build lowercase dir", "build", true, true},
+		{"Build mixed dir", "Build", true, true},
+		{"test.LOG uppercase ext", "test.LOG", false, true},
+		{"test.log lowercase ext", "test.log", false, true},
+		{"test.Log mixed ext", "test.Log", false, true},
 	}
 
 	for _, tt := range tests {
-		got := m.Match(tt.path, tt.isDir)
-		if got != tt.want {
-			t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.Match(tt.path, tt.isDir)
+			if got != tt.want {
+				t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -319,31 +328,34 @@ func TestMatch_NestedGitignore(t *testing.T) {
 	m.AddPatterns("src/lib", []byte("*.bak\n"))
 
 	tests := []struct {
+		name string
 		path string
 		want bool
 	}{
 		// Root patterns apply everywhere
-		{"test.log", true},
-		{"src/test.log", true},
-		{"src/lib/test.log", true},
+		{"root test.log", "test.log", true},
+		{"nested src/test.log", "src/test.log", true},
+		{"deeply nested src/lib/test.log", "src/lib/test.log", true},
 
 		// src patterns only in src/
-		{"test.tmp", false},        // not in src/
-		{"src/test.tmp", true},     // in src/
-		{"src/keep.tmp", false},    // negated in src/
-		{"src/lib/test.tmp", true}, // inherited
+		{"test.tmp not in src", "test.tmp", false},        // not in src/
+		{"src/test.tmp in src", "src/test.tmp", true},     // in src/
+		{"src/keep.tmp negated", "src/keep.tmp", false},   // negated in src/
+		{"src/lib/test.tmp inherited", "src/lib/test.tmp", true}, // inherited
 
 		// src/lib patterns only in src/lib/
-		{"test.bak", false},        // not in src/lib/
-		{"src/test.bak", false},    // not in src/lib/
-		{"src/lib/test.bak", true}, // in src/lib/
+		{"test.bak not in src/lib", "test.bak", false},        // not in src/lib/
+		{"src/test.bak not in src/lib", "src/test.bak", false}, // not in src/lib/
+		{"src/lib/test.bak in src/lib", "src/lib/test.bak", true}, // in src/lib/
 	}
 
 	for _, tt := range tests {
-		got := m.Match(tt.path, false)
-		if got != tt.want {
-			t.Errorf("Match(%q) = %v, want %v", tt.path, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.Match(tt.path, false)
+			if got != tt.want {
+				t.Errorf("Match(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -515,37 +527,40 @@ Thumbs.db
 `))
 
 	tests := []struct {
+		name  string
 		path  string
 		isDir bool
 		want  bool
 	}{
-		{"node_modules", true, true},
-		{"node_modules/lodash/index.js", false, true},
-		{"vendor/lib/file.go", false, true},
-		{"build/app.exe", false, true},
-		{"dist/bundle.js", false, true},
-		{"app.exe", false, true},
-		{"debug.log", false, true},
-		{"logs/error.log", false, true},
-		{".idea/workspace.xml", false, true},
-		{".vscode/settings.json", false, true},
-		{"file.swp", false, true},
-		{".DS_Store", false, true},
-		{"Thumbs.db", false, true},
-		{".env", false, true},
-		{".env.local", false, true},
-		{".env.production.local", false, true},
-		{".gitkeep", false, false}, // negated
-		{"src/main.go", false, false},
-		{"README.md", false, false},
-		{"package.json", false, false},
+		{"node_modules dir", "node_modules", true, true},
+		{"node_modules/lodash/index.js", "node_modules/lodash/index.js", false, true},
+		{"vendor/lib/file.go", "vendor/lib/file.go", false, true},
+		{"build/app.exe", "build/app.exe", false, true},
+		{"dist/bundle.js", "dist/bundle.js", false, true},
+		{"app.exe", "app.exe", false, true},
+		{"debug.log", "debug.log", false, true},
+		{"logs/error.log", "logs/error.log", false, true},
+		{".idea/workspace.xml", ".idea/workspace.xml", false, true},
+		{".vscode/settings.json", ".vscode/settings.json", false, true},
+		{"file.swp", "file.swp", false, true},
+		{".DS_Store", ".DS_Store", false, true},
+		{"Thumbs.db", "Thumbs.db", false, true},
+		{".env", ".env", false, true},
+		{".env.local", ".env.local", false, true},
+		{".env.production.local", ".env.production.local", false, true},
+		{".gitkeep negated", ".gitkeep", false, false}, // negated
+		{"src/main.go no match", "src/main.go", false, false},
+		{"README.md no match", "README.md", false, false},
+		{"package.json no match", "package.json", false, false},
 	}
 
 	for _, tt := range tests {
-		got := m.Match(tt.path, tt.isDir)
-		if got != tt.want {
-			t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.Match(tt.path, tt.isDir)
+			if got != tt.want {
+				t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -556,22 +571,25 @@ func TestMatcher_GitDirectory(t *testing.T) {
 	m.AddPatterns("", []byte(".git/\n"))
 
 	tests := []struct {
+		name  string
 		path  string
 		isDir bool
 		want  bool
 	}{
-		{".git", true, true},
-		{".git/config", false, true},
-		{".git/objects/pack/pack-123.idx", false, true},
-		{".gitignore", false, false}, // not .git/
-		{".github/workflows/ci.yml", false, false},
+		{".git dir", ".git", true, true},
+		{".git/config", ".git/config", false, true},
+		{".git/objects/pack/pack-123.idx", ".git/objects/pack/pack-123.idx", false, true},
+		{".gitignore not .git", ".gitignore", false, false}, // not .git/
+		{".github/workflows/ci.yml", ".github/workflows/ci.yml", false, false},
 	}
 
 	for _, tt := range tests {
-		got := m.Match(tt.path, tt.isDir)
-		if got != tt.want {
-			t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.Match(tt.path, tt.isDir)
+			if got != tt.want {
+				t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -586,28 +604,31 @@ foo/**
 `))
 
 	tests := []struct {
+		name string
 		path string
 		want bool
 	}{
-		{"logs", true},
-		{"src/logs", true},
-		{"a/b/c/logs", true},
-		{"logs/debug.log", true},
-		{"src/logs/error.log", true},
-		{".cache", true},
-		{"home/.cache", true},
-		{"a/b", true},
-		{"a/x/b", true},
-		{"a/x/y/z/b", true},
-		{"foo/bar", true},
-		{"foo/bar/baz", true},
+		{"logs root", "logs", true},
+		{"src/logs nested", "src/logs", true},
+		{"a/b/c/logs deeply nested", "a/b/c/logs", true},
+		{"logs/debug.log under logs", "logs/debug.log", true},
+		{"src/logs/error.log nested under logs", "src/logs/error.log", true},
+		{".cache root", ".cache", true},
+		{"home/.cache nested", "home/.cache", true},
+		{"a/b middle star", "a/b", true},
+		{"a/x/b one segment star", "a/x/b", true},
+		{"a/x/y/z/b many segments star", "a/x/y/z/b", true},
+		{"foo/bar under foo", "foo/bar", true},
+		{"foo/bar/baz deeply under foo", "foo/bar/baz", true},
 	}
 
 	for _, tt := range tests {
-		got := m.Match(tt.path, false)
-		if got != tt.want {
-			t.Errorf("Match(%q) = %v, want %v", tt.path, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.Match(tt.path, false)
+			if got != tt.want {
+				t.Errorf("Match(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
 	}
 }
 

@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -29,12 +30,14 @@ func TestMatchSingleSegment_Literal(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		seg := segment{value: tt.pattern, wildcard: false}
-		got := matchSingleSegment(seg, tt.input, false, testCtx(0))
-		if got != tt.want {
-			t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
-				tt.pattern, tt.input, got, tt.want)
-		}
+		t.Run(tt.pattern+"_"+tt.input, func(t *testing.T) {
+			seg := segment{value: tt.pattern, wildcard: false}
+			got := matchSingleSegment(seg, tt.input, false, testCtx(0))
+			if got != tt.want {
+				t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
+					tt.pattern, tt.input, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -90,12 +93,14 @@ func TestMatchSingleSegment_Wildcard(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		seg := segment{value: tt.pattern, wildcard: true}
-		got := matchSingleSegment(seg, tt.input, false, testCtx(0))
-		if got != tt.want {
-			t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
-				tt.pattern, tt.input, got, tt.want)
-		}
+		t.Run(tt.pattern+"_"+tt.input, func(t *testing.T) {
+			seg := segment{value: tt.pattern, wildcard: true}
+			got := matchSingleSegment(seg, tt.input, false, testCtx(0))
+			if got != tt.want {
+				t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
+					tt.pattern, tt.input, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -124,18 +129,21 @@ func TestMatchSingleSegment_CaseInsensitive(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		wildcard := containsWildcard(tt.pattern)
-		value := tt.pattern
-		if tt.caseInsensitive {
-			// Simulate AddPatterns pre-lowercasing
-			value = strings.ToLower(value)
-		}
-		seg := segment{value: value, wildcard: wildcard}
-		got := matchSingleSegment(seg, tt.input, tt.caseInsensitive, testCtx(0))
-		if got != tt.want {
-			t.Errorf("matchSingleSegment(%q, %q, caseInsensitive=%v) = %v, want %v",
-				tt.pattern, tt.input, tt.caseInsensitive, got, tt.want)
-		}
+		name := fmt.Sprintf("%s_%s_ci=%v", tt.pattern, tt.input, tt.caseInsensitive)
+		t.Run(name, func(t *testing.T) {
+			wildcard := containsWildcard(tt.pattern)
+			value := tt.pattern
+			if tt.caseInsensitive {
+				// Simulate AddPatterns pre-lowercasing
+				value = strings.ToLower(value)
+			}
+			seg := segment{value: value, wildcard: wildcard}
+			got := matchSingleSegment(seg, tt.input, tt.caseInsensitive, testCtx(0))
+			if got != tt.want {
+				t.Errorf("matchSingleSegment(%q, %q, caseInsensitive=%v) = %v, want %v",
+					tt.pattern, tt.input, tt.caseInsensitive, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -249,11 +257,13 @@ func TestMatchGlob(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := matchGlob(tt.pattern, tt.s, testCtx(0))
-		if got != tt.want {
-			t.Errorf("matchGlob(%q, %q) = %v, want %v",
-				tt.pattern, tt.s, got, tt.want)
-		}
+		t.Run(fmt.Sprintf("%s_%s", tt.pattern, tt.s), func(t *testing.T) {
+			got := matchGlob(tt.pattern, tt.s, testCtx(0))
+			if got != tt.want {
+				t.Errorf("matchGlob(%q, %q) = %v, want %v",
+					tt.pattern, tt.s, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -407,11 +417,13 @@ func TestMatchGlob_CharClass(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := matchGlob(tt.pattern, tt.s, testCtx(0))
-		if got != tt.want {
-			t.Errorf("matchGlob(%q, %q) = %v, want %v",
-				tt.pattern, tt.s, got, tt.want)
-		}
+		t.Run(fmt.Sprintf("%s_%s", tt.pattern, tt.s), func(t *testing.T) {
+			got := matchGlob(tt.pattern, tt.s, testCtx(0))
+			if got != tt.want {
+				t.Errorf("matchGlob(%q, %q) = %v, want %v",
+					tt.pattern, tt.s, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -847,16 +859,18 @@ func TestSplitPath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := splitPath(tt.path)
-		if len(got) != len(tt.want) {
-			t.Errorf("splitPath(%q) = %v, want %v", tt.path, got, tt.want)
-			continue
-		}
-		for i := range got {
-			if got[i] != tt.want[i] {
-				t.Errorf("splitPath(%q)[%d] = %q, want %q", tt.path, i, got[i], tt.want[i])
+		t.Run(fmt.Sprintf("%q", tt.path), func(t *testing.T) {
+			got := splitPath(tt.path)
+			if len(got) != len(tt.want) {
+				t.Errorf("splitPath(%q) = %v, want %v", tt.path, got, tt.want)
+				return
 			}
-		}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("splitPath(%q)[%d] = %q, want %q", tt.path, i, got[i], tt.want[i])
+				}
+			}
+		})
 	}
 }
 

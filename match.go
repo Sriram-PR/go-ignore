@@ -11,10 +11,15 @@ import (
 // Can be overridden via MatcherOptions.
 const DefaultMaxBacktrackIterations = 10000
 
+// maxRecursionDepth limits the recursion depth in matching functions
+// to prevent stack overflow from deeply nested patterns.
+const maxRecursionDepth = 200
+
 // matchContext tracks state during matching to prevent runaway backtracking.
 type matchContext struct {
 	iterations int
 	maxIter    int
+	depth      int
 }
 
 // newMatchContext creates a new match context with the specified limit.
@@ -131,8 +136,8 @@ func matchFloating(r *rule, matchSegments []string, prefixMatch, caseInsensitive
 // matchSegmentsExact recursively matches pattern segments against path segments.
 // This is the core matching algorithm with ** support.
 func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, caseInsensitive bool) bool {
-	// Check iteration limit
-	if !ctx.tick() {
+	// Check iteration limit and recursion depth
+	if !ctx.tick() || ctx.depth >= maxRecursionDepth {
 		return false
 	}
 
@@ -147,14 +152,18 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, cas
 	if seg.doubleStar {
 		// ** can match zero or more path segments
 		// Try matching remaining pattern against path starting at each position
+		ctx.depth++
 		for i := 0; i <= len(path); i++ {
 			if matchSegmentsExact(pattern[1:], path[i:], ctx, caseInsensitive) {
+				ctx.depth--
 				return true
 			}
 			if !ctx.tick() {
+				ctx.depth--
 				return false
 			}
 		}
+		ctx.depth--
 		return false
 	}
 
@@ -169,7 +178,10 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, cas
 	}
 
 	// Recurse for remaining segments
-	return matchSegmentsExact(pattern[1:], path[1:], ctx, caseInsensitive)
+	ctx.depth++
+	result := matchSegmentsExact(pattern[1:], path[1:], ctx, caseInsensitive)
+	ctx.depth--
+	return result
 }
 
 // matchSegmentsPrefix matches pattern as a PREFIX of path.
@@ -177,8 +189,8 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, cas
 // after the pattern is fully matched. Used for directory patterns matching
 // files inside the directory.
 func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, caseInsensitive bool) bool {
-	// Check iteration limit
-	if !ctx.tick() {
+	// Check iteration limit and recursion depth
+	if !ctx.tick() || ctx.depth >= maxRecursionDepth {
 		return false
 	}
 
@@ -195,14 +207,18 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, ca
 	if seg.doubleStar {
 		// ** can match zero or more path segments
 		// Try matching remaining pattern against path starting at each position
+		ctx.depth++
 		for i := 0; i <= len(path); i++ {
 			if matchSegmentsPrefix(pattern[1:], path[i:], ctx, caseInsensitive) {
+				ctx.depth--
 				return true
 			}
 			if !ctx.tick() {
+				ctx.depth--
 				return false
 			}
 		}
+		ctx.depth--
 		return false
 	}
 
@@ -217,7 +233,10 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, ca
 	}
 
 	// Recurse for remaining segments
-	return matchSegmentsPrefix(pattern[1:], path[1:], ctx, caseInsensitive)
+	ctx.depth++
+	result := matchSegmentsPrefix(pattern[1:], path[1:], ctx, caseInsensitive)
+	ctx.depth--
+	return result
 }
 
 // matchSingleSegment matches a single pattern segment against a path segment.

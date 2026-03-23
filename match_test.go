@@ -239,8 +239,8 @@ func TestMatchGlob(t *testing.T) {
 		{"?*?", "a", false},       // Need at least 2 chars
 
 		// ? with multi-byte Unicode (? matches one byte, not one rune)
-		{"?", "é", false},  // é is 2 bytes, ? matches 1 byte
-		{"??", "é", true},  // 2 bytes, ?? matches both
+		{"?", "é", false},   // é is 2 bytes, ? matches 1 byte
+		{"??", "é", true},   // 2 bytes, ?? matches both
 		{"???", "é", false}, // too many ?s for 2-byte char
 
 		// Backslash escaping

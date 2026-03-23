@@ -338,14 +338,14 @@ func TestMatch_NestedGitignore(t *testing.T) {
 		{"deeply nested src/lib/test.log", "src/lib/test.log", true},
 
 		// src patterns only in src/
-		{"test.tmp not in src", "test.tmp", false},        // not in src/
-		{"src/test.tmp in src", "src/test.tmp", true},     // in src/
-		{"src/keep.tmp negated", "src/keep.tmp", false},   // negated in src/
+		{"test.tmp not in src", "test.tmp", false},               // not in src/
+		{"src/test.tmp in src", "src/test.tmp", true},            // in src/
+		{"src/keep.tmp negated", "src/keep.tmp", false},          // negated in src/
 		{"src/lib/test.tmp inherited", "src/lib/test.tmp", true}, // inherited
 
 		// src/lib patterns only in src/lib/
-		{"test.bak not in src/lib", "test.bak", false},        // not in src/lib/
-		{"src/test.bak not in src/lib", "src/test.bak", false}, // not in src/lib/
+		{"test.bak not in src/lib", "test.bak", false},            // not in src/lib/
+		{"src/test.bak not in src/lib", "src/test.bak", false},    // not in src/lib/
 		{"src/lib/test.bak in src/lib", "src/lib/test.bak", true}, // in src/lib/
 	}
 

@@ -117,13 +117,11 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 		return nil
 	}
 
-	// Normalize basePath for consistent reporting (parseLines also normalizes
-	// internally for rule scoping; we normalize here so the handler receives
-	// the same basePath that rules store).
+	// Normalize basePath once for consistent rule scoping and warning reporting.
 	normalizedBase := normalizeBasePath(basePath)
 
 	// Parse rules (this doesn't need the lock)
-	newRules, parseWarnings := parseLines(basePath, content)
+	newRules, parseWarnings := parseLines(normalizedBase, content)
 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
 	// This avoids calling strings.ToLower on every match call.

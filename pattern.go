@@ -39,7 +39,6 @@ type segment struct {
 func parseLines(basePath string, content []byte) ([]rule, []ParseWarning) {
 	// Normalize content (BOM, CRLF)
 	content = normalizeContent(content)
-	basePath = normalizeBasePath(basePath)
 
 	lines := strings.Split(string(content), "\n")
 	var rules []rule

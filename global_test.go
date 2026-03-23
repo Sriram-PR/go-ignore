@@ -120,6 +120,14 @@ func TestGitConfigExcludesFile_Success(t *testing.T) {
 	// Prevent XDG fallback from interfering
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "nonexistent-xdg"))
 
+	// Verify the precondition: git must actually read our config.
+	// On some platforms (e.g., Windows CI), GIT_CONFIG_GLOBAL may not
+	// be respected by the installed git version.
+	path, err := gitConfigExcludesFile()
+	if err != nil || path == "" {
+		t.Skip("git config does not respect GIT_CONFIG_GLOBAL on this platform")
+	}
+
 	m := New()
 	if err := m.AddGlobalPatterns(); err != nil {
 		t.Fatalf("AddGlobalPatterns: %v", err)

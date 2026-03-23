@@ -136,24 +136,22 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 		}
 	}
 
-	// Acquire write lock to add rules and handle warnings
+	// Acquire write lock to add rules and capture handler ref
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Add rules
 	m.rules = append(m.rules, newRules...)
+	handler := m.handler
+	if handler == nil {
+		m.warnings = append(m.warnings, parseWarnings...)
+	}
+	m.mu.Unlock()
 
-	// Handle warnings
-	if m.handler != nil {
-		// Send to handler with normalized basePath (consistent with rule.basePath)
+	// Dispatch warnings outside lock to prevent deadlock if handler calls back
+	if handler != nil {
 		for _, w := range parseWarnings {
-			m.handler(normalizedBase, w)
+			handler(normalizedBase, w)
 		}
 		return nil
 	}
-
-	// Collect warnings
-	m.warnings = append(m.warnings, parseWarnings...)
 	return parseWarnings
 }
 

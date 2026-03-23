@@ -265,7 +265,7 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	for i := range m.rules {
 		r := &m.rules[i]
 
-		if matchRule(r, path, pathSegments, isDir, m.opts.CaseInsensitive, ctx) {
+		if matchRule(r, path, pathSegments, isDir, m.opts.CaseInsensitive, &ctx) {
 			result.Matched = true
 			result.Rule = r.pattern
 			result.BasePath = r.basePath

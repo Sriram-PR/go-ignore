@@ -25,13 +25,12 @@ type matchContext struct {
 // newMatchContext creates a new match context with the specified limit.
 // If maxIter is 0, uses DefaultMaxBacktrackIterations.
 // If maxIter is -1, no limit is applied (not recommended).
-func newMatchContext(maxIter int) *matchContext {
+func newMatchContext(maxIter int) matchContext {
 	if maxIter == 0 {
 		maxIter = DefaultMaxBacktrackIterations
 	}
-	return &matchContext{
-		iterations: 0,
-		maxIter:    maxIter,
+	return matchContext{
+		maxIter: maxIter,
 	}
 }
 

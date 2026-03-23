@@ -5,6 +5,12 @@ import (
 	"testing"
 )
 
+// testCtx creates a matchContext for tests and returns a pointer to it.
+func testCtx(maxIter int) *matchContext {
+	c := newMatchContext(maxIter)
+	return &c
+}
+
 func TestMatchSingleSegment_Literal(t *testing.T) {
 	tests := []struct {
 		pattern string
@@ -24,7 +30,7 @@ func TestMatchSingleSegment_Literal(t *testing.T) {
 
 	for _, tt := range tests {
 		seg := segment{value: tt.pattern, wildcard: false}
-		got := matchSingleSegment(seg, tt.input, false, newMatchContext(0))
+		got := matchSingleSegment(seg, tt.input, false, testCtx(0))
 		if got != tt.want {
 			t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
 				tt.pattern, tt.input, got, tt.want)
@@ -85,7 +91,7 @@ func TestMatchSingleSegment_Wildcard(t *testing.T) {
 
 	for _, tt := range tests {
 		seg := segment{value: tt.pattern, wildcard: true}
-		got := matchSingleSegment(seg, tt.input, false, newMatchContext(0))
+		got := matchSingleSegment(seg, tt.input, false, testCtx(0))
 		if got != tt.want {
 			t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
 				tt.pattern, tt.input, got, tt.want)
@@ -125,7 +131,7 @@ func TestMatchSingleSegment_CaseInsensitive(t *testing.T) {
 			value = strings.ToLower(value)
 		}
 		seg := segment{value: value, wildcard: wildcard}
-		got := matchSingleSegment(seg, tt.input, tt.caseInsensitive, newMatchContext(0))
+		got := matchSingleSegment(seg, tt.input, tt.caseInsensitive, testCtx(0))
 		if got != tt.want {
 			t.Errorf("matchSingleSegment(%q, %q, caseInsensitive=%v) = %v, want %v",
 				tt.pattern, tt.input, tt.caseInsensitive, got, tt.want)
@@ -238,7 +244,7 @@ func TestMatchGlob(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := matchGlob(tt.pattern, tt.s, newMatchContext(0))
+		got := matchGlob(tt.pattern, tt.s, testCtx(0))
 		if got != tt.want {
 			t.Errorf("matchGlob(%q, %q) = %v, want %v",
 				tt.pattern, tt.s, got, tt.want)
@@ -388,7 +394,7 @@ func TestMatchGlob_CharClass(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := matchGlob(tt.pattern, tt.s, newMatchContext(0))
+		got := matchGlob(tt.pattern, tt.s, testCtx(0))
 		if got != tt.want {
 			t.Errorf("matchGlob(%q, %q) = %v, want %v",
 				tt.pattern, tt.s, got, tt.want)
@@ -461,7 +467,7 @@ func TestMatchSegments_Simple(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := newMatchContext(0)
+			ctx := testCtx(0)
 			got := matchSegmentsExact(tt.pattern, tt.path, ctx, false)
 			if got != tt.want {
 				t.Errorf("matchSegmentsExact() = %v, want %v", got, tt.want)
@@ -591,7 +597,7 @@ func TestMatchSegments_DoubleStar(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := newMatchContext(0)
+			ctx := testCtx(0)
 			got := matchSegmentsExact(tt.pattern, tt.path, ctx, false)
 			if got != tt.want {
 				t.Errorf("matchSegmentsExact() = %v, want %v", got, tt.want)
@@ -653,7 +659,7 @@ func TestMatchRule_Basic(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, false, newMatchContext(0))
+			got := matchRule(r, path, pathSegs, tt.isDir, false, testCtx(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q, isDir=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.isDir, got, tt.want)
@@ -697,7 +703,7 @@ func TestMatchRule_BasePath(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, false, false, newMatchContext(0))
+			got := matchRule(r, path, pathSegs, false, false, testCtx(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, basePath=%q, path=%q) = %v, want %v",
 					tt.pattern, tt.basePath, tt.path, got, tt.want)
@@ -747,7 +753,7 @@ func TestMatchRule_PathologicalPattern(t *testing.T) {
 	pathSegs := splitPath(path)
 
 	// Should complete without hanging (due to backtrack limit)
-	got := matchRule(r, path, pathSegs, false, false, newMatchContext(1000))
+	got := matchRule(r, path, pathSegs, false, false, testCtx(1000))
 	if got {
 		t.Error("expected no match for pathological pattern")
 	}
@@ -761,7 +767,7 @@ func TestMatchGlob_PathologicalPattern(t *testing.T) {
 	s := "aaaaaaaaaaaaaaaaaaaaaaaa" // 24 a's, no b — no match possible
 
 	ctx := newMatchContext(500) // Low limit to verify it terminates
-	got := matchGlob(pattern, s, ctx)
+	got := matchGlob(pattern, s, &ctx)
 	if got {
 		t.Error("expected no match for pathological glob pattern")
 	}
@@ -803,7 +809,7 @@ func TestMatchRule_CaseInsensitive(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, false, tt.caseInsensitive, newMatchContext(0))
+			got := matchRule(r, path, pathSegs, false, tt.caseInsensitive, testCtx(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q, caseInsensitive=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.caseInsensitive, got, tt.want)
@@ -890,7 +896,7 @@ func TestMatchRule_DirectoryContents(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, false, newMatchContext(0))
+			got := matchRule(r, path, pathSegs, tt.isDir, false, testCtx(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q, isDir=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.isDir, got, tt.want)
@@ -926,7 +932,7 @@ func TestMatchRule_EscapedWildcards(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, false, false, newMatchContext(0))
+			got := matchRule(r, path, pathSegs, false, false, testCtx(0))
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q) = %v, want %v",
 					tt.pattern, tt.path, got, tt.want)
@@ -988,7 +994,7 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, false, newMatchContext(0))
+			got := matchRule(r, path, pathSegs, tt.isDir, false, testCtx(0))
 			if got != tt.want {
 				t.Errorf("pattern %q, path %q: got %v, want %v",
 					tt.pattern, tt.path, got, tt.want)
@@ -999,13 +1005,13 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 
 func BenchmarkMatchGlob_Simple(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		matchGlob("*.log", "test.log", newMatchContext(0))
+		matchGlob("*.log", "test.log", testCtx(0))
 	}
 }
 
 func BenchmarkMatchGlob_Complex(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		matchGlob("*test*spec*.go", "my_test_spec_file.go", newMatchContext(0))
+		matchGlob("*test*spec*.go", "my_test_spec_file.go", testCtx(0))
 	}
 }
 
@@ -1014,7 +1020,7 @@ func BenchmarkMatchSegments_Simple(b *testing.B) {
 	path := []string{"src", "main.go"}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := newMatchContext(0)
+		ctx := testCtx(0)
 		matchSegmentsExact(pattern, path, ctx, false)
 	}
 }
@@ -1024,7 +1030,7 @@ func BenchmarkMatchSegments_DoubleStar(b *testing.B) {
 	path := []string{"src", "lib", "test", "unit", "foo_test.go"}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := newMatchContext(0)
+		ctx := testCtx(0)
 		matchSegmentsExact(pattern, path, ctx, false)
 	}
 }

@@ -171,7 +171,7 @@ func FuzzGlob(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, pattern, s string) {
 		// Should never panic
-		_ = matchGlob(pattern, s, newMatchContext(0))
+		_ = matchGlob(pattern, s, testCtx(0))
 	})
 }
 
@@ -293,7 +293,7 @@ func FuzzSegmentMatching(f *testing.F) {
 		pathSegs := splitPath(path)
 
 		// Should never panic
-		ctx := newMatchContext(1000) // Limit iterations for fuzzing
+		ctx := testCtx(1000) // Limit iterations for fuzzing
 		_ = matchSegmentsExact(segments, pathSegs, ctx, false)
 	})
 }

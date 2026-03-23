@@ -78,8 +78,7 @@ func normalizeBasePath(basePath string) string {
 //
 // Normalization steps (applied in order):
 //  1. Strip UTF-8 BOM if present (EF BB BF) - loops for idempotency
-//  2. Normalize CRLF to LF (Windows line endings)
-//  3. Normalize standalone CR to LF (old Mac format)
+//  2. Normalize CRLF and standalone CR to LF (single pass)
 //
 // This ensures consistent parsing regardless of the file's origin platform.
 func normalizeContent(content []byte) []byte {
@@ -93,13 +92,22 @@ func normalizeContent(content []byte) []byte {
 		content = content[3:]
 	}
 
-	// Step 2: Normalize CRLF to LF (Windows line endings)
-	content = bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n"))
-
-	// Step 3: Handle standalone CR (old Mac format)
-	content = bytes.ReplaceAll(content, []byte("\r"), []byte("\n"))
-
-	return content
+	// Step 2: Normalize CRLF and standalone CR to LF in a single pass
+	if !bytes.ContainsRune(content, '\r') {
+		return content // fast path: no CR at all
+	}
+	buf := make([]byte, 0, len(content))
+	for i := 0; i < len(content); i++ {
+		if content[i] == '\r' {
+			buf = append(buf, '\n')
+			if i+1 < len(content) && content[i+1] == '\n' {
+				i++ // skip the \n after \r
+			}
+		} else {
+			buf = append(buf, content[i])
+		}
+	}
+	return buf
 }
 
 // trimTrailingWhitespace removes trailing spaces and tabs from a line,

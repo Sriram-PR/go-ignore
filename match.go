@@ -96,8 +96,8 @@ func resolveMatchSegments(r *rule, path string, pathSegments []string) []string 
 	if path == r.basePath {
 		return []string{}
 	}
-	matchPath := path[len(r.basePathSlash):] // skip basePath + "/"
-	return splitPath(matchPath)
+	// Sub-slice the already-split path segments instead of re-splitting
+	return pathSegments[r.baseSegCount:]
 }
 
 // matchFloating tries to match a floating (unanchored) pattern at any position in the path.

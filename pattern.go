@@ -19,6 +19,7 @@ type rule struct {
 	pattern       string    // original pattern (for debugging/reporting)
 	basePath      string    // directory scope (empty = root)
 	basePathSlash string    // basePath + "/" (pre-computed, empty if basePath is empty)
+	baseSegCount  int       // number of segments in basePath (pre-computed)
 	segments      []segment // parsed pattern segments for matching
 	line          int       // line number in source file (1-indexed)
 	negate        bool      // true if pattern started with !
@@ -168,6 +169,7 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 	}
 	if basePath != "" {
 		r.basePathSlash = basePath + "/"
+		r.baseSegCount = len(splitPath(basePath))
 	}
 	return r, nil
 }

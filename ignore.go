@@ -68,11 +68,8 @@ type Matcher struct {
 // New creates an empty Matcher with default options.
 func New() *Matcher {
 	return &Matcher{
-		rules:    make([]rule, 0),
-		warnings: make([]ParseWarning, 0),
 		opts: MatcherOptions{
 			MaxBacktrackIterations: DefaultMaxBacktrackIterations,
-			CaseInsensitive:        false,
 		},
 	}
 }
@@ -83,9 +80,7 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 		opts.MaxBacktrackIterations = DefaultMaxBacktrackIterations
 	}
 	return &Matcher{
-		rules:    make([]rule, 0),
-		warnings: make([]ParseWarning, 0),
-		opts:     opts,
+		opts: opts,
 	}
 }
 

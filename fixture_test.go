@@ -6,6 +6,76 @@ import (
 	"testing"
 )
 
+// TestFixtureMatchCorrectness loads fixture files and verifies match behavior.
+func TestFixtureMatchCorrectness(t *testing.T) {
+	type matchCase struct {
+		path  string
+		isDir bool
+		want  bool
+	}
+
+	fixtures := []struct {
+		path  string
+		cases []matchCase
+	}{
+		{
+			"testdata/simple.gitignore",
+			[]matchCase{
+				{"test.log", false, true},          // *.log
+				{"build", true, true},               // build/
+				{"build/output.js", false, true},     // inside build/
+				{".DS_Store", false, true},           // .DS_Store
+				{"src/main.go", false, false},        // no match
+				{"node_modules", true, true},         // node_modules/
+				{"Thumbs.db", false, true},           // Thumbs.db
+			},
+		},
+		{
+			"testdata/complex.gitignore",
+			[]matchCase{
+				{"important.log", false, false},             // negated by !important.log
+				{"keep.log", false, false},                   // negated by !keep.log
+				{"debug.log", false, true},                   // *.log
+				{"src/generated/file.go", false, true},       // src/generated/
+				{"docs/api/index.html", false, true},         // docs/**
+				{"config.local", false, true},                // /config.local
+				{"sub/config.local", false, false},           // anchored, not nested
+				{"a/x/y/b", false, true},                     // a/**/b
+			},
+		},
+		{
+			"testdata/edge-cases.gitignore",
+			[]matchCase{
+				{"foo bar.txt", false, true},       // spaces in filename
+				{".env.local", false, true},        // .env.local
+				{".env.production", false, true},   // .env.*
+				{"#not-a-comment", false, true},    // \#not-a-comment
+				{"test.tar.gz", false, true},       // *.tar.gz
+				{"test.log.old", false, true},      // *.log.old
+			},
+		},
+	}
+
+	for _, f := range fixtures {
+		t.Run(filepath.Base(f.path), func(t *testing.T) {
+			content, err := os.ReadFile(f.path)
+			if err != nil {
+				t.Fatalf("read fixture %s: %v", f.path, err)
+			}
+
+			m := New()
+			m.AddPatterns("", content)
+
+			for _, tc := range f.cases {
+				got := m.Match(tc.path, tc.isDir)
+				if got != tc.want {
+					t.Errorf("Match(%q, %v) = %v, want %v", tc.path, tc.isDir, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
 // TestLoadFixtures validates that all testdata fixture files parse without
 // panics and produce the expected number of rules and no unexpected warnings.
 func TestLoadFixtures(t *testing.T) {

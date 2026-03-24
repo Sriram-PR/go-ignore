@@ -49,7 +49,7 @@ func parseLines(basePath string, content []byte, maxPatternLength int) ([]rule, 
 	content = normalizeContent(content)
 
 	lines := strings.Split(string(content), "\n")
-	var rules []rule
+	rules := make([]rule, 0, len(lines))
 	var warnings []ParseWarning
 
 	for i, line := range lines {

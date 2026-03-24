@@ -631,6 +631,52 @@ func TestMatchSegments_DoubleStar(t *testing.T) {
 	}
 }
 
+func TestMatchSegmentsExact_RecursionDepthLimit(t *testing.T) {
+	// Build a pattern with 250 ** segments (exceeds maxRecursionDepth of 200)
+	// followed by a literal target segment.
+	pattern := make([]segment, 251)
+	for i := 0; i < 250; i++ {
+		pattern[i] = segment{doubleStar: true}
+	}
+	pattern[250] = segment{value: "target"}
+
+	// Build a path with 250 segments ending in "target"
+	path := make([]string, 250)
+	for i := 0; i < 249; i++ {
+		path[i] = "a"
+	}
+	path[249] = "target"
+
+	// Use a high tick budget so depth is the limiting factor
+	ctx := testCtx(1_000_000)
+	got := matchSegmentsExact(pattern, path, ctx, false)
+	if got {
+		t.Error("expected false when recursion depth exceeds maxRecursionDepth")
+	}
+}
+
+func TestMatchSegmentsPrefix_RecursionDepthLimit(t *testing.T) {
+	// Same setup but for prefix matching
+	pattern := make([]segment, 251)
+	for i := 0; i < 250; i++ {
+		pattern[i] = segment{doubleStar: true}
+	}
+	pattern[250] = segment{value: "target"}
+
+	path := make([]string, 251)
+	for i := 0; i < 249; i++ {
+		path[i] = "a"
+	}
+	path[249] = "target"
+	path[250] = "file.txt" // extra segment for prefix match
+
+	ctx := testCtx(1_000_000)
+	got := matchSegmentsPrefix(pattern, path, ctx, false)
+	if got {
+		t.Error("expected false when recursion depth exceeds maxRecursionDepth")
+	}
+}
+
 func TestMatchRule_Basic(t *testing.T) {
 	tests := []struct {
 		name    string

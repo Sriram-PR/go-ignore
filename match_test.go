@@ -394,6 +394,39 @@ func TestMatchGlob_CharClass(t *testing.T) {
 		{"[[:space:]]", "\t", true},
 		{"[[:space:]]", "a", false},
 
+		// POSIX blank
+		{"[[:blank:]]", " ", true},
+		{"[[:blank:]]", "\t", true},
+		{"[[:blank:]]", "a", false},
+		{"[[:blank:]]", "\n", false},
+
+		// POSIX print
+		{"[[:print:]]", "a", true},
+		{"[[:print:]]", " ", true},
+		{"[[:print:]]", "~", true},
+		{"[[:print:]]", "\x01", false},
+		{"[[:print:]]", "\x7f", false},
+
+		// POSIX graph
+		{"[[:graph:]]", "a", true},
+		{"[[:graph:]]", "!", true},
+		{"[[:graph:]]", " ", false},
+		{"[[:graph:]]", "\x01", false},
+
+		// POSIX punct
+		{"[[:punct:]]", "!", true},
+		{"[[:punct:]]", ".", true},
+		{"[[:punct:]]", "@", true},
+		{"[[:punct:]]", "{", true},
+		{"[[:punct:]]", "a", false},
+		{"[[:punct:]]", "0", false},
+
+		// POSIX cntrl
+		{"[[:cntrl:]]", "\x01", true},
+		{"[[:cntrl:]]", "\x7f", true},
+		{"[[:cntrl:]]", "a", false},
+		{"[[:cntrl:]]", " ", false},
+
 		// Invalid POSIX name — fallback to literal
 		{"[[:bogus:]]", "[", false},
 

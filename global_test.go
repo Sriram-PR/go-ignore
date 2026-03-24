@@ -341,6 +341,35 @@ func TestAddExcludePatterns_EmptyFile(t *testing.T) {
 	}
 }
 
+func TestAddExcludePatterns_ReadPermissionError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission test not reliable on Windows")
+	}
+
+	tmp := t.TempDir()
+	infoDir := filepath.Join(tmp, "info")
+	if err := os.MkdirAll(infoDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	excludePath := filepath.Join(infoDir, "exclude")
+	if err := os.WriteFile(excludePath, []byte("*.log\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := os.Chmod(excludePath, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(excludePath, 0o644)
+	})
+
+	m := New()
+	err := m.AddExcludePatterns(tmp)
+	if err == nil {
+		t.Fatal("expected error for unreadable exclude file, got nil")
+	}
+}
+
 func TestAddGlobalPatterns_ReadPermissionError(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission test not reliable on Windows")

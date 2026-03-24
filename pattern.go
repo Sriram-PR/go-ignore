@@ -213,15 +213,25 @@ func parseSegments(pattern string) []segment {
 		if part == "**" {
 			seg.doubleStar = true
 			seg.value = ""
-		} else if strings.Contains(part, "*") || strings.Contains(part, "?") || strings.Contains(part, "\\") || strings.Contains(part, "[") {
-			// Segments with *, ?, or \ all require glob matching.
-			// Backslash escapes (e.g., \* for literal *) are resolved during matching.
-			seg.wildcard = true
-			seg.hasStar = strings.Contains(part, "*")
-			seg.hasQuestion = strings.Contains(part, "?")
-			seg.hasEscape = strings.Contains(part, "\\")
-			seg.hasCharClass = strings.Contains(part, "[")
-			seg.starCount = strings.Count(part, "*")
+		} else {
+			// Single pass to detect wildcard characters and compute flags.
+			for i := 0; i < len(part); i++ {
+				switch part[i] {
+				case '*':
+					seg.wildcard = true
+					seg.hasStar = true
+					seg.starCount++
+				case '?':
+					seg.wildcard = true
+					seg.hasQuestion = true
+				case '\\':
+					seg.wildcard = true
+					seg.hasEscape = true
+				case '[':
+					seg.wildcard = true
+					seg.hasCharClass = true
+				}
+			}
 		}
 
 		segments = append(segments, seg)

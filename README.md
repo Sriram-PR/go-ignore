@@ -350,13 +350,14 @@ Benchmarked on Intel i9-14900HX (Go 1.25, linux/amd64):
 
 | Operation | Time | Allocs |
 |-----------|------|--------|
-| Simple match | ~130–302ns | 2 |
-| Match with `**` (shallow) | ~208ns | 2 |
-| Match with `**` (deep path) | ~955ns | 2 |
-| Match against 100 rules | ~8–14µs | 2 |
-| Pathological `**` (bounded) | ~678–786ns | 2 |
-| Glob matching (no alloc) | ~37–91ns | 0 |
-| Path normalization | ~25ns | 0 |
+| Simple match (hit) | ~157ns | 0 |
+| Simple match (miss) | ~214ns | 0 |
+| Match with `**` (shallow) | ~174ns | 0 |
+| Match with `**` (deep path) | ~3.2µs | 0 |
+| Match against 200 rules | ~9–16µs | 0 |
+| Pathological `**` (bounded) | ~920ns–1.3µs | 1 |
+| Glob matching | ~58–91ns | 0 |
+| Path normalization | ~58ns | 0 |
 
 The backtrack budget (`MaxBacktrackIterations`, default 10,000) is **shared across all rules** within a single `Match` call. A matcher with many complex `**` patterns will exhaust the budget faster than one with few patterns. When the budget is exceeded, remaining rules are treated as non-matching. Increase the budget via `MatcherOptions` if needed.
 

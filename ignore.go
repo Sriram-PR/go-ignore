@@ -251,9 +251,7 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 
 	pathSegments := splitPath(path)
 
-	// Acquire read lock
 	m.mu.RLock()
-	defer m.mu.RUnlock()
 
 	// Pre-lowercase path and segments once for case-insensitive matching,
 	// instead of lowering per-segment per-rule in matchSingleSegment.
@@ -290,6 +288,7 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 		}
 	}
 
+	m.mu.RUnlock()
 	return result
 }
 

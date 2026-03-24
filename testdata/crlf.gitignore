@@ -1,0 +1,8 @@
+# Windows line endings test
+*.log
+build/
+!important.log
+
+# Nested patterns
+**/temp
+src/**/test

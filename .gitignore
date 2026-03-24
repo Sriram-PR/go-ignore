@@ -55,12 +55,6 @@ desktop.ini
 testdata/fuzz/
 **/testdata/fuzz/
 
-# Generated test fixtures (created by fixtures_gen.go)
-testdata/crlf.gitignore
-testdata/with-bom.gitignore
-testdata/pathological.gitignore
-testdata/realistic/large.gitignore
-
 # Build output directories
 /bin/
 /dist/

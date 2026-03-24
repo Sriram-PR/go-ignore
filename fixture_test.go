@@ -89,6 +89,10 @@ func TestLoadFixtures(t *testing.T) {
 		{"testdata/realistic/go.gitignore", 1},
 		{"testdata/realistic/node.gitignore", 1},
 		{"testdata/realistic/python.gitignore", 1},
+		{"testdata/crlf.gitignore", 5},
+		{"testdata/with-bom.gitignore", 6},
+		{"testdata/pathological.gitignore", 16},
+		{"testdata/realistic/large.gitignore", 100},
 	}
 
 	for _, f := range fixtures {

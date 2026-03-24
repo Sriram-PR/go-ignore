@@ -1,0 +1,11 @@
+﻿# UTF-8 BOM test file
+# The BOM (EF BB BF) should be stripped during parsing
+
+*.log
+*.tmp
+build/
+node_modules/
+
+# Unicode patterns
+日本語.txt
+données/

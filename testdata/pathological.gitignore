@@ -1,0 +1,28 @@
+# Pathological patterns for stress testing backtracking
+
+# Multiple double-stars
+a/**/b/**/c
+a/**/b/**/c/**/d
+a/**/b/**/c/**/d/**/e
+
+# Double-star with wildcards
+**/*.log
+**/test_*
+**/*_test.go
+
+# Deeply nested double-star
+src/**/internal/**/generated/**
+
+# Many alternates (would be worse with character classes)
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+
+# Complex combinations
+**/node_modules/**/package.json
+src/**/test/**/*_test.go

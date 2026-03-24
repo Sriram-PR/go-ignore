@@ -352,7 +352,7 @@ Benchmarked on Intel i9-14900HX (Go 1.25, linux/amd64):
 | Glob matching (no alloc) | ~37–91ns | 0 |
 | Path normalization | ~25ns | 0 |
 
-The library includes backtrack protection (default 10,000 iterations) to prevent pathological patterns from causing excessive CPU usage.
+The backtrack budget (`MaxBacktrackIterations`, default 10,000) is **shared across all rules** within a single `Match` call. A matcher with many complex `**` patterns will exhaust the budget faster than one with few patterns. When the budget is exceeded, remaining rules are treated as non-matching. Increase the budget via `MatcherOptions` if needed.
 
 ## Thread Safety
 

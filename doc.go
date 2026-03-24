@@ -56,6 +56,11 @@
 // Note: ? and [...] operate on raw bytes, not Unicode code points,
 // consistent with Git's behavior.
 //
+// The backtrack iteration budget (MaxBacktrackIterations, default 10,000)
+// is shared across all rules within a single Match call. This prevents
+// pathological patterns distributed across many rules from causing
+// excessive CPU usage.
+//
 // # Global Gitignore
 //
 // Load the user's global gitignore file (core.excludesFile or

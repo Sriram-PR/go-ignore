@@ -77,6 +77,15 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.4.0
+
+- **Zero-allocation matching** — `Match` and `MatchWithReason` now perform 0 heap allocations for typical paths (down from 2), using stack-buffered path splitting
+- **Performance improvements** — removed `defer` for inlining, single-pass wildcard detection, pre-lowered case-insensitive paths, pre-allocated parse buffers
+- **Test coverage** — added tests for `MaxPatterns`/`MaxPatternLength` limits, `maxRecursionDepth`, 5 POSIX classes (`blank`/`print`/`graph`/`punct`/`cntrl`), `AddExcludePatterns` permission errors, `matchSegmentsPrefix`, `SetWarningHandler(nil)` reset, fixture match correctness
+- **Documentation** — documented resource limits, shared backtrack budget, byte-level `?` matching, `..` path handling, added runnable examples
+- **Bug fix** — `gitConfigExcludesFile` now distinguishes expected errors (git not found, key not set) from unexpected errors (permission denied, signals)
+- **Refactor** — moved dead `matchGlob` function from production code to test helpers
+
 ### v0.3.1
 
 - `.git/info/exclude` support via `AddExcludePatterns()` — completes all three gitignore sources

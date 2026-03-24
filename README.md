@@ -279,6 +279,10 @@ If the exclude file does not exist, `AddExcludePatterns` returns nil (no error).
 
 The library does **not** automatically ignore `.git/` — add it explicitly if needed.
 
+## Path Normalization Notes
+
+The library does **not** resolve `..` (parent directory) components in paths. Paths containing `..` are matched literally against patterns. If your application accepts paths from untrusted sources, use `filepath.Clean()` before passing them to `Match()` to prevent path traversal issues.
+
 ## Resource Limits
 
 Default limits prevent resource exhaustion from untrusted input:

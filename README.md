@@ -277,6 +277,18 @@ If the exclude file does not exist, `AddExcludePatterns` returns nil (no error).
 
 The library does **not** automatically ignore `.git/` — add it explicitly if needed.
 
+## Resource Limits
+
+Default limits prevent resource exhaustion from untrusted input:
+
+| Limit | Default | Description |
+|-------|---------|-------------|
+| `MaxPatterns` | 100,000 | Total rules a Matcher will hold. Excess rules are dropped with a warning. |
+| `MaxPatternLength` | 4,096 | Maximum length of a single pattern line. Longer lines are skipped with a warning. |
+| `MaxBacktrackIterations` | 10,000 | Iteration budget shared across all rules per `Match` call. Prevents pathological `**` patterns from causing excessive CPU. |
+
+Set any limit to `-1` to disable it (not recommended for untrusted input).
+
 ## API Reference
 
 ### Types
@@ -287,6 +299,8 @@ type Matcher struct { /* ... */ }
 type MatcherOptions struct {
     MaxBacktrackIterations int  // Default: 10000, use -1 for unlimited
     CaseInsensitive        bool // Default: false
+    MaxPatterns            int  // Default: 100000, use -1 for unlimited
+    MaxPatternLength       int  // Default: 4096, use -1 for unlimited
 }
 
 type MatchResult struct {

@@ -35,6 +35,27 @@ func ExampleMatcher_MatchWithReason() {
 	// ignored=false negated=true rule="!important.log"
 }
 
+func ExampleMatcher_SetWarningHandler() {
+	m := ignore.New()
+	m.SetWarningHandler(func(basePath string, w ignore.ParseWarning) {
+		fmt.Printf("line %d: %s\n", w.Line, w.Message)
+	})
+	m.AddPatterns("", []byte("*.log\n!\n"))
+	// Output:
+	// line 2: pattern is empty after processing
+}
+
+func ExampleMatcher_AddGlobalPatterns() {
+	m := ignore.New()
+	if err := m.AddGlobalPatterns(); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println("loaded:", m.RuleCount() >= 0)
+	// Output:
+	// loaded: true
+}
+
 func ExampleNewWithOptions() {
 	m := ignore.NewWithOptions(ignore.MatcherOptions{
 		CaseInsensitive: true,

@@ -21,37 +21,37 @@ func TestFixtureMatchCorrectness(t *testing.T) {
 		{
 			"testdata/simple.gitignore",
 			[]matchCase{
-				{"test.log", false, true},          // *.log
-				{"build", true, true},               // build/
-				{"build/output.js", false, true},     // inside build/
-				{".DS_Store", false, true},           // .DS_Store
-				{"src/main.go", false, false},        // no match
-				{"node_modules", true, true},         // node_modules/
-				{"Thumbs.db", false, true},           // Thumbs.db
+				{"test.log", false, true},        // *.log
+				{"build", true, true},            // build/
+				{"build/output.js", false, true}, // inside build/
+				{".DS_Store", false, true},       // .DS_Store
+				{"src/main.go", false, false},    // no match
+				{"node_modules", true, true},     // node_modules/
+				{"Thumbs.db", false, true},       // Thumbs.db
 			},
 		},
 		{
 			"testdata/complex.gitignore",
 			[]matchCase{
-				{"important.log", false, false},             // negated by !important.log
-				{"keep.log", false, false},                   // negated by !keep.log
-				{"debug.log", false, true},                   // *.log
-				{"src/generated/file.go", false, true},       // src/generated/
-				{"docs/api/index.html", false, true},         // docs/**
-				{"config.local", false, true},                // /config.local
-				{"sub/config.local", false, false},           // anchored, not nested
-				{"a/x/y/b", false, true},                     // a/**/b
+				{"important.log", false, false},        // negated by !important.log
+				{"keep.log", false, false},             // negated by !keep.log
+				{"debug.log", false, true},             // *.log
+				{"src/generated/file.go", false, true}, // src/generated/
+				{"docs/api/index.html", false, true},   // docs/**
+				{"config.local", false, true},          // /config.local
+				{"sub/config.local", false, false},     // anchored, not nested
+				{"a/x/y/b", false, true},               // a/**/b
 			},
 		},
 		{
 			"testdata/edge-cases.gitignore",
 			[]matchCase{
-				{"foo bar.txt", false, true},       // spaces in filename
-				{".env.local", false, true},        // .env.local
-				{".env.production", false, true},   // .env.*
-				{"#not-a-comment", false, true},    // \#not-a-comment
-				{"test.tar.gz", false, true},       // *.tar.gz
-				{"test.log.old", false, true},      // *.log.old
+				{"foo bar.txt", false, true},     // spaces in filename
+				{".env.local", false, true},      // .env.local
+				{".env.production", false, true}, // .env.*
+				{"#not-a-comment", false, true},  // \#not-a-comment
+				{"test.tar.gz", false, true},     // *.tar.gz
+				{"test.log.old", false, true},    // *.log.old
 			},
 		},
 	}

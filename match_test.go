@@ -664,6 +664,80 @@ func TestMatchSegments_DoubleStar(t *testing.T) {
 	}
 }
 
+func TestMatchSegmentsPrefix(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern []segment
+		path    []string
+		want    bool
+	}{
+		{
+			"empty pattern empty path",
+			[]segment{},
+			[]string{},
+			false, // prefix requires extra segments after pattern
+		},
+		{
+			"empty pattern with path",
+			[]segment{},
+			[]string{"foo"},
+			true, // file inside "empty" prefix dir
+		},
+		{
+			"literal prefix match",
+			[]segment{{value: "foo"}},
+			[]string{"foo", "bar"},
+			true, // bar is inside foo/
+		},
+		{
+			"literal exact (not prefix)",
+			[]segment{{value: "foo"}},
+			[]string{"foo"},
+			false, // no extra segments = not "inside"
+		},
+		{
+			"literal no match",
+			[]segment{{value: "foo"}},
+			[]string{"bar", "baz"},
+			false,
+		},
+		{
+			"two literals prefix",
+			[]segment{{value: "foo"}, {value: "bar"}},
+			[]string{"foo", "bar", "file.txt"},
+			true,
+		},
+		{
+			"doublestar prefix",
+			[]segment{{value: "a"}, {doubleStar: true}, {value: "b"}},
+			[]string{"a", "x", "b", "file.txt"},
+			true,
+		},
+		{
+			"doublestar exact (not prefix)",
+			[]segment{{value: "a"}, {doubleStar: true}, {value: "b"}},
+			[]string{"a", "x", "b"},
+			false,
+		},
+		{
+			"wildcard prefix",
+			[]segment{{value: "*.d", wildcard: true, hasStar: true, starCount: 1}},
+			[]string{"test.d", "file.txt"},
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testCtx(0)
+			got := matchSegmentsPrefix(tt.pattern, tt.path, ctx, false)
+			if got != tt.want {
+				t.Errorf("matchSegmentsPrefix() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMatchSegmentsExact_RecursionDepthLimit(t *testing.T) {
 	// Build a pattern with 250 ** segments (exceeds maxRecursionDepth of 200)
 	// followed by a literal target segment.

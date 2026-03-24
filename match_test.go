@@ -6,6 +6,34 @@ import (
 	"testing"
 )
 
+// matchGlob matches a glob pattern against a string (test helper).
+// Moved from match.go — only used by tests and benchmarks.
+func matchGlob(pattern, s string, ctx *matchContext) bool {
+	hasWild := strings.ContainsAny(pattern, "*?\\[")
+
+	if !hasWild {
+		return pattern == s
+	}
+
+	if pattern == "*" {
+		return true
+	}
+
+	hasBracket := strings.Contains(pattern, "[")
+	hasEscape := strings.Contains(pattern, "\\")
+	hasQuestion := strings.Contains(pattern, "?")
+	if !hasQuestion && !hasEscape && !hasBracket {
+		if strings.Count(pattern, "*") == 1 && strings.HasSuffix(pattern, "*") {
+			return strings.HasPrefix(s, pattern[:len(pattern)-1])
+		}
+		if strings.Count(pattern, "*") == 1 && strings.HasPrefix(pattern, "*") {
+			return strings.HasSuffix(s, pattern[1:])
+		}
+	}
+
+	return matchGlobRecursive(pattern, s, ctx)
+}
+
 // testCtx creates a matchContext for tests and returns a pointer to it.
 func testCtx(maxIter int) *matchContext {
 	c := newMatchContext(maxIter)

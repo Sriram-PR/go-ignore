@@ -293,45 +293,6 @@ func matchGlobSeg(seg *segment, s string, ctx *matchContext) bool {
 	return matchGlobRecursive(pattern, s, ctx)
 }
 
-// matchGlob matches a glob pattern against a string.
-// Supports * as "match zero or more characters", ? as "match exactly one character",
-// [...] as character classes, and \ as escape.
-// Backtracking is bounded by the shared matchContext.
-func matchGlob(pattern, s string, ctx *matchContext) bool {
-	hasWild := strings.ContainsAny(pattern, "*?\\[")
-
-	// Fast path: no wildcards or escapes
-	if !hasWild {
-		return pattern == s
-	}
-
-	// Fast path: single * matches everything
-	if pattern == "*" {
-		return true
-	}
-
-	// Fast paths only apply when there are no ?, \, or [ characters
-	hasBracket := strings.Contains(pattern, "[")
-	hasEscape := strings.Contains(pattern, "\\")
-	hasQuestion := strings.Contains(pattern, "?")
-	if !hasQuestion && !hasEscape && !hasBracket {
-		// Fast path: prefix* pattern
-		if strings.Count(pattern, "*") == 1 && strings.HasSuffix(pattern, "*") {
-			prefix := pattern[:len(pattern)-1]
-			return strings.HasPrefix(s, prefix)
-		}
-
-		// Fast path: *suffix pattern
-		if strings.Count(pattern, "*") == 1 && strings.HasPrefix(pattern, "*") {
-			suffix := pattern[1:]
-			return strings.HasSuffix(s, suffix)
-		}
-	}
-
-	// General case: use recursive matching
-	return matchGlobRecursive(pattern, s, ctx)
-}
-
 // matchGlobRecursive performs recursive glob matching.
 // This handles patterns with * (zero or more chars), ? (exactly one char),
 // and \ (escape next character for literal matching).

@@ -44,12 +44,11 @@ func (ctx *matchContext) tick() bool {
 }
 
 // matchRule checks if a path matches a single rule.
-// path should already be normalized.
+// path should already be normalized (and pre-lowered if case-insensitive).
 // pathSegments is the path split by "/".
 // isDir indicates whether the path is a directory.
-// caseInsensitive enables case-insensitive matching.
 // ctx is the shared backtrack budget for the entire Match call.
-func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInsensitive bool, ctx *matchContext) bool {
+func matchRule(r *rule, path string, pathSegments []string, isDir bool, ctx *matchContext) bool {
 	// Check if we've already exhausted the budget
 	if !ctx.tick() {
 		return false
@@ -75,12 +74,12 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, caseInse
 	// Handle anchored vs floating patterns
 	if r.anchored {
 		if prefixMatch {
-			return matchSegmentsPrefix(r.segments, matchSegments, ctx, caseInsensitive)
+			return matchSegmentsPrefix(r.segments, matchSegments, ctx)
 		}
-		return matchSegmentsExact(r.segments, matchSegments, ctx, caseInsensitive)
+		return matchSegmentsExact(r.segments, matchSegments, ctx)
 	}
 
-	return matchFloating(r, matchSegments, prefixMatch, caseInsensitive, ctx)
+	return matchFloating(r, matchSegments, prefixMatch, ctx)
 }
 
 // resolveMatchSegments applies basePath scoping and returns the segments to match against.
@@ -101,7 +100,7 @@ func resolveMatchSegments(r *rule, path string, pathSegments []string) []string 
 }
 
 // matchFloating tries to match a floating (unanchored) pattern at any position in the path.
-func matchFloating(r *rule, matchSegments []string, prefixMatch, caseInsensitive bool, ctx *matchContext) bool {
+func matchFloating(r *rule, matchSegments []string, prefixMatch bool, ctx *matchContext) bool {
 	maxStart := len(matchSegments) - len(r.segments)
 	if prefixMatch {
 		maxStart = len(matchSegments) - 1
@@ -111,11 +110,11 @@ func matchFloating(r *rule, matchSegments []string, prefixMatch, caseInsensitive
 			return false
 		}
 		if prefixMatch {
-			if matchSegmentsPrefix(r.segments, matchSegments[i:], ctx, caseInsensitive) {
+			if matchSegmentsPrefix(r.segments, matchSegments[i:], ctx) {
 				return true
 			}
 		} else {
-			if matchSegmentsExact(r.segments, matchSegments[i:], ctx, caseInsensitive) {
+			if matchSegmentsExact(r.segments, matchSegments[i:], ctx) {
 				return true
 			}
 		}
@@ -124,9 +123,9 @@ func matchFloating(r *rule, matchSegments []string, prefixMatch, caseInsensitive
 	// Special case: pattern with ** can match even if more segments than path
 	if len(r.segments) > 0 && r.segments[0].doubleStar {
 		if prefixMatch {
-			return matchSegmentsPrefix(r.segments, matchSegments, ctx, caseInsensitive)
+			return matchSegmentsPrefix(r.segments, matchSegments, ctx)
 		}
-		return matchSegmentsExact(r.segments, matchSegments, ctx, caseInsensitive)
+		return matchSegmentsExact(r.segments, matchSegments, ctx)
 	}
 
 	return false
@@ -134,7 +133,7 @@ func matchFloating(r *rule, matchSegments []string, prefixMatch, caseInsensitive
 
 // matchSegmentsExact recursively matches pattern segments against path segments.
 // This is the core matching algorithm with ** support.
-func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, caseInsensitive bool) bool {
+func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) bool {
 	// Check iteration limit and recursion depth
 	if !ctx.tick() || ctx.depth >= maxRecursionDepth {
 		return false
@@ -153,7 +152,7 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, cas
 		// Try matching remaining pattern against path starting at each position
 		ctx.depth++
 		for i := 0; i <= len(path); i++ {
-			if matchSegmentsExact(pattern[1:], path[i:], ctx, caseInsensitive) {
+			if matchSegmentsExact(pattern[1:], path[i:], ctx) {
 				ctx.depth--
 				return true
 			}
@@ -172,13 +171,13 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, cas
 	}
 
 	// Match current segment
-	if !matchSingleSegment(seg, path[0], caseInsensitive, ctx) {
+	if !matchSingleSegment(seg, path[0], ctx) {
 		return false
 	}
 
 	// Recurse for remaining segments
 	ctx.depth++
-	result := matchSegmentsExact(pattern[1:], path[1:], ctx, caseInsensitive)
+	result := matchSegmentsExact(pattern[1:], path[1:], ctx)
 	ctx.depth--
 	return result
 }
@@ -187,7 +186,7 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext, cas
 // Unlike matchSegmentsExact, this allows the path to have additional segments
 // after the pattern is fully matched. Used for directory patterns matching
 // files inside the directory.
-func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, caseInsensitive bool) bool {
+func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bool {
 	// Check iteration limit and recursion depth
 	if !ctx.tick() || ctx.depth >= maxRecursionDepth {
 		return false
@@ -208,7 +207,7 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, ca
 		// Try matching remaining pattern against path starting at each position
 		ctx.depth++
 		for i := 0; i <= len(path); i++ {
-			if matchSegmentsPrefix(pattern[1:], path[i:], ctx, caseInsensitive) {
+			if matchSegmentsPrefix(pattern[1:], path[i:], ctx) {
 				ctx.depth--
 				return true
 			}
@@ -227,13 +226,13 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, ca
 	}
 
 	// Match current segment
-	if !matchSingleSegment(seg, path[0], caseInsensitive, ctx) {
+	if !matchSingleSegment(seg, path[0], ctx) {
 		return false
 	}
 
 	// Recurse for remaining segments
 	ctx.depth++
-	result := matchSegmentsPrefix(pattern[1:], path[1:], ctx, caseInsensitive)
+	result := matchSegmentsPrefix(pattern[1:], path[1:], ctx)
 	ctx.depth--
 	return result
 }
@@ -242,18 +241,15 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext, ca
 // Handles literal strings, * wildcards, ? wildcards, and \ escapes.
 // The matchContext is shared with the caller so glob-level backtracking
 // counts against the same budget as segment-level matching.
-func matchSingleSegment(seg segment, pathSeg string, caseInsensitive bool, ctx *matchContext) bool {
+func matchSingleSegment(seg segment, pathSeg string, ctx *matchContext) bool {
 	if seg.doubleStar {
 		// ** shouldn't reach here; handled in matchSegmentsExact
 		return true
 	}
 
 	pattern := seg.value
-	if caseInsensitive {
-		// Pattern values are pre-lowercased at AddPatterns time,
-		// so only the path segment needs lowering here.
-		pathSeg = strings.ToLower(pathSeg)
-	}
+	// Note: case-insensitive lowering is done once in MatchWithReason,
+	// not per-segment-per-rule here. Pattern values are pre-lowered at AddPatterns time.
 
 	if !seg.wildcard {
 		// Literal match

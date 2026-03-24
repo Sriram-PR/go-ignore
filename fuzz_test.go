@@ -294,7 +294,7 @@ func FuzzSegmentMatching(f *testing.F) {
 
 		// Should never panic
 		ctx := testCtx(1000) // Limit iterations for fuzzing
-		_ = matchSegmentsExact(segments, pathSegs, ctx, false)
+		_ = matchSegmentsExact(segments, pathSegs, ctx)
 	})
 }
 

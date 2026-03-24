@@ -255,6 +255,15 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
+	// Pre-lowercase path and segments once for case-insensitive matching,
+	// instead of lowering per-segment per-rule in matchSingleSegment.
+	if m.opts.CaseInsensitive {
+		path = strings.ToLower(path)
+		for i, seg := range pathSegments {
+			pathSegments[i] = strings.ToLower(seg)
+		}
+	}
+
 	var result MatchResult
 
 	// Single shared backtrack budget for the entire Match call.
@@ -266,7 +275,7 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	for i := range m.rules {
 		r := &m.rules[i]
 
-		if matchRule(r, path, pathSegments, isDir, m.opts.CaseInsensitive, &ctx) {
+		if matchRule(r, path, pathSegments, isDir, &ctx) {
 			result.Matched = true
 			result.Rule = r.pattern
 			result.BasePath = r.basePath

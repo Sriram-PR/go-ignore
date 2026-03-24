@@ -110,12 +110,13 @@ func gitConfigExcludesFile() (string, error) {
 	cmd := exec.Command("git", "config", "--global", "core.excludesFile")
 	out, err := cmd.Output()
 	if err != nil {
-		// git not found or config key not set — expected, fall through to XDG.
+		// git not found, config key not set, or fatal git error (e.g., no
+		// global config file on Windows) — expected, fall through to XDG.
 		var exitErr *exec.ExitError
-		if errors.Is(err, exec.ErrNotFound) || (errors.As(err, &exitErr) && exitErr.ExitCode() == 1) {
+		if errors.Is(err, exec.ErrNotFound) || errors.As(err, &exitErr) {
 			return "", nil
 		}
-		// Unexpected error (e.g., permission denied, signal)
+		// Non-exec error (e.g., permission denied on the binary itself)
 		return "", fmt.Errorf("running git config: %w", err)
 	}
 

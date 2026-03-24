@@ -765,7 +765,7 @@ func TestAddPatterns_MaxPatternsUnlimited(t *testing.T) {
 	m := NewWithOptions(MatcherOptions{MaxPatterns: -1})
 
 	// Add 1000 patterns — all should be accepted
-	var content []byte
+	content := make([]byte, 0, 12*1000)
 	for i := 0; i < 1000; i++ {
 		content = append(content, []byte(fmt.Sprintf("pattern%d\n", i))...)
 	}

@@ -221,6 +221,35 @@ func TestSetWarningHandler_Precedence(t *testing.T) {
 	}
 }
 
+func TestSetWarningHandler_Reset(t *testing.T) {
+	m := New()
+
+	// Set a handler and add patterns with warnings
+	var handlerCount int
+	m.SetWarningHandler(func(_ string, _ ParseWarning) {
+		handlerCount++
+	})
+	m.AddPatterns("", []byte("!\n")) // triggers warning via handler
+	if handlerCount != 1 {
+		t.Fatalf("handler called %d times, want 1", handlerCount)
+	}
+
+	// Reset to collection mode
+	m.SetWarningHandler(nil)
+
+	// Add more patterns with warnings — should collect, not call handler
+	m.AddPatterns("", []byte("/\n"))
+	if handlerCount != 1 {
+		t.Errorf("handler called after reset: got %d, want 1", handlerCount)
+	}
+
+	// Verify warnings are now collected
+	w := m.Warnings()
+	if len(w) != 1 {
+		t.Errorf("Warnings() = %d, want 1 (from post-reset AddPatterns)", len(w))
+	}
+}
+
 func TestMatch_Basic(t *testing.T) {
 	m := New()
 	m.AddPatterns("", []byte("*.log\nbuild/\n!important.log\n"))

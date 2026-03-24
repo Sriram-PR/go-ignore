@@ -258,12 +258,14 @@ If the exclude file does not exist, `AddExcludePatterns` returns nil (no error).
 | `#comment` | Comment line | Ignored |
 | `\#file` | Literal # | Matches `#file` |
 | `\!file` | Literal ! | Matches `!file` |
-| `?.txt` | Single char | `a.txt`, `b.txt` (not `ab.txt`) |
+| `?.txt` | Single byte | `a.txt`, `b.txt` (not `ab.txt`) |
 | `[abc]` | Character class | `a`, `b`, or `c` |
 | `[a-z]` | Character range | Any lowercase letter |
 | `[!abc]` | Negated class | Any char except `a`, `b`, `c` |
 | `[[:alpha:]]` | POSIX class | Any letter |
 | `\*` | Literal * | Matches `*` (escaped wildcard) |
+
+**Note:** `?` and character classes (`[...]`) operate on raw bytes, not Unicode code points, consistent with Git's behavior. A multi-byte UTF-8 character requires multiple `?` to match.
 
 ### Pattern Anchoring
 

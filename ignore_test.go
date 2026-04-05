@@ -539,6 +539,34 @@ func TestMatcher_ConcurrentAddAndMatch(t *testing.T) {
 	wg.Wait()
 }
 
+func TestMatcher_ConcurrentHandlerDispatch(t *testing.T) {
+	m := New()
+	var mu sync.Mutex
+	var warnings []ParseWarning
+	m.SetWarningHandler(func(basePath string, w ParseWarning) {
+		mu.Lock()
+		warnings = append(warnings, w)
+		mu.Unlock()
+	})
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m.AddPatterns("", []byte("!\n")) // triggers warning
+		}()
+	}
+	wg.Wait()
+
+	mu.Lock()
+	got := len(warnings)
+	mu.Unlock()
+	if got != 20 {
+		t.Errorf("expected 20 warnings, got %d", got)
+	}
+}
+
 func TestMatcher_RealWorld(t *testing.T) {
 	m := New()
 

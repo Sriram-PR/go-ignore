@@ -80,11 +80,12 @@ type MatcherOptions struct {
 // performance, batch all AddPatterns calls before starting concurrent Match
 // operations.
 type Matcher struct {
-	mu       sync.RWMutex
-	rules    []rule
-	warnings []ParseWarning
-	handler  WarningHandler
-	opts     MatcherOptions
+	mu        sync.RWMutex
+	handlerMu sync.Mutex // serializes WarningHandler dispatch across goroutines
+	rules     []rule
+	warnings  []ParseWarning
+	handler   WarningHandler
+	opts      MatcherOptions
 }
 
 // New creates an empty Matcher with default options.
@@ -197,11 +198,14 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 	}
 	m.mu.Unlock()
 
-	// Dispatch warnings outside lock to prevent deadlock if handler calls back
+	// Dispatch warnings outside main lock to prevent deadlock if handler calls back.
+	// Use handlerMu to serialize concurrent handler invocations.
 	if handler != nil {
+		m.handlerMu.Lock()
 		for _, w := range parseWarnings {
 			handler(normalizedBase, w)
 		}
+		m.handlerMu.Unlock()
 		return nil
 	}
 	return parseWarnings

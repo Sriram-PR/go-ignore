@@ -11,6 +11,11 @@ import (
 // Can be overridden via MatcherOptions.
 const DefaultMaxBacktrackIterations = 10000
 
+// hardMaxBacktrackIterations is an absolute safety cap applied even when
+// MaxBacktrackIterations is set to -1 ("unlimited"). This prevents exponential
+// backtracking in pathological glob patterns (e.g., *a*a*a*...*b) from hanging.
+const hardMaxBacktrackIterations = 10_000_000
+
 // maxRecursionDepth limits the recursion depth in matching functions
 // to prevent stack overflow from deeply nested patterns.
 const maxRecursionDepth = 200
@@ -24,10 +29,12 @@ type matchContext struct {
 
 // newMatchContext creates a new match context with the specified limit.
 // If maxIter is 0, uses DefaultMaxBacktrackIterations.
-// If maxIter is -1, no limit is applied (not recommended).
+// If maxIter is -1, uses hardMaxBacktrackIterations as a safety cap.
 func newMatchContext(maxIter int) matchContext {
 	if maxIter == 0 {
 		maxIter = DefaultMaxBacktrackIterations
+	} else if maxIter < 0 {
+		maxIter = hardMaxBacktrackIterations
 	}
 	return matchContext{
 		maxIter: maxIter,
@@ -37,9 +44,6 @@ func newMatchContext(maxIter int) matchContext {
 // tick increments the iteration counter and returns false if limit exceeded.
 func (ctx *matchContext) tick() bool {
 	ctx.iterations++
-	if ctx.maxIter < 0 {
-		return true // No limit
-	}
 	return ctx.iterations <= ctx.maxIter
 }
 

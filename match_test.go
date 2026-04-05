@@ -987,6 +987,23 @@ func TestMatchGlob_PathologicalPattern(t *testing.T) {
 	}
 }
 
+func TestMatchGlob_HardCapUnlimited(t *testing.T) {
+	// When MaxBacktrackIterations is -1, the hard cap should prevent hanging.
+	// This pattern causes exponential backtracking without a budget.
+	pattern := strings.Repeat("*a", 15) + "*b"
+	s := strings.Repeat("a", 30)
+
+	ctx := newMatchContext(-1) // "unlimited" — should use hard cap
+	got := matchGlob(pattern, s, &ctx)
+	if got {
+		t.Error("expected no match for pathological pattern")
+	}
+	// Verify it terminated via the hard cap, not instantly
+	if ctx.iterations < 1000 {
+		t.Errorf("expected significant iterations, got %d", ctx.iterations)
+	}
+}
+
 func TestMatchRule_CaseInsensitive(t *testing.T) {
 	tests := []struct {
 		pattern         string

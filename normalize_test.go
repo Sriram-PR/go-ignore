@@ -46,6 +46,10 @@ func TestNormalizePath(t *testing.T) {
 		{"dot slash with backslash", ".\\foo\\bar", "foo/bar", true},
 		{"all combined", ".\\foo\\\\bar/baz//qux/", "foo/bar/baz/qux", true},
 
+		// Null byte rejection
+		{"null byte in path", "foo\x00bar", "", false},
+		{"null byte in segment", "a/b\x00c/d", "", false},
+
 		// ".." resolution
 		{"dotdot simple", "a/b/../c", "a/c", false},
 		{"dotdot basepath bypass", "src/../secret.txt", "secret.txt", false},

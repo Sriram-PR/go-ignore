@@ -24,6 +24,11 @@ import (
 // paths (in parseLines). It is NOT applied to patterns during parsing — patterns
 // are parsed as-is and matched with their original escape sequences intact.
 func normalizePath(p string) string {
+	// Step 0: Reject paths containing null bytes (invalid on all filesystems).
+	if strings.IndexByte(p, 0) >= 0 {
+		return ""
+	}
+
 	// Step 1: Convert backslashes to forward slashes (Windows only).
 	// On Linux/macOS, backslash is a valid filename character and should not
 	// be converted. Git only performs this conversion on Windows.

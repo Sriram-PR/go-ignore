@@ -105,8 +105,14 @@ node_modules/
 
 	f.Fuzz(func(t *testing.T, path string, isDir bool) {
 		// Should never panic
-		_ = m.Match(path, isDir)
-		_ = m.MatchWithReason(path, isDir)
+		matched := m.Match(path, isDir)
+		result := m.MatchWithReason(path, isDir)
+
+		// Match must equal MatchWithReason.Ignored
+		if matched != result.Ignored {
+			t.Errorf("Match(%q, %v) = %v but MatchWithReason.Ignored = %v",
+				path, isDir, matched, result.Ignored)
+		}
 	})
 }
 
@@ -137,8 +143,14 @@ func FuzzPatternAndPath(f *testing.F) {
 
 		// Should never panic even with arbitrary patterns
 		m.AddPatterns("", []byte(pattern+"\n"))
-		_ = m.Match(path, isDir)
-		_ = m.MatchWithReason(path, isDir)
+		matched := m.Match(path, isDir)
+		result := m.MatchWithReason(path, isDir)
+
+		// Match must equal MatchWithReason.Ignored
+		if matched != result.Ignored {
+			t.Errorf("Match(%q, %v) = %v but MatchWithReason.Ignored = %v (pattern %q)",
+				path, isDir, matched, result.Ignored, pattern)
+		}
 	})
 }
 

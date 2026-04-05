@@ -390,6 +390,24 @@ func TestMatch_NestedGitignore(t *testing.T) {
 	}
 }
 
+func TestMatch_DotDotDoesNotBypassBasePath(t *testing.T) {
+	m := New()
+	m.AddPatterns("src", []byte("secret.txt\n"))
+
+	// src/../secret.txt resolves to secret.txt which is NOT under src/
+	if m.Match("src/../secret.txt", false) {
+		t.Error("src/../secret.txt should not match pattern scoped to src/")
+	}
+	// Direct secret.txt at root should not match src-scoped pattern
+	if m.Match("secret.txt", false) {
+		t.Error("secret.txt at root should not match pattern scoped to src/")
+	}
+	// src/secret.txt should still match
+	if !m.Match("src/secret.txt", false) {
+		t.Error("src/secret.txt should match pattern scoped to src/")
+	}
+}
+
 func TestMatchWithReason_Basic(t *testing.T) {
 	m := New()
 	m.AddPatterns("", []byte("*.log\n!important.log\nbuild/\n"))

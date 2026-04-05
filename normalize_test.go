@@ -46,9 +46,18 @@ func TestNormalizePath(t *testing.T) {
 		{"dot slash with backslash", ".\\foo\\bar", "foo/bar", true},
 		{"all combined", ".\\foo\\\\bar/baz//qux/", "foo/bar/baz/qux", true},
 
+		// ".." resolution
+		{"dotdot simple", "a/b/../c", "a/c", false},
+		{"dotdot basepath bypass", "src/../secret.txt", "secret.txt", false},
+		{"dotdot multiple", "a/../b/../c", "c", false},
+		{"dotdot above root", "../secret.txt", "", false},
+		{"dotdot bare", "..", "", false},
+		{"dotdot deep above root", "a/../../b", "", false},
+		{"dotdot in filename", "foo..bar", "foo..bar", false},
+		{"dotdot no effect", "a/b/c", "a/b/c", false},
+
 		// Edge cases
 		{"just dot", ".", ".", false},
-		{"dot dot", "..", "..", false},
 		{"dot in middle", "foo/./bar", "foo/./bar", false}, // Only leading ./ is removed
 		{"hidden file", ".gitignore", ".gitignore", false},
 		{"hidden dir", ".git/config", ".git/config", false},

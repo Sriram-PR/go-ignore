@@ -3,6 +3,7 @@ package ignore
 
 import (
 	"bytes"
+	"path"
 	"runtime"
 	"strings"
 )
@@ -16,8 +17,8 @@ import (
 //  3. Remove leading "./" prefix (all occurrences for idempotency)
 //  4. Remove trailing slash
 //
-// Note: ".." components are NOT resolved. Callers should use filepath.Clean
-// if the input may contain ".." segments.
+// ".." components are resolved via path.Clean. Paths that resolve above the
+// repository root (e.g., "../secret.txt") are treated as empty (no match).
 //
 // This function is applied to input paths (in Match/MatchWithReason) and base
 // paths (in parseLines). It is NOT applied to patterns during parsing — patterns
@@ -56,6 +57,19 @@ func normalizePath(p string) string {
 
 	// Step 4: Remove trailing slash
 	p = strings.TrimSuffix(p, "/")
+
+	// Step 5: Resolve ".." components to prevent basePath bypass.
+	// e.g., "src/../secret.txt" → "secret.txt" won't match patterns scoped to "src/".
+	if strings.Contains(p, "..") {
+		p = path.Clean(p)
+		if p == "." {
+			return ""
+		}
+		// Paths that resolve above repo root are invalid
+		if p == ".." || strings.HasPrefix(p, "../") {
+			return ""
+		}
+	}
 
 	return p
 }

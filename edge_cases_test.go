@@ -239,8 +239,8 @@ func TestEdgeCases_SpecialPatterns(t *testing.T) {
 		{"hidden directory", ".cache/", ".cache", true, true},
 		{"hidden directory contents", ".cache/", ".cache/data.bin", true, false},
 
-		// Double dots
-		{"dotdot pattern", "..", "..", true, false},
+		// Double dots — ".." resolves above repo root, so it's treated as empty (no match)
+		{"dotdot pattern", "..", "..", false, false},
 
 		// Single character
 		{"single char file", "a", "a", true, false},

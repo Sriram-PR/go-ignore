@@ -459,8 +459,12 @@ func TestMatchGlob_CharClass(t *testing.T) {
 		{"[[:cntrl:]]", "a", false},
 		{"[[:cntrl:]]", " ", false},
 
-		// Invalid POSIX name — fallback to literal
-		{"[[:bogus:]]", "[", false},
+		// Invalid POSIX name — '[' treated as literal class member, rest parsed as literals.
+		// Effective class contains: [, :, b, o, g, u, s. Trailing ']' is literal outside class.
+		{"[[:bogus:]]", "[", false},   // needs 2 chars (class member + literal ']')
+		{"[[:bogus:]]", "[]", true},   // '[' in class, ']' matches trailing literal
+		{"[[:bogus:]]", "b]", true},   // 'b' in class (from "bogus"), ']' matches
+		{"[[:bogus:]]", "x]", false},  // 'x' not in class
 
 		// Mixed POSIX and literals/ranges
 		{"[[:digit:]abc]", "5", true},

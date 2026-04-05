@@ -67,7 +67,7 @@ func normalizePath(p string) string {
 	// e.g., "src/../secret.txt" → "secret.txt" won't match patterns scoped to "src/".
 	if strings.Contains(p, "..") {
 		p = path.Clean(p)
-		if p == "." {
+		if p == "." || p == "/" {
 			return ""
 		}
 		// Paths that resolve above repo root are invalid

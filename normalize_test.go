@@ -56,6 +56,7 @@ func TestNormalizePath(t *testing.T) {
 		{"dotdot multiple", "a/../b/../c", "c", false},
 		{"dotdot above root", "../secret.txt", "", false},
 		{"dotdot bare", "..", "", false},
+		{"dotdot from root", "/..", "", false},
 		{"dotdot deep above root", "a/../../b", "", false},
 		{"dotdot in filename", "foo..bar", "foo..bar", false},
 		{"dotdot no effect", "a/b/c", "a/b/c", false},

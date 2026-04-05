@@ -561,8 +561,8 @@ func splitPath(path string) []string {
 }
 
 // splitPathBuf splits a normalized path into segments using a caller-provided buffer.
-// For paths with 16 or fewer segments (the common case), this avoids heap allocation.
-// The buffer slice should be backed by a stack-allocated array: var buf [16]string; splitPathBuf(p, buf[:0]).
+// For paths with 32 or fewer segments (the common case), this avoids heap allocation.
+// The buffer slice should be backed by a stack-allocated array: var buf [32]string; splitPathBuf(p, buf[:0]).
 func splitPathBuf(path string, buf []string) []string {
 	if path == "" {
 		return buf[:0]

@@ -127,6 +127,30 @@ func BenchmarkMatch_DeepPath(b *testing.B) {
 	}
 }
 
+// BenchmarkMatch_DeepPath20 measures matching with 20 segments (within 32-element stack buffer).
+func BenchmarkMatch_DeepPath20(b *testing.B) {
+	b.ReportAllocs()
+	m := New()
+	m.AddPatterns("", []byte("*.log\n"))
+	path := "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/test.log" // 20 segments
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Match(path, false)
+	}
+}
+
+// BenchmarkMatch_DeepPath32 measures matching at the stack buffer boundary (32 segments).
+func BenchmarkMatch_DeepPath32(b *testing.B) {
+	b.ReportAllocs()
+	m := New()
+	m.AddPatterns("", []byte("*.log\n"))
+	path := "a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/aa/bb/cc/dd/ee/test.log" // 32 segments
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Match(path, false)
+	}
+}
+
 // BenchmarkMatch_DoubleStar measures ** pattern performance
 func BenchmarkMatch_DoubleStar(b *testing.B) {
 	b.ReportAllocs()

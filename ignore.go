@@ -249,7 +249,7 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 		return MatchResult{Ignored: false, Matched: false}
 	}
 
-	var segBuf [16]string
+	var segBuf [32]string
 	pathSegments := splitPathBuf(path, segBuf[:0])
 
 	m.mu.RLock()

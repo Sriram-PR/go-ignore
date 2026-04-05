@@ -152,10 +152,15 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) boo
 
 	// Handle ** (double-star)
 	if seg.doubleStar {
-		// ** can match zero or more path segments
-		// Try matching remaining pattern against path starting at each position
+		// ** can match zero or more path segments.
+		// Trailing ** (last segment) must consume at least one segment:
+		// abc/** should match abc/file but not abc itself (matches git behavior).
+		minI := 0
+		if len(pattern) == 1 {
+			minI = 1
+		}
 		ctx.depth++
-		for i := 0; i <= len(path); i++ {
+		for i := minI; i <= len(path); i++ {
 			if matchSegmentsExact(pattern[1:], path[i:], ctx) {
 				ctx.depth--
 				return true

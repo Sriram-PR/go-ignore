@@ -577,7 +577,7 @@ func TestMatchSegments_DoubleStar(t *testing.T) {
 			"** matches empty",
 			[]segment{{doubleStar: true}},
 			[]string{},
-			true,
+			false, // trailing ** requires at least one segment
 		},
 		{
 			"** matches single",
@@ -616,10 +616,10 @@ func TestMatchSegments_DoubleStar(t *testing.T) {
 			false,
 		},
 		{
-			"foo/** matches foo",
+			"foo/** does not match foo itself",
 			[]segment{{value: "foo"}, {doubleStar: true}},
 			[]string{"foo"},
-			true,
+			false, // trailing ** requires content inside, not the dir itself
 		},
 		{
 			"foo/** matches foo/bar",
@@ -1214,9 +1214,10 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 		{"doublestar prefix temp nested", "**/temp", "x/temp", false, true},
 		{"doublestar prefix temp deep", "**/temp", "x/y/temp", false, true},
 
-		// /** suffix - everything inside
+		// /** suffix - everything inside (not the directory itself)
 		{"doublestar suffix", "build/**", "build/a", false, true},
 		{"doublestar suffix deep", "build/**", "build/a/b/c", false, true},
+		{"doublestar suffix dir itself", "build/**", "build", true, false},
 
 		// /**/ middle - any depth between
 		{"doublestar middle direct", "a/**/b", "a/b", false, true},

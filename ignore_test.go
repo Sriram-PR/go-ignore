@@ -697,6 +697,8 @@ foo/**
 		{"a/x/y/z/b many segments star", "a/x/y/z/b", true},
 		{"foo/bar under foo", "foo/bar", true},
 		{"foo/bar/baz deeply under foo", "foo/bar/baz", true},
+		// foo/** should NOT match foo directory itself
+		{"foo dir itself not matched by foo/**", "foo", false},
 	}
 
 	for _, tt := range tests {

@@ -77,6 +77,17 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.4.1
+
+- **Security: basePath bypass via `..`** — `normalizePath` now resolves `..` components via `path.Clean`, preventing `src/../secret.txt` from matching patterns scoped to `src/`
+- **Security: exponential backtrack with unlimited budget** — `MaxBacktrackIterations: -1` now caps at 10M iterations instead of running unbounded
+- **Security: null byte injection** — paths containing null bytes are now rejected (treated as empty/no match)
+- **Bug fix: trailing `**` git parity** — `abc/**` no longer matches `abc` directory itself, only its contents (matches real `git check-ignore` behavior)
+- **Bug fix: WarningHandler data race** — concurrent `AddPatterns` calls with a handler no longer race; dispatch serialized via dedicated mutex
+- **Performance: zero-alloc deep paths** — `splitPathBuf` increased from `[16]string` to `[32]string`, eliminating heap allocation for paths up to 32 segments
+- **Performance: case-insensitive matching** — reduced from 5 allocations to 1 on uppercase input by re-splitting the lowered path instead of lowering each segment
+- **Test quality** — added `Match`/`MatchWithReason` consistency invariant to fuzz targets; fixed bogus POSIX class test to verify actual fallback behavior
+
 ### v0.4.0
 
 - **Zero-allocation matching** — `Match` and `MatchWithReason` now perform 0 heap allocations for typical paths (down from 2), using stack-buffered path splitting

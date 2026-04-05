@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload coverage (ubuntu + latest Go only)
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.26'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage.out
           fail_ci_if_error: false
@@ -81,7 +81,7 @@ jobs:
           go-version: stable
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           args: --timeout=5m

@@ -260,10 +260,12 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 
 	// Pre-lowercase path and segments once for case-insensitive matching,
 	// instead of lowering per-segment per-rule in matchSingleSegment.
+	// Re-split after lowering so segments point into the lowered string (1 alloc vs N+1).
 	if m.opts.CaseInsensitive {
-		path = strings.ToLower(path)
-		for i, seg := range pathSegments {
-			pathSegments[i] = strings.ToLower(seg)
+		lowered := strings.ToLower(path)
+		if lowered != path {
+			path = lowered
+			pathSegments = splitPathBuf(path, segBuf[:0])
 		}
 	}
 

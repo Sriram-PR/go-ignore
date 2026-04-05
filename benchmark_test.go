@@ -309,6 +309,17 @@ func BenchmarkMatch_CaseInsensitive(b *testing.B) {
 	}
 }
 
+// BenchmarkMatch_CaseInsensitiveUpper measures case-insensitive with uppercase input
+func BenchmarkMatch_CaseInsensitiveUpper(b *testing.B) {
+	b.ReportAllocs()
+	m := NewWithOptions(MatcherOptions{CaseInsensitive: true})
+	m.AddPatterns("", []byte("*.log\nBUILD/\n"))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Match("Some/Path/To/DEBUG.LOG", false)
+	}
+}
+
 // BenchmarkNormalizePath measures path normalization overhead
 func BenchmarkNormalizePath(b *testing.B) {
 	b.ReportAllocs()

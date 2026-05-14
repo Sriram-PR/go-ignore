@@ -261,8 +261,9 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bo
 // counts against the same budget as segment-level matching.
 func matchSingleSegment(seg segment, pathSeg string, ctx *matchContext) bool {
 	if seg.doubleStar {
-		// ** shouldn't reach here; handled in matchSegmentsExact
-		return true
+		// ** must be handled by matchSegmentsExact/matchSegmentsPrefix;
+		// if it ever leaks here, fail closed rather than report a spurious match.
+		return false
 	}
 
 	pattern := seg.value

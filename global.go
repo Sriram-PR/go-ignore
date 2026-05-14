@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,7 +9,13 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+// gitConfigTimeout bounds the `git config` subprocess used to resolve the
+// global excludesFile, so a hung or unresponsive git binary cannot stall
+// AddGlobalPatterns indefinitely.
+const gitConfigTimeout = 5 * time.Second
 
 // AddGlobalPatterns loads the user's global gitignore file and adds its
 // patterns to the matcher. The global gitignore path is resolved in order:
@@ -107,9 +114,15 @@ func resolveGlobalIgnorePath() (string, error) {
 // gitConfigExcludesFile reads the global core.excludesFile from git config.
 // Returns empty string if git is not available or the key is not set.
 func gitConfigExcludesFile() (string, error) {
-	cmd := exec.Command("git", "config", "--global", "core.excludesFile")
+	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "config", "--global", "core.excludesFile")
 	out, err := cmd.Output()
 	if err != nil {
+		// Timeout — treat as "git unavailable" and fall through to XDG.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return "", nil
+		}
 		// git not found, config key not set, or fatal git error (e.g., no
 		// global config file on Windows) — expected, fall through to XDG.
 		var exitErr *exec.ExitError

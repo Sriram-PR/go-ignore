@@ -373,11 +373,3 @@ func gitCheckIgnoreVerbose(repoDir, path string) gitCheckResult {
 
 	return gitCheckResult{ignored: true, rule: rule}
 }
-
-// TestGitParity_KnownDifferences documents known differences from git behavior
-func TestGitParity_KnownDifferences(t *testing.T) {
-	// Document known differences between our implementation and git.
-	// Currently there are no known differences — all previously documented
-	// cases (e.g. \! escape at pattern start) have been resolved.
-	t.Log("No known differences from git behavior")
-}

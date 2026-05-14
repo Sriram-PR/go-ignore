@@ -47,14 +47,23 @@ func (ctx *matchContext) tick() bool {
 	return ctx.iterations <= ctx.maxIter
 }
 
+// exhausted reports whether the iteration budget is already used up,
+// without consuming a unit. Used to short-circuit later rules after
+// earlier backtracking has used the budget.
+func (ctx *matchContext) exhausted() bool {
+	return ctx.iterations >= ctx.maxIter
+}
+
 // matchRule checks if a path matches a single rule.
 // path should already be normalized (and pre-lowered if case-insensitive).
 // pathSegments is the path split by "/".
 // isDir indicates whether the path is a directory.
 // ctx is the shared backtrack budget for the entire Match call.
 func matchRule(r *rule, path string, pathSegments []string, isDir bool, ctx *matchContext) bool {
-	// Check if we've already exhausted the budget
-	if !ctx.tick() {
+	// Short-circuit if earlier backtracking exhausted the budget.
+	// Read-only — rule enumeration must not itself consume budget,
+	// or large rule sets would silently false-negative late rules.
+	if ctx.exhausted() {
 		return false
 	}
 
@@ -110,7 +119,7 @@ func matchFloating(r *rule, matchSegments []string, prefixMatch bool, ctx *match
 		maxStart = len(matchSegments) - 1
 	}
 	for i := 0; i <= maxStart; i++ {
-		if !ctx.tick() {
+		if ctx.exhausted() {
 			return false
 		}
 		if prefixMatch {
@@ -138,8 +147,8 @@ func matchFloating(r *rule, matchSegments []string, prefixMatch bool, ctx *match
 // matchSegmentsExact recursively matches pattern segments against path segments.
 // This is the core matching algorithm with ** support.
 func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) bool {
-	// Check iteration limit and recursion depth
-	if !ctx.tick() || ctx.depth >= maxRecursionDepth {
+	// Bound recursion depth; budget is only consumed inside backtrack loops.
+	if ctx.exhausted() || ctx.depth >= maxRecursionDepth {
 		return false
 	}
 
@@ -196,8 +205,8 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) boo
 // after the pattern is fully matched. Used for directory patterns matching
 // files inside the directory.
 func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bool {
-	// Check iteration limit and recursion depth
-	if !ctx.tick() || ctx.depth >= maxRecursionDepth {
+	// Bound recursion depth; budget is only consumed inside backtrack loops.
+	if ctx.exhausted() || ctx.depth >= maxRecursionDepth {
 		return false
 	}
 
@@ -305,7 +314,7 @@ func matchGlobSeg(seg *segment, s string, ctx *matchContext) bool {
 // patterns (e.g., *a*a*a*a*b) from causing excessive CPU usage.
 func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 	for len(pattern) > 0 {
-		if !ctx.tick() {
+		if ctx.exhausted() {
 			return false // Backtrack limit exceeded
 		}
 

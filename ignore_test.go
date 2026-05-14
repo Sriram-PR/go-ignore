@@ -839,6 +839,23 @@ func TestAddPatterns_MaxPatternLengthUnlimited(t *testing.T) {
 	}
 }
 
+// Regression: with rule count >= MaxBacktrackIterations, late-rule matches
+// were silently dropped because every rule consumed a budget tick on entry.
+func TestMatcher_BudgetDoesNotChargePerRule(t *testing.T) {
+	m := New()
+	var sb strings.Builder
+	for i := 0; i < DefaultMaxBacktrackIterations+1000; i++ {
+		fmt.Fprintf(&sb, "neverMatch%d\n", i)
+	}
+	sb.WriteString("target.txt\n")
+	m.AddPatterns("", []byte(sb.String()))
+
+	if !m.Match("target.txt", false) {
+		t.Fatalf("Match(target.txt) = false with %d rules; budget consumed by rule enumeration",
+			m.RuleCount())
+	}
+}
+
 func BenchmarkMatch_Simple(b *testing.B) {
 	b.ReportAllocs()
 	m := New()

@@ -269,33 +269,45 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 		}
 	}
 
-	var result MatchResult
-
 	// Single shared backtrack budget for the entire Match call.
 	// This prevents pathological patterns across many rules from causing
 	// excessive CPU usage — previously each rule got a fresh budget.
 	ctx := newMatchContext(m.opts.MaxBacktrackIterations)
 
-	// Evaluate rules in order (last match wins)
-	for i := range m.rules {
-		r := &m.rules[i]
+	result := evaluateRules(m.rules, path, pathSegments, isDir, &ctx)
 
-		if matchRule(r, path, pathSegments, isDir, &ctx) {
-			result.Matched = true
-			result.Rule = r.pattern
-			result.BasePath = r.basePath
-			result.Line = r.line
-			result.Negated = r.negate
-
-			if r.negate {
-				result.Ignored = false
-			} else {
-				result.Ignored = true
+	// Spec: a file cannot be re-included if a parent directory is excluded.
+	// Only walk ancestors when negation tried to re-include the path —
+	// otherwise the result is already correct and we'd waste budget.
+	if result.Matched && !result.Ignored && len(pathSegments) > 1 {
+		for i := 1; i < len(pathSegments); i++ {
+			ancestor := strings.Join(pathSegments[:i], "/")
+			ancRes := evaluateRules(m.rules, ancestor, pathSegments[:i], true, &ctx)
+			if ancRes.Matched && ancRes.Ignored {
+				m.mu.RUnlock()
+				return ancRes
 			}
 		}
 	}
 
 	m.mu.RUnlock()
+	return result
+}
+
+// evaluateRules runs all rules against a single path with last-match-wins semantics.
+func evaluateRules(rules []rule, path string, pathSegments []string, isDir bool, ctx *matchContext) MatchResult {
+	var result MatchResult
+	for i := range rules {
+		r := &rules[i]
+		if matchRule(r, path, pathSegments, isDir, ctx) {
+			result.Matched = true
+			result.Rule = r.pattern
+			result.BasePath = r.basePath
+			result.Line = r.line
+			result.Negated = r.negate
+			result.Ignored = !r.negate
+		}
+	}
 	return result
 }
 

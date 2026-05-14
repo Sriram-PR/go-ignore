@@ -339,16 +339,20 @@ func TestEdgeCases_Negation(t *testing.T) {
 		},
 		// Nested negation
 		{
-			"nested file negation",
+			// Spec: parent dir excluded blocks re-include via negation.
+			// git check-ignore agrees: logs/keep.log is ignored by logs/.
+			"nested file negation blocked by parent",
 			"logs/\n!logs/keep.log",
 			"logs/keep.log",
-			false,
+			true,
 		},
 		{
-			"nested dir negation",
+			// Spec: parent dir excluded blocks re-include via negation.
+			// git check-ignore agrees: temp/important is ignored.
+			"nested dir negation blocked by parent",
 			"temp/\n!temp/important/",
 			"temp/important",
-			false,
+			true,
 		},
 	}
 

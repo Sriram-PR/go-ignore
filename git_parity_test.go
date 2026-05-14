@@ -122,6 +122,20 @@ func TestGitParity_EdgeCases(t *testing.T) {
 			createDirs: []string{"logs/keep", "logs/other"},
 		},
 		{
+			// Spec: "It is not possible to re-include a file if a parent
+			// directory of that file is excluded."
+			name:       "parent dir excluded blocks negation",
+			gitignore:  "build/\n!build/keep.txt\n",
+			paths:      []string{"build/keep.txt", "build/other.txt"},
+			createDirs: []string{"build"},
+		},
+		{
+			name:       "parent dir excluded blocks deep negation",
+			gitignore:  "node_modules/\n!node_modules/important/keep.js\n",
+			paths:      []string{"node_modules/important/keep.js", "node_modules/other.js"},
+			createDirs: []string{"node_modules/important"},
+		},
+		{
 			name:      "multiple wildcards",
 			gitignore: "*.min.js\n*.test.go\ntest_*.py\n",
 			paths:     []string{"app.min.js", "lib.min.js", "foo_test.go", "test_bar.py", "main.go"},

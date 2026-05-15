@@ -167,9 +167,9 @@ func TestGitParity_EdgeCases(t *testing.T) {
 		},
 		{
 			// A Windows-authored .gitignore commonly uses CRLF line endings.
-			name:      "CRLF line endings",
-			gitignore: "*.log\r\n!keep.log\r\nbuild/\r\n",
-			paths:     []string{"foo.log", "keep.log", "build/x.txt"},
+			name:       "CRLF line endings",
+			gitignore:  "*.log\r\n!keep.log\r\nbuild/\r\n",
+			paths:      []string{"foo.log", "keep.log", "build/x.txt"},
 			createDirs: []string{"build"},
 		},
 		{

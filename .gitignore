@@ -51,9 +51,9 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Fuzz test corpus and cache
-testdata/fuzz/
-**/testdata/fuzz/
+# Fuzz cache (interesting inputs live in $GOCACHE/fuzz/, not here).
+# Go's fuzz infrastructure writes minimized crash inputs to
+# testdata/fuzz/FuzzName/; those should be committed as regression seeds.
 
 # Build output directories
 /bin/

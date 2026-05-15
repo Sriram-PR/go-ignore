@@ -131,6 +131,24 @@ func FuzzPatternAndPath(f *testing.F) {
 		{"*.tar.gz", "archive.tar.gz"},
 		{"*test*", "mytest.go"},
 		{"a/**/b/**/c", "a/x/b/y/c"},
+		// Parent-dir-excluded negation (spec edge case fixed in this branch).
+		{"build/\n!build/keep.txt", "build/keep.txt"},
+		{"node_modules/\n!node_modules/important", "node_modules/important/file.js"},
+		// Anchored vs unanchored.
+		{"/root.txt", "sub/root.txt"},
+		{"foo/**", "foo"},
+		{"**/foo", "a/b/foo"},
+		// Character class edges.
+		{"[!a-z].txt", "1.txt"},
+		{"[a\\-z].txt", "-.txt"},
+		{"[[:digit:]].log", "0.log"},
+		{"[]abc].txt", "].txt"},
+		// Escapes.
+		{`foo\ `, "foo "},
+		{`foo\\`, `foo\`},
+		{"\\!literal", "!literal"},
+		// Deep ** matching.
+		{"**/leaf.txt", "a/b/c/d/e/f/g/leaf.txt"},
 	}
 
 	for _, seed := range seeds {
@@ -175,6 +193,18 @@ func FuzzGlob(f *testing.F) {
 		{"[[:alpha:]]", "a"},
 		{"[unclosed", "x"},
 		{"[]abc]", "]"},
+		// Backtrack-heavy patterns near the budget boundary.
+		{"*a*a*a*b", "aaab"},
+		{"*a*a*a*a*a*", "aaaaa"},
+		// Escape + meta combinations.
+		{`\\*`, `\*`},
+		{`?\\*`, `a\b`},
+		{`\\?`, `\a`},
+		// Range / POSIX edges.
+		{"[a-]", "-"},
+		{"[--]", "-"},
+		{"[\\]]", "]"},
+		{"[[:xdigit:]]", "F"},
 	}
 
 	for _, seed := range seeds {

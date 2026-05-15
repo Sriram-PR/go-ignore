@@ -77,6 +77,22 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.5.0
+
+- **Spec compliance: parent-dir-excluded negation** — a path cannot be re-included by `!` if a parent directory is excluded by a prior rule. Verified against `git check-ignore`. Behavior change: callers whose tests asserted the previous (incorrect) re-include will need updates; two such tests in this repo were corrected.
+- **Correctness: backtrack budget no longer charges rule enumeration** — previously every rule consumed a tick on entry, so matchers with more rules than `MaxBacktrackIterations` (default 10,000) silently false-negative-ed late rules. The shared budget is now only consumed inside actual backtracking loops; rule iteration and forward progress are free.
+- **Robustness: `git config` subprocess bounded by 5s timeout** — a hung or unresponsive `git` binary can no longer stall `AddGlobalPatterns` indefinitely; timeout falls back to XDG path resolution.
+- **Defensive: `matchSingleSegment` doubleStar fallback fails closed** — the unreachable branch now returns `false` instead of `true`, so any future refactor that accidentally routes a `**` segment here fails safely rather than reporting a spurious match.
+- **Test quality: POSIX class git parity** — six POSIX character class scenarios (`alpha`, `digit`, `alnum`, `upper`/`lower`, `xdigit`, combined) now compared against `git check-ignore` directly.
+- **Test quality: CRLF and UTF-8 BOM parity** — Windows-authored `.gitignore` content with `\r\n` line endings or a leading UTF-8 BOM is exercised end-to-end against git.
+- **Test quality: escape patterns end-to-end** — added `Match`-level tests for `foo\ ` (literal trailing space) and `foo\\` (literal backslash); previously the trimming logic was unit-tested in isolation.
+- **Test quality: per-path subtest isolation** — `compareWithGit` now wraps each path in `t.Run` so one mismatch in a multi-path case produces a clean failure rather than a single error containing all paths.
+- **Test quality: `FuzzGlob` invariant** — fuzz target now asserts the fast-path wrapper `matchGlob` agrees with `matchGlobRecursive` on every input, instead of only checking for panics.
+- **Test quality: expanded fuzz seed corpora** — `FuzzPatternAndPath` and `FuzzGlob` seeded with audit-discovered edge cases (parent-excluded negation, anchoring, char-class edges, escapes, deep `**`, backtrack-heavy patterns). `.gitignore` updated so any future minimized crash inputs in `testdata/fuzz/` are tracked as regression seeds.
+- **Test infra: `gitCheckIgnoreVerbose` correctness** — verbose helper now recognizes leading-`!` rules as negations (`git check-ignore -v` returns exit 0 even for re-includes); spurious `MISMATCH` log lines no longer mask real future regressions.
+- **Tooling: dead `lll` exclusion removed** from `.golangci.yml` (linter not in the enable list).
+- **Tooling: `Makefile` fuzz target** — stray `$` regex anchor (silently consumed by Make) removed for consistency with `ci.yml`.
+
 ### v0.4.1
 
 - **Security: basePath bypass via `..`** — `normalizePath` now resolves `..` components via `path.Clean`, preventing `src/../secret.txt` from matching patterns scoped to `src/`

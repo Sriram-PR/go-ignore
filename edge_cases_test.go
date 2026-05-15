@@ -215,8 +215,35 @@ func TestEdgeCases_Whitespace(t *testing.T) {
 		// Per spec, "\ " at the end preserves a trailing space that would otherwise be trimmed.
 		{"escaped trailing space matches space", `foo\ `, "foo ", true},
 		{"escaped trailing space does not match unspaced", `foo\ `, "foo", false},
+	}
 
-		// Escaped backslash: pattern "foo\\" represents the literal 4-character string "foo\".
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New()
+			m.AddPatterns("", []byte(tt.pattern+"\n"))
+			got := m.Match(tt.path, false)
+			if got != tt.want {
+				t.Errorf("Match(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestEdgeCases_EscapedBackslash covers pattern "foo\\" — the gitignore escape
+// for a literal backslash in a filename. This scenario is Unix-only: on
+// Windows, backslash is the path separator and gets converted to '/' during
+// normalization, so a filename containing a literal '\' is unrepresentable.
+func TestEdgeCases_EscapedBackslash(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("backslash is a path separator on Windows; literal-backslash filenames are not representable")
+	}
+
+	tests := []struct {
+		name    string
+		pattern string
+		path    string
+		want    bool
+	}{
 		{"escaped backslash matches literal backslash", `foo\\`, `foo\`, true},
 		{"escaped backslash does not match unbackslashed", `foo\\`, "foo", false},
 	}

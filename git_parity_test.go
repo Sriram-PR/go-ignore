@@ -418,5 +418,9 @@ func gitCheckIgnoreVerbose(repoDir, path string) gitCheckResult {
 		rule = ruleParts[2]
 	}
 
-	return gitCheckResult{ignored: true, rule: rule}
+	// git check-ignore -v exits 0 whenever *some* rule matches, including
+	// negation rules. Treat a leading '!' as a re-include so the verbose
+	// helper reflects actual ignore semantics, not just "some rule matched".
+	ignored := !strings.HasPrefix(rule, "!")
+	return gitCheckResult{ignored: ignored, rule: rule}
 }

@@ -182,8 +182,24 @@ func FuzzGlob(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, pattern, s string) {
-		// Should never panic
-		_ = matchGlob(pattern, s, testCtx(0))
+		// Invariant: the fast-path wrapper matchGlob must agree with the
+		// slow path matchGlobRecursive for every input. Use a generous budget
+		// on both so neither short-circuits before the other.
+		const big = hardMaxBacktrackIterations
+		ctxA := testCtx(big)
+		ctxB := testCtx(big)
+		fast := matchGlob(pattern, s, ctxA)
+		slow := matchGlobRecursive(pattern, s, ctxB)
+		// Skip the comparison when either side exhausted its budget — a
+		// pathological pattern can still produce divergent partial results
+		// without indicating a correctness bug.
+		if ctxA.exhausted() || ctxB.exhausted() {
+			return
+		}
+		if fast != slow {
+			t.Errorf("matchGlob(%q, %q) = %v but matchGlobRecursive = %v",
+				pattern, s, fast, slow)
+		}
 	})
 }
 

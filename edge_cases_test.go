@@ -210,6 +210,15 @@ func TestEdgeCases_Whitespace(t *testing.T) {
 
 		// Multiple spaces in middle
 		{"multiple spaces", "foo  bar.txt", "foo  bar.txt", true},
+
+		// Backslash-escaped trailing space: the literal pattern is "foo " (with one space).
+		// Per spec, "\ " at the end preserves a trailing space that would otherwise be trimmed.
+		{"escaped trailing space matches space", `foo\ `, "foo ", true},
+		{"escaped trailing space does not match unspaced", `foo\ `, "foo", false},
+
+		// Escaped backslash: pattern "foo\\" represents the literal 4-character string "foo\".
+		{"escaped backslash matches literal backslash", `foo\\`, `foo\`, true},
+		{"escaped backslash does not match unbackslashed", `foo\\`, "foo", false},
 	}
 
 	for _, tt := range tests {

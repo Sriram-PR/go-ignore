@@ -88,6 +88,36 @@ func TestGitParity_Basic(t *testing.T) {
 			gitignore: "[a-f].txt\n[a-z]akefile\n",
 			paths:     []string{"a.txt", "f.txt", "g.txt", "makefile"},
 		},
+		{
+			name:      "POSIX alpha class",
+			gitignore: "[[:alpha:]].txt\n",
+			paths:     []string{"a.txt", "Z.txt", "1.txt", "_.txt"},
+		},
+		{
+			name:      "POSIX digit class",
+			gitignore: "[[:digit:]]debug.log\n",
+			paths:     []string{"0debug.log", "9debug.log", "adebug.log"},
+		},
+		{
+			name:      "POSIX alnum class",
+			gitignore: "[[:alnum:]].log\n",
+			paths:     []string{"a.log", "Z.log", "5.log", "-.log"},
+		},
+		{
+			name:      "POSIX upper and lower classes",
+			gitignore: "[[:upper:]]ame\n[[:lower:]]ame\n",
+			paths:     []string{"Name", "name", "1ame"},
+		},
+		{
+			name:      "POSIX xdigit class",
+			gitignore: "[[:xdigit:]].hex\n",
+			paths:     []string{"0.hex", "f.hex", "F.hex", "g.hex"},
+		},
+		{
+			name:      "POSIX class combined with literal",
+			gitignore: "file[[:digit:]].txt\n",
+			paths:     []string{"file0.txt", "file9.txt", "filea.txt", "file.txt"},
+		},
 	}
 
 	for _, tt := range tests {

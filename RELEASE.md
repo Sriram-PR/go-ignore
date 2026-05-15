@@ -77,6 +77,11 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.5.1
+
+- **Test-only: Windows CI fix** — `TestEdgeCases_Whitespace/escaped_backslash_*` asserted a Unix-only scenario (filename containing a literal `\`) that is unrepresentable on Windows, where backslash is the path separator and gets converted to `/` during normalization. The two cases were split into a new `TestEdgeCases_EscapedBackslash` that skips on Windows. No library code changed.
+- **Test-only: FuzzGlob deadline fix** — `FuzzGlob` was using `hardMaxBacktrackIterations` (10M) per input so neither side would short-circuit prematurely, but pathological backtracking patterns could then consume enough wall time to exceed Go's fuzz worker context deadline. Both sides now use `DefaultMaxBacktrackIterations` (10k); pathological inputs exhaust at the same point and are skipped by the existing exhaustion guard.
+
 ### v0.5.0
 
 - **Spec compliance: parent-dir-excluded negation** — a path cannot be re-included by `!` if a parent directory is excluded by a prior rule. Verified against `git check-ignore`. Behavior change: callers whose tests asserted the previous (incorrect) re-include will need updates; two such tests in this repo were corrected.

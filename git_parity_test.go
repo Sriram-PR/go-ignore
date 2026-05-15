@@ -166,6 +166,21 @@ func TestGitParity_EdgeCases(t *testing.T) {
 			createDirs: []string{"node_modules/important"},
 		},
 		{
+			// A Windows-authored .gitignore commonly uses CRLF line endings.
+			name:      "CRLF line endings",
+			gitignore: "*.log\r\n!keep.log\r\nbuild/\r\n",
+			paths:     []string{"foo.log", "keep.log", "build/x.txt"},
+			createDirs: []string{"build"},
+		},
+		{
+			// UTF-8 BOM at the start of a .gitignore — common from
+			// editors like Notepad on Windows.
+			name:       "UTF-8 BOM prefix",
+			gitignore:  "\xef\xbb\xbf*.log\nbuild/\n",
+			paths:      []string{"foo.log", "build/x.txt"},
+			createDirs: []string{"build"},
+		},
+		{
 			name:      "multiple wildcards",
 			gitignore: "*.min.js\n*.test.go\ntest_*.py\n",
 			paths:     []string{"app.min.js", "lib.min.js", "foo_test.go", "test_bar.py", "main.go"},

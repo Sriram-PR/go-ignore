@@ -212,21 +212,23 @@ func compareWithGit(t *testing.T, gitignoreContent string, paths []string, creat
 	m := New()
 	m.AddPatterns("", []byte(gitignoreContent))
 
-	// Compare results for each path
+	// Compare results for each path. Per-path t.Run gives clean failure
+	// isolation when one path mismatches in a multi-path case.
 	for _, path := range paths {
-		gitResult := gitCheckIgnore(t, tmpDir, path)
+		t.Run(path, func(t *testing.T) {
+			gitResult := gitCheckIgnore(t, tmpDir, path)
 
-		// Determine if path is a directory
-		fullPath := filepath.Join(tmpDir, path)
-		info, err := os.Stat(fullPath)
-		isDir := err == nil && info.IsDir()
+			fullPath := filepath.Join(tmpDir, path)
+			info, err := os.Stat(fullPath)
+			isDir := err == nil && info.IsDir()
 
-		ourResult := m.Match(path, isDir)
+			ourResult := m.Match(path, isDir)
 
-		if ourResult != gitResult {
-			t.Errorf("path %q: our result = %v, git result = %v\ngitignore:\n%s",
-				path, ourResult, gitResult, gitignoreContent)
-		}
+			if ourResult != gitResult {
+				t.Errorf("our result = %v, git result = %v\ngitignore:\n%s",
+					ourResult, gitResult, gitignoreContent)
+			}
+		})
 	}
 }
 

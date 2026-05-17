@@ -77,6 +77,27 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.6.0
+
+Internal hygiene and documentation polish release. No public API change, no behavior change in matching.
+
+**Internal refactor**
+- **Dead field removed** — `segment.hasStar` was set during parse but never read; the same information is carried by `starCount`. Removed the field, its assignment in `parseLines`, and the lone test-struct literal that referenced it.
+- **`normalizeBasePath` wrapper inlined** — the wrapper was a transparent forwarder to `normalizePath` (the empty-string early return was redundant with `normalizePath`'s own behavior). The single call site now invokes `normalizePath` directly; the redundant test was removed since `TestNormalizePath` already covers the same inputs.
+- **`normalizeContent` CR scan** — replaced `bytes.ContainsRune(content, '\r')` with `bytes.IndexByte(content, '\r') < 0`. `'\r'` is ASCII; no need to decode UTF-8 for the fast-path check.
+
+**Documentation**
+- **`newMatchContext` doc** — said "If `maxIter` is `-1`", but the code branch is `maxIter < 0`. Doc now says "any negative value" to match.
+- **`maxRecursionDepth` doc** — clarified that the limit applies to every recursive call in `matchSegmentsExact` / `matchSegmentsPrefix`, including the linear tail-recursive segment walk, not just `**` branches.
+- **`MatcherOptions.MaxBacktrackIterations` doc** — "-1 for unlimited" was misleading; negative values raise the limit to the internal safety cap (10,000,000 iterations), not true unlimited. Doc now states this explicitly.
+- **README `..` handling** — README said the library does not resolve `..`, but `normalizePath` calls `path.Clean` on paths containing `..` and rejects paths that escape the repository root. Corrected the section so callers don't double-clean.
+- **`[^abc]` documented** — `matchCharClass` accepts both `!` and `^` as negation inside character classes, but `doc.go` and the README only documented `!`. Both now mention `[^abc]` as an alias.
+- **`AddExcludePatterns` example** — added a runnable `ExampleMatcher_AddExcludePatterns` that creates a temp `.git/info/exclude` and exercises the call; pkg.go.dev Examples tab now has an entry for that method.
+
+**Tooling**
+- **CI branch triggers** — `.github/workflows/ci.yml` listed `[main, master]` but the repo only has `main`. Dropped `master`.
+- **Makefile fuzz targets** — `go test -fuzz=...` lines were missing the package path, so they silently no-op'd from subdirectories. Each line now ends with `.`.
+
 ### v0.5.1
 
 - **Test-only: Windows CI fix** — `TestEdgeCases_Whitespace/escaped_backslash_*` asserted a Unix-only scenario (filename containing a literal `\`) that is unrepresentable on Windows, where backslash is the path separator and gets converted to `/` during normalization. The two cases were split into a new `TestEdgeCases_EscapedBackslash` that skips on Windows. No library code changed.

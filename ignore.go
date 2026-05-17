@@ -150,7 +150,7 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 	}
 
 	// Normalize basePath once for consistent rule scoping and warning reporting.
-	normalizedBase := normalizeBasePath(basePath)
+	normalizedBase := normalizePath(basePath)
 
 	// Parse rules (this doesn't need the lock)
 	newRules, parseWarnings := parseLines(normalizedBase, content, m.opts.MaxPatternLength)

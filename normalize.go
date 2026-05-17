@@ -79,22 +79,6 @@ func normalizePath(p string) string {
 	return p
 }
 
-// normalizeBasePath normalizes a base path for rule scoping.
-// Similar to normalizePath but preserves the semantic meaning of basePath.
-//
-// The basePath represents the directory containing a .gitignore file,
-// relative to the repository root. Empty string means repository root.
-func normalizeBasePath(basePath string) string {
-	if basePath == "" {
-		return ""
-	}
-
-	// Apply standard path normalization (already removes trailing slash)
-	basePath = normalizePath(basePath)
-
-	return basePath
-}
-
 // normalizeContent normalizes .gitignore file content for parsing.
 // It handles platform-specific encoding variations.
 //

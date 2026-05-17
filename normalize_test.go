@@ -81,44 +81,6 @@ func TestNormalizePath(t *testing.T) {
 	}
 }
 
-func TestNormalizeBasePath(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		want        string
-		windowsOnly bool
-	}{
-		// Empty is repository root
-		{"empty string", "", "", false},
-
-		// Basic normalization
-		{"simple path", "src", "src", false},
-		{"nested path", "src/lib", "src/lib", false},
-
-		// Trailing slash removed
-		{"trailing slash", "src/", "src", false},
-
-		// Backslash conversion (Windows only)
-		{"windows path", "src\\lib", "src/lib", true},
-		{"windows with trailing", "src\\lib\\", "src/lib", true},
-
-		// Leading ./ removed
-		{"leading dot slash", "./src", "src", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.windowsOnly && runtime.GOOS != "windows" {
-				t.Skip("backslash conversion only applies on Windows")
-			}
-			got := normalizeBasePath(tt.input)
-			if got != tt.want {
-				t.Errorf("normalizeBasePath(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestNormalizeContent(t *testing.T) {
 	tests := []struct {
 		name  string

@@ -757,7 +757,7 @@ func TestMatchSegmentsPrefix(t *testing.T) {
 		},
 		{
 			"wildcard prefix",
-			[]segment{{value: "*.d", wildcard: true, hasStar: true, starCount: 1}},
+			[]segment{{value: "*.d", wildcard: true, starCount: 1}},
 			[]string{"test.d", "file.txt"},
 			true,
 		},

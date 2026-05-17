@@ -33,7 +33,6 @@ type segment struct {
 	value        string // literal or pattern text (empty for **)
 	wildcard     bool   // contains * (but not **) - requires glob matching
 	doubleStar   bool   // is ** - matches zero or more directories
-	hasStar      bool   // contains * (not **) — pre-computed at parse time
 	hasQuestion  bool   // contains ?
 	hasEscape    bool   // contains backslash
 	hasCharClass bool   // contains [ (character class or literal bracket)
@@ -219,7 +218,6 @@ func parseSegments(pattern string) []segment {
 				switch part[i] {
 				case '*':
 					seg.wildcard = true
-					seg.hasStar = true
 					seg.starCount++
 				case '?':
 					seg.wildcard = true

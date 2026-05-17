@@ -77,6 +77,36 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.7.0
+
+API-shape cleanup before the v1.0 freeze. **Contains breaking changes** to the public API; migration is mechanical and the migration steps below cover every call-site pattern in the existing test suite.
+
+**Breaking changes**
+
+- **`WarningHandler` moved into `MatcherOptions`** — `SetWarningHandler` is removed. The handler is fixed at construction time, eliminating the "must call before AddPatterns" footgun. To migrate:
+  ```go
+  // before
+  m := ignore.New()
+  m.SetWarningHandler(handler)
+  // after
+  m := ignore.NewWithOptions(ignore.MatcherOptions{WarningHandler: handler})
+  ```
+- **`WarningHandler` signature change** — `func(basePath string, w ParseWarning)` → `func(w ParseWarning)`. The `basePath` argument was duplicating `w.BasePath`. Read `w.BasePath` inside the handler instead.
+- **`AddPatterns` no longer returns `[]ParseWarning`** — the return value was populated only when no handler was configured (asymmetric API). Warnings now flow through exactly one channel: the configured `WarningHandler` if set, otherwise `Warnings()`. To migrate:
+  ```go
+  // before
+  warnings := m.AddPatterns("", content)
+  // after
+  m.AddPatterns("", content)
+  warnings := m.Warnings() // or use a WarningHandler in MatcherOptions
+  ```
+- **`MatchResult.Negated` field replaced by `(MatchResult).Negated()` method** — the field was a derivable view (`Matched && !Ignored`). The method preserves the accessor ergonomics without storing redundant state. Replace `result.Negated` with `result.Negated()`. New companion methods `IsIgnored()` and `IsExplicit()` provide the same accessor pattern for the `Ignored` and `Matched` fields; callers that want layout-stable accessors should prefer the methods over field reads.
+
+**Non-breaking additions**
+
+- **`LoadRepo(repoRoot, opts) (*Matcher, error)`** — convenience constructor that pre-loads all three standard gitignore sources for a working tree in git's precedence order: global gitignore (lowest), `<repoRoot>/.git/info/exclude`, `<repoRoot>/.gitignore` (highest). Missing files are silently skipped. Nested per-directory `.gitignore` files are not walked; callers that need them should follow up with `AddPatterns` calls scoped to each subdirectory.
+- **`AddPatternsReader(basePath, r) error`** — streams pattern content from an `io.Reader` instead of requiring callers to buffer the whole file via `io.ReadAll` first. Read errors are wrapped and returned; rules are added on a successful read.
+
 ### v0.6.0
 
 Internal hygiene and documentation polish release. No public API change, no behavior change in matching.

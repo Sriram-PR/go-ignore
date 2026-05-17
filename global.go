@@ -17,6 +17,43 @@ import (
 // AddGlobalPatterns indefinitely.
 const gitConfigTimeout = 5 * time.Second
 
+// LoadRepo creates a Matcher pre-loaded with the three standard gitignore
+// sources for a working tree, in git's precedence order (lowest first, so the
+// last-loaded rule wins per the matcher's last-match-wins semantics):
+//
+//  1. The user's global gitignore (resolved via git config / XDG; see AddGlobalPatterns)
+//  2. <repoRoot>/.git/info/exclude (see AddExcludePatterns)
+//  3. <repoRoot>/.gitignore (root scope)
+//
+// Missing files are silently skipped; only real read failures are returned.
+// Nested .gitignore files under subdirectories are NOT walked — callers that
+// need per-directory rules should call AddPatterns with the appropriate
+// basePath after LoadRepo returns.
+//
+// Pass a zero-value MatcherOptions{} to accept all defaults.
+func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
+	m := NewWithOptions(opts)
+
+	if err := m.AddGlobalPatterns(); err != nil {
+		return nil, err
+	}
+
+	if err := m.AddExcludePatterns(filepath.Join(repoRoot, ".git")); err != nil {
+		return nil, err
+	}
+
+	rootIgnore := filepath.Join(repoRoot, ".gitignore")
+	content, err := os.ReadFile(rootIgnore)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return m, nil
+		}
+		return nil, fmt.Errorf("reading %s: %w", rootIgnore, err)
+	}
+	m.AddPatterns("", content)
+	return m, nil
+}
+
 // AddGlobalPatterns loads the user's global gitignore file and adds its
 // patterns to the matcher. The global gitignore path is resolved in order:
 //

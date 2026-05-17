@@ -308,6 +308,74 @@ func TestAddExcludePatterns_WithFile(t *testing.T) {
 	}
 }
 
+func TestLoadRepo(t *testing.T) {
+	// Isolate from any real global gitignore on the host.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	repo := t.TempDir()
+
+	// <repo>/.gitignore (highest precedence)
+	if err := os.WriteFile(filepath.Join(repo, ".gitignore"),
+		[]byte("*.log\n!important.log\n"), 0o644); err != nil {
+		t.Fatalf("write .gitignore: %v", err)
+	}
+
+	// <repo>/.git/info/exclude (medium precedence)
+	infoDir := filepath.Join(repo, ".git", "info")
+	if err := os.MkdirAll(infoDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(infoDir, "exclude"),
+		[]byte("scratch/\n"), 0o644); err != nil {
+		t.Fatalf("write exclude: %v", err)
+	}
+
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+
+	// Rules from both files should be active. (Global may or may not contribute
+	// depending on host config; we assert a floor, not an exact count.)
+	if m.RuleCount() < 3 {
+		t.Errorf("RuleCount = %d, want >= 3", m.RuleCount())
+	}
+
+	tests := []struct {
+		path  string
+		isDir bool
+		want  bool
+	}{
+		{"debug.log", false, true},      // .gitignore *.log
+		{"important.log", false, false}, // .gitignore !important.log
+		{"scratch", true, true},         // exclude scratch/
+		{"src/main.go", false, false},   // no rule matches
+	}
+	for _, tt := range tests {
+		if got := m.Match(tt.path, tt.isDir); got != tt.want {
+			t.Errorf("Match(%q, %v) = %v, want %v", tt.path, tt.isDir, got, tt.want)
+		}
+	}
+}
+
+func TestLoadRepo_MissingFiles(t *testing.T) {
+	// Isolate from any real global gitignore on the host.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	repo := t.TempDir()
+	// No .gitignore, no .git/info/exclude — should still succeed.
+
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if m == nil {
+		t.Fatal("LoadRepo returned nil matcher")
+	}
+}
+
 func TestAddExcludePatterns_NoFile(t *testing.T) {
 	tmp := t.TempDir()
 	// No info/exclude file created — should return nil with 0 rules

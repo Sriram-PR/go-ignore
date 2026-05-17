@@ -51,6 +51,13 @@ const (
 
 // MatcherOptions configures Matcher behavior.
 type MatcherOptions struct {
+	// WarningHandler is invoked for each parse warning produced by AddPatterns
+	// (and helpers that call it). If nil, warnings are collected and made
+	// available through Warnings(). The handler is fixed at construction time
+	// and cannot be changed afterward; this prevents the ordering bug where a
+	// handler set after AddPatterns would silently miss earlier warnings.
+	WarningHandler WarningHandler
+
 	// MaxBacktrackIterations limits ** pattern matching iterations.
 	// Default: DefaultMaxBacktrackIterations (10000).
 	// Set to 0 to use the default. Any negative value raises the limit to the
@@ -86,7 +93,6 @@ type Matcher struct {
 	handlerMu sync.Mutex // serializes WarningHandler dispatch across goroutines
 	rules     []rule
 	warnings  []ParseWarning
-	handler   WarningHandler
 	opts      MatcherOptions
 }
 
@@ -117,17 +123,6 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 	}
 }
 
-// SetWarningHandler sets a callback for parse warnings.
-// If set, warnings are reported via callback instead of being collected.
-// Passing nil resets to collection mode (warnings available via Warnings()).
-// IMPORTANT: Must be called before AddPatterns for the handler to receive warnings.
-// If called after AddPatterns, only subsequent AddPatterns calls will use the handler.
-func (m *Matcher) SetWarningHandler(fn WarningHandler) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.handler = fn
-}
-
 // AddPatterns parses gitignore content and adds rules.
 // basePath is the directory containing the .gitignore (empty string for root).
 //
@@ -140,7 +135,7 @@ func (m *Matcher) SetWarningHandler(fn WarningHandler) {
 // without acquiring locks; empty content goes through parsing (which yields nothing).
 //
 // Returns warnings for malformed patterns. Warnings are only returned if no
-// WarningHandler was set via SetWarningHandler; otherwise warnings go to the handler.
+// WarningHandler was set in MatcherOptions; otherwise warnings go to the handler.
 //
 // Thread-safe: can be called concurrently with Match.
 // Performance note: For best performance when loading many .gitignore files,
@@ -194,7 +189,7 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 	}
 
 	m.rules = append(m.rules, newRules...)
-	handler := m.handler
+	handler := m.opts.WarningHandler
 	if handler == nil {
 		m.warnings = append(m.warnings, parseWarnings...)
 	}

@@ -37,10 +37,11 @@ func ExampleMatcher_MatchWithReason() {
 	// ignored=false negated=true rule="!important.log"
 }
 
-func ExampleMatcher_SetWarningHandler() {
-	m := ignore.New()
-	m.SetWarningHandler(func(basePath string, w ignore.ParseWarning) {
-		fmt.Printf("line %d: %s\n", w.Line, w.Message)
+func ExampleMatcherOptions_warningHandler() {
+	m := ignore.NewWithOptions(ignore.MatcherOptions{
+		WarningHandler: func(basePath string, w ignore.ParseWarning) {
+			fmt.Printf("line %d: %s\n", w.Line, w.Message)
+		},
 	})
 	m.AddPatterns("", []byte("*.log\n!\n"))
 	// Output:

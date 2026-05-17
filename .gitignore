@@ -64,3 +64,6 @@ desktop.ini
 .env
 .env.local
 *.local
+
+# Claude Code local settings and per-project memory
+/.claude/

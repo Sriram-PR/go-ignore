@@ -254,10 +254,11 @@ func TestAddGlobalPatterns_WithWarningHandler(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	m := New()
 	var warnings []ParseWarning
-	m.SetWarningHandler(func(_ string, w ParseWarning) {
-		warnings = append(warnings, w)
+	m := NewWithOptions(MatcherOptions{
+		WarningHandler: func(_ string, w ParseWarning) {
+			warnings = append(warnings, w)
+		},
 	})
 
 	if err := m.AddGlobalPatterns(); err != nil {

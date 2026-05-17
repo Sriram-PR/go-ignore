@@ -157,15 +157,15 @@ func TestWarnings(t *testing.T) {
 	}
 }
 
-func TestSetWarningHandler(t *testing.T) {
-	m := New()
-
+func TestWarningHandler(t *testing.T) {
 	var received []ParseWarning
 	var receivedBasePaths []string
 
-	m.SetWarningHandler(func(basePath string, w ParseWarning) {
-		received = append(received, w)
-		receivedBasePaths = append(receivedBasePaths, basePath)
+	m := NewWithOptions(MatcherOptions{
+		WarningHandler: func(basePath string, w ParseWarning) {
+			received = append(received, w)
+			receivedBasePaths = append(receivedBasePaths, basePath)
+		},
 	})
 
 	// Add patterns with warnings
@@ -191,62 +191,6 @@ func TestSetWarningHandler(t *testing.T) {
 	// Warnings() should be empty when handler is used
 	if len(m.Warnings()) != 0 {
 		t.Error("Warnings() should be empty when handler is set")
-	}
-}
-
-func TestSetWarningHandler_Precedence(t *testing.T) {
-	m := New()
-
-	// Add patterns without handler - warnings collected
-	m.AddPatterns("", []byte("!\n"))
-	if len(m.Warnings()) != 1 {
-		t.Error("Warning should be collected when no handler")
-	}
-
-	// Set handler
-	var handlerCalled bool
-	m.SetWarningHandler(func(basePath string, w ParseWarning) {
-		handlerCalled = true
-	})
-
-	// Add more patterns - should go to handler
-	m.AddPatterns("", []byte("!\n"))
-	if !handlerCalled {
-		t.Error("Handler should be called after SetWarningHandler")
-	}
-
-	// Previous warnings still in collection
-	if len(m.Warnings()) != 1 {
-		t.Error("Previous warnings should still be in collection")
-	}
-}
-
-func TestSetWarningHandler_Reset(t *testing.T) {
-	m := New()
-
-	// Set a handler and add patterns with warnings
-	var handlerCount int
-	m.SetWarningHandler(func(_ string, _ ParseWarning) {
-		handlerCount++
-	})
-	m.AddPatterns("", []byte("!\n")) // triggers warning via handler
-	if handlerCount != 1 {
-		t.Fatalf("handler called %d times, want 1", handlerCount)
-	}
-
-	// Reset to collection mode
-	m.SetWarningHandler(nil)
-
-	// Add more patterns with warnings — should collect, not call handler
-	m.AddPatterns("", []byte("/\n"))
-	if handlerCount != 1 {
-		t.Errorf("handler called after reset: got %d, want 1", handlerCount)
-	}
-
-	// Verify warnings are now collected
-	w := m.Warnings()
-	if len(w) != 1 {
-		t.Errorf("Warnings() = %d, want 1 (from post-reset AddPatterns)", len(w))
 	}
 }
 
@@ -540,13 +484,14 @@ func TestMatcher_ConcurrentAddAndMatch(t *testing.T) {
 }
 
 func TestMatcher_ConcurrentHandlerDispatch(t *testing.T) {
-	m := New()
 	var mu sync.Mutex
 	var warnings []ParseWarning
-	m.SetWarningHandler(func(basePath string, w ParseWarning) {
-		mu.Lock()
-		warnings = append(warnings, w)
-		mu.Unlock()
+	m := NewWithOptions(MatcherOptions{
+		WarningHandler: func(basePath string, w ParseWarning) {
+			mu.Lock()
+			warnings = append(warnings, w)
+			mu.Unlock()
+		},
 	})
 
 	var wg sync.WaitGroup

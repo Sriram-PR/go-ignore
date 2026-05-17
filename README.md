@@ -281,7 +281,7 @@ The library does **not** automatically ignore `.git/` — add it explicitly if n
 
 ## Path Normalization Notes
 
-The library does **not** resolve `..` (parent directory) components in paths. Paths containing `..` are matched literally against patterns. If your application accepts paths from untrusted sources, use `filepath.Clean()` before passing them to `Match()` to prevent path traversal issues.
+Paths containing `..` are resolved internally via `path.Clean` so callers cannot bypass scoped patterns (e.g., `src/../secret.txt` is matched as `secret.txt`, not as a path inside `src/`). Paths that resolve above the repository root (e.g., `../escape.txt`) are treated as non-matching.
 
 ## Resource Limits
 

@@ -261,7 +261,7 @@ If the exclude file does not exist, `AddExcludePatterns` returns nil (no error).
 | `?.txt` | Single byte | `a.txt`, `b.txt` (not `ab.txt`) |
 | `[abc]` | Character class | `a`, `b`, or `c` |
 | `[a-z]` | Character range | Any lowercase letter |
-| `[!abc]` | Negated class | Any char except `a`, `b`, `c` |
+| `[!abc]` or `[^abc]` | Negated class | Any char except `a`, `b`, `c` |
 | `[[:alpha:]]` | POSIX class | Any letter |
 | `\*` | Literal * | Matches `*` (escaped wildcard) |
 

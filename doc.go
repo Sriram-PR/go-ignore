@@ -49,7 +49,7 @@
 //   - Negation: "!important.log" re-includes a file
 //   - Character classes: "[abc]" matches one byte: a, b, or c
 //   - Ranges: "[a-z]", "[0-9]" match character ranges
-//   - Negated classes: "[!abc]" matches any character except a, b, or c
+//   - Negated classes: "[!abc]" or "[^abc]" matches any character except a, b, or c
 //   - POSIX classes: "[[:alpha:]]", "[[:digit:]]" and 10 more
 //   - Escapes: "\*", "\?", "\#", "\!" for literal matching
 //

@@ -2,6 +2,8 @@ package ignore_test
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	ignore "github.com/Sriram-PR/go-ignore"
 )
@@ -54,6 +56,38 @@ func ExampleMatcher_AddGlobalPatterns() {
 	fmt.Println("loaded:", m.RuleCount() >= 0)
 	// Output:
 	// loaded: true
+}
+
+func ExampleMatcher_AddExcludePatterns() {
+	// Simulate a repo with a .git/info/exclude file.
+	gitDir, err := os.MkdirTemp("", "go-ignore-example-*")
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	defer os.RemoveAll(gitDir)
+
+	if err := os.MkdirAll(filepath.Join(gitDir, "info"), 0o755); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	excludeFile := filepath.Join(gitDir, "info", "exclude")
+	if err := os.WriteFile(excludeFile, []byte("*.local\n"), 0o644); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	m := ignore.New()
+	if err := m.AddExcludePatterns(gitDir); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	fmt.Println(m.Match("config.local", false))
+	fmt.Println(m.Match("config.yaml", false))
+	// Output:
+	// true
+	// false
 }
 
 func ExampleNewWithOptions() {

@@ -16,8 +16,11 @@ const DefaultMaxBacktrackIterations = 10000
 // backtracking in pathological glob patterns (e.g., *a*a*a*...*b) from hanging.
 const hardMaxBacktrackIterations = 10_000_000
 
-// maxRecursionDepth limits the recursion depth in matching functions
-// to prevent stack overflow from deeply nested patterns.
+// maxRecursionDepth bounds recursion in segment-matching functions to prevent
+// stack overflow. It applies to every recursive call in matchSegmentsExact and
+// matchSegmentsPrefix, including the linear tail-recursive segment walk (not
+// just ** branches). Patterns or paths with more than 200 segments are treated
+// as non-matching once the limit is reached.
 const maxRecursionDepth = 200
 
 // matchContext tracks state during matching to prevent runaway backtracking.

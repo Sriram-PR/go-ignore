@@ -53,7 +53,9 @@ const (
 type MatcherOptions struct {
 	// MaxBacktrackIterations limits ** pattern matching iterations.
 	// Default: DefaultMaxBacktrackIterations (10000).
-	// Set to 0 to use default. Set to -1 for unlimited (not recommended).
+	// Set to 0 to use the default. Any negative value raises the limit to the
+	// internal safety cap (10,000,000 iterations) — true unlimited is not
+	// supported and the cap still applies even with -1.
 	MaxBacktrackIterations int
 
 	// CaseInsensitive enables case-insensitive matching.

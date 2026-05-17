@@ -31,7 +31,7 @@ func ExampleMatcher_MatchWithReason() {
 	fmt.Printf("ignored=%v rule=%q\n", result.Ignored, result.Rule)
 
 	result = m.MatchWithReason("important.log", false)
-	fmt.Printf("ignored=%v negated=%v rule=%q\n", result.Ignored, result.Negated, result.Rule)
+	fmt.Printf("ignored=%v negated=%v rule=%q\n", result.Ignored, result.Negated(), result.Rule)
 	// Output:
 	// ignored=true rule="*.log"
 	// ignored=false negated=true rule="!important.log"

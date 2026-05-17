@@ -6,6 +6,11 @@ import (
 )
 
 // MatchResult provides detailed information about a match decision.
+//
+// Callers are encouraged to use the IsIgnored, IsExplicit, and Negated methods
+// rather than reading the bool fields directly; the methods provide a stable
+// accessor API even if the underlying struct layout changes in a future major
+// version.
 type MatchResult struct {
 	// Rule is the pattern string of the last matching rule (empty if Matched == false).
 	// If multiple rules matched, this is the final decisive rule.
@@ -27,11 +32,20 @@ type MatchResult struct {
 	// If false, no rules matched and the path is not ignored (default behavior).
 	// If true, at least one rule matched (including negation rules); check Ignored for the final result.
 	Matched bool
-
-	// Negated indicates whether the matching rule was a negation (started with !).
-	// When Negated == true and Matched == true, the path was re-included.
-	Negated bool
 }
+
+// IsIgnored reports whether the path is ignored by the final match decision.
+// Equivalent to reading the Ignored field, but stable across struct-layout changes.
+func (r MatchResult) IsIgnored() bool { return r.Ignored }
+
+// IsExplicit reports whether any rule matched the path (including negation rules).
+// When false, no rule matched and Ignored is false by default.
+// Equivalent to reading the Matched field, but stable across struct-layout changes.
+func (r MatchResult) IsExplicit() bool { return r.Matched }
+
+// Negated reports whether the final matching rule was a negation rule (i.e., the
+// path was re-included). True iff IsExplicit() && !IsIgnored().
+func (r MatchResult) Negated() bool { return r.Matched && !r.Ignored }
 
 // WarningHandler is called for each parse warning if set.
 // The warning includes BasePath; no separate basePath argument is provided.
@@ -301,7 +315,6 @@ func evaluateRules(rules []rule, path string, pathSegments []string, isDir bool,
 			result.Rule = r.pattern
 			result.BasePath = r.basePath
 			result.Line = r.line
-			result.Negated = r.negate
 			result.Ignored = !r.negate
 		}
 	}

@@ -120,12 +120,12 @@ result := m.MatchWithReason("debug.log", false)
 fmt.Printf("Ignored: %v\n", result.Ignored)   // true
 fmt.Printf("Rule: %s\n", result.Rule)         // *.log
 fmt.Printf("Line: %d\n", result.Line)         // 1
-fmt.Printf("Negated: %v\n", result.Negated)   // false
+fmt.Printf("Negated: %v\n", result.Negated()) // false
 
 result = m.MatchWithReason("important.log", false)
 fmt.Printf("Ignored: %v\n", result.Ignored)   // false (re-included)
 fmt.Printf("Rule: %s\n", result.Rule)         // !important.log
-fmt.Printf("Negated: %v\n", result.Negated)   // true
+fmt.Printf("Negated: %v\n", result.Negated()) // true
 ```
 
 ### Case-Insensitive Matching (Windows/macOS)
@@ -315,8 +315,11 @@ type MatchResult struct {
     Rule     string // The matching pattern
     BasePath string // Source .gitignore location
     Line     int    // Line number (1-indexed)
-    Negated  bool   // Was it a negation rule
 }
+
+func (r MatchResult) IsIgnored() bool  // r.Ignored
+func (r MatchResult) IsExplicit() bool // r.Matched
+func (r MatchResult) Negated() bool    // r.Matched && !r.Ignored
 
 type ParseWarning struct {
     Pattern  string
@@ -325,7 +328,7 @@ type ParseWarning struct {
     BasePath string
 }
 
-type WarningHandler func(basePath string, warning ParseWarning)
+type WarningHandler func(warning ParseWarning)
 ```
 
 ### Functions

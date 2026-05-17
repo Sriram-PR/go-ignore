@@ -380,8 +380,8 @@ func TestMatchWithReason_Basic(t *testing.T) {
 			if result.Line != tt.line {
 				t.Errorf("Line = %d, want %d", result.Line, tt.line)
 			}
-			if result.Negated != tt.negated {
-				t.Errorf("Negated = %v, want %v", result.Negated, tt.negated)
+			if result.Negated() != tt.negated {
+				t.Errorf("Negated() = %v, want %v", result.Negated(), tt.negated)
 			}
 		})
 	}
@@ -660,13 +660,13 @@ build/
 
 	// Example 1: Regular ignore
 	result := m.MatchWithReason("debug.log", false)
-	if !result.Matched || !result.Ignored || result.Rule != "*.log" || result.Negated {
+	if !result.Matched || !result.Ignored || result.Rule != "*.log" || result.Negated() {
 		t.Errorf("Example 1 failed: %+v", result)
 	}
 
 	// Example 2: Negation re-includes file
 	result = m.MatchWithReason("important.log", false)
-	if !result.Matched || result.Ignored || result.Rule != "!important.log" || !result.Negated {
+	if !result.Matched || result.Ignored || result.Rule != "!important.log" || !result.Negated() {
 		t.Errorf("Example 2 failed: %+v", result)
 	}
 

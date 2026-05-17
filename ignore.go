@@ -1,6 +1,8 @@
 package ignore
 
 import (
+	"fmt"
+	"io"
 	"strings"
 	"sync"
 )
@@ -220,6 +222,26 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) {
 		}
 		m.handlerMu.Unlock()
 	}
+}
+
+// AddPatternsReader reads gitignore content from r and calls AddPatterns.
+// It is equivalent to io.ReadAll followed by AddPatterns, but avoids forcing
+// callers to buffer the entire file themselves.
+//
+// If reading r fails, no rules are added and the read error is returned wrapped.
+// A successful read with empty content is treated the same as AddPatterns(basePath, nil).
+//
+// Thread-safe: can be called concurrently with Match.
+func (m *Matcher) AddPatternsReader(basePath string, r io.Reader) error {
+	if r == nil {
+		return nil
+	}
+	content, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("reading patterns: %w", err)
+	}
+	m.AddPatterns(basePath, content)
+	return nil
 }
 
 // Warnings returns all collected parse warnings.

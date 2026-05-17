@@ -1,7 +1,10 @@
 package ignore
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"runtime"
 	"strings"
 	"sync"
@@ -156,6 +159,63 @@ func TestWarnings(t *testing.T) {
 		}
 	}
 }
+
+func TestAddPatternsReader(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
+		m := New()
+		r := bytes.NewReader([]byte("*.log\nbuild/\n"))
+		if err := m.AddPatternsReader("", r); err != nil {
+			t.Fatalf("AddPatternsReader: %v", err)
+		}
+		if m.RuleCount() != 2 {
+			t.Errorf("RuleCount = %d, want 2", m.RuleCount())
+		}
+		if !m.Match("debug.log", false) {
+			t.Error("*.log should match debug.log")
+		}
+	})
+
+	t.Run("nil reader", func(t *testing.T) {
+		m := New()
+		if err := m.AddPatternsReader("", nil); err != nil {
+			t.Fatalf("AddPatternsReader(nil): %v", err)
+		}
+		if m.RuleCount() != 0 {
+			t.Errorf("RuleCount = %d, want 0", m.RuleCount())
+		}
+	})
+
+	t.Run("empty reader", func(t *testing.T) {
+		m := New()
+		if err := m.AddPatternsReader("", bytes.NewReader(nil)); err != nil {
+			t.Fatalf("AddPatternsReader(empty): %v", err)
+		}
+		if m.RuleCount() != 0 {
+			t.Errorf("RuleCount = %d, want 0", m.RuleCount())
+		}
+	})
+
+	t.Run("read error wraps", func(t *testing.T) {
+		m := New()
+		sentinel := errors.New("simulated read failure")
+		err := m.AddPatternsReader("", errReader{err: sentinel})
+		if err == nil {
+			t.Fatal("expected error from failing reader")
+		}
+		if !errors.Is(err, sentinel) {
+			t.Errorf("error chain missing sentinel: %v", err)
+		}
+		if m.RuleCount() != 0 {
+			t.Errorf("RuleCount = %d, want 0 after read failure", m.RuleCount())
+		}
+	})
+}
+
+type errReader struct{ err error }
+
+func (e errReader) Read(_ []byte) (int, error) { return 0, e.err }
+
+var _ io.Reader = errReader{}
 
 func TestWarningHandler(t *testing.T) {
 	var received []ParseWarning

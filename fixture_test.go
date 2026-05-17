@@ -103,7 +103,7 @@ func TestLoadFixtures(t *testing.T) {
 			}
 
 			m := New()
-			warnings := m.AddPatterns("", content)
+			m.AddPatterns("", content)
 
 			if m.RuleCount() < f.minRules {
 				t.Errorf("fixture %s: got %d rules, want at least %d",
@@ -112,7 +112,7 @@ func TestLoadFixtures(t *testing.T) {
 
 			// Log warnings for visibility but don't fail on them —
 			// some fixtures intentionally contain edge cases that produce warnings.
-			for _, w := range warnings {
+			for _, w := range m.Warnings() {
 				t.Logf("warning line %d: %s (%q)", w.Line, w.Message, w.Pattern)
 			}
 		})

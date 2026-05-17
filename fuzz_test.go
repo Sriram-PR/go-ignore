@@ -45,8 +45,7 @@ func FuzzAddPatterns(f *testing.F) {
 		m := New()
 
 		// Should never panic
-		warnings := m.AddPatterns("", content)
-		_ = warnings
+		m.AddPatterns("", content)
 
 		// Warnings should return without panic
 		_ = m.Warnings()

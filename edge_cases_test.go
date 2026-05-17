@@ -455,15 +455,15 @@ func TestEdgeCases_EmptyAndNil(t *testing.T) {
 	m := New()
 
 	// Empty content
-	warnings := m.AddPatterns("", []byte{})
-	if len(warnings) != 0 {
+	m.AddPatterns("", []byte{})
+	if w := m.Warnings(); len(w) != 0 {
 		t.Errorf("empty content should produce no warnings")
 	}
 
 	// Nil content
-	warnings = m.AddPatterns("", nil)
-	if warnings != nil {
-		t.Errorf("nil content should return nil warnings")
+	m.AddPatterns("", nil)
+	if w := m.Warnings(); len(w) != 0 {
+		t.Errorf("nil content should produce no warnings")
 	}
 
 	// Add actual pattern

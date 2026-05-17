@@ -135,16 +135,17 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 // Both nil and empty content produce no rules. Nil content returns immediately
 // without acquiring locks; empty content goes through parsing (which yields nothing).
 //
-// Returns warnings for malformed patterns. Warnings are only returned if no
-// WarningHandler was set in MatcherOptions; otherwise warnings go to the handler.
+// Parse warnings are delivered through the configured WarningHandler (set via
+// MatcherOptions); if no handler is configured, warnings are appended to an
+// internal buffer accessible via Warnings().
 //
 // Thread-safe: can be called concurrently with Match.
 // Performance note: For best performance when loading many .gitignore files,
 // batch AddPatterns calls before starting concurrent Match operations to
 // reduce lock contention.
-func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
+func (m *Matcher) AddPatterns(basePath string, content []byte) {
 	if content == nil {
-		return nil
+		return
 	}
 
 	// Normalize basePath once for consistent rule scoping and warning reporting.
@@ -204,9 +205,7 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 			handler(w)
 		}
 		m.handlerMu.Unlock()
-		return nil
 	}
-	return parseWarnings
 }
 
 // Warnings returns all collected parse warnings.

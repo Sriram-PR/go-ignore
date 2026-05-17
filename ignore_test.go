@@ -79,10 +79,10 @@ func TestMatchWithReason_SharedBacktrackBudget(t *testing.T) {
 func TestAddPatterns_Basic(t *testing.T) {
 	m := New()
 	content := []byte("*.log\nbuild/\n")
-	warnings := m.AddPatterns("", content)
+	m.AddPatterns("", content)
 
-	if len(warnings) != 0 {
-		t.Errorf("AddPatterns returned %d warnings, want 0", len(warnings))
+	if w := m.Warnings(); len(w) != 0 {
+		t.Errorf("Warnings = %d, want 0", len(w))
 	}
 	if m.RuleCount() != 2 {
 		t.Errorf("RuleCount = %d, want 2", m.RuleCount())
@@ -102,10 +102,10 @@ func TestAddPatterns_WithBasePath(t *testing.T) {
 
 func TestAddPatterns_NilContent(t *testing.T) {
 	m := New()
-	warnings := m.AddPatterns("", nil)
+	m.AddPatterns("", nil)
 
-	if warnings != nil {
-		t.Errorf("AddPatterns(nil) should return nil warnings")
+	if w := m.Warnings(); len(w) != 0 {
+		t.Errorf("Warnings = %d, want 0", len(w))
 	}
 	if m.RuleCount() != 0 {
 		t.Errorf("RuleCount = %d, want 0", m.RuleCount())
@@ -114,10 +114,10 @@ func TestAddPatterns_NilContent(t *testing.T) {
 
 func TestAddPatterns_EmptyContent(t *testing.T) {
 	m := New()
-	warnings := m.AddPatterns("", []byte{})
+	m.AddPatterns("", []byte{})
 
-	if len(warnings) != 0 {
-		t.Errorf("AddPatterns([]) returned %d warnings, want 0", len(warnings))
+	if w := m.Warnings(); len(w) != 0 {
+		t.Errorf("Warnings = %d, want 0", len(w))
 	}
 	if m.RuleCount() != 0 {
 		t.Errorf("RuleCount = %d, want 0", m.RuleCount())
@@ -127,10 +127,10 @@ func TestAddPatterns_EmptyContent(t *testing.T) {
 func TestAddPatterns_WithWarnings(t *testing.T) {
 	m := New()
 	content := []byte("*.log\n!\n/\nvalid.txt\n")
-	warnings := m.AddPatterns("", content)
+	m.AddPatterns("", content)
 
-	if len(warnings) != 2 {
-		t.Errorf("AddPatterns returned %d warnings, want 2", len(warnings))
+	if w := m.Warnings(); len(w) != 2 {
+		t.Errorf("Warnings = %d, want 2", len(w))
 	}
 	if m.RuleCount() != 2 {
 		t.Errorf("RuleCount = %d, want 2 (*.log and valid.txt)", m.RuleCount())
@@ -167,12 +167,7 @@ func TestWarningHandler(t *testing.T) {
 	})
 
 	// Add patterns with warnings
-	warnings := m.AddPatterns("src", []byte("!\n/\n"))
-
-	// Should not return warnings when handler is set
-	if warnings != nil {
-		t.Errorf("AddPatterns should return nil when handler is set, got %v", warnings)
-	}
+	m.AddPatterns("src", []byte("!\n/\n"))
 
 	// Handler should have received warnings
 	if len(received) != 2 {
@@ -692,19 +687,20 @@ func TestAddPatterns_MaxPatterns(t *testing.T) {
 	m := NewWithOptions(MatcherOptions{MaxPatterns: 5})
 
 	// Add 3 patterns — all should be accepted
-	w := m.AddPatterns("", []byte("*.log\nbuild/\n*.tmp\n"))
-	if len(w) != 0 {
-		t.Errorf("unexpected warnings: %v", w)
+	m.AddPatterns("", []byte("*.log\nbuild/\n*.tmp\n"))
+	if w := m.Warnings(); len(w) != 0 {
+		t.Errorf("unexpected warnings after first add: %v", w)
 	}
 	if m.RuleCount() != 3 {
 		t.Fatalf("RuleCount = %d, want 3", m.RuleCount())
 	}
 
 	// Add 5 more — only 2 should be accepted (remaining capacity)
-	w = m.AddPatterns("", []byte("a\nb\nc\nd\ne\n"))
+	m.AddPatterns("", []byte("a\nb\nc\nd\ne\n"))
 	if m.RuleCount() != 5 {
 		t.Errorf("RuleCount = %d, want 5", m.RuleCount())
 	}
+	w := m.Warnings()
 	if len(w) != 1 {
 		t.Fatalf("expected 1 truncation warning, got %d", len(w))
 	}
@@ -713,15 +709,16 @@ func TestAddPatterns_MaxPatterns(t *testing.T) {
 	}
 
 	// Add 1 more — should be fully skipped
-	w = m.AddPatterns("", []byte("f\n"))
+	m.AddPatterns("", []byte("f\n"))
 	if m.RuleCount() != 5 {
 		t.Errorf("RuleCount = %d, want 5 (unchanged)", m.RuleCount())
 	}
-	if len(w) != 1 {
-		t.Fatalf("expected 1 skip warning, got %d", len(w))
+	w = m.Warnings()
+	if len(w) != 2 {
+		t.Fatalf("expected 2 cumulative warnings, got %d", len(w))
 	}
-	if w[0].Message != "maximum pattern count reached, new patterns skipped" {
-		t.Errorf("unexpected warning message: %s", w[0].Message)
+	if w[1].Message != "maximum pattern count reached, new patterns skipped" {
+		t.Errorf("unexpected warning message: %s", w[1].Message)
 	}
 
 	// Verify matching still works for admitted patterns
@@ -737,10 +734,11 @@ func TestAddPatterns_MaxPatternLength(t *testing.T) {
 	m := NewWithOptions(MatcherOptions{MaxPatternLength: 10})
 
 	// Short pattern (accepted) and long pattern (skipped)
-	w := m.AddPatterns("", []byte("*.log\nthis-pattern-is-way-too-long\n"))
+	m.AddPatterns("", []byte("*.log\nthis-pattern-is-way-too-long\n"))
 	if m.RuleCount() != 1 {
 		t.Errorf("RuleCount = %d, want 1", m.RuleCount())
 	}
+	w := m.Warnings()
 	if len(w) != 1 {
 		t.Fatalf("expected 1 warning, got %d", len(w))
 	}
@@ -760,8 +758,8 @@ func TestAddPatterns_MaxPatternsUnlimited(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		content = append(content, []byte(fmt.Sprintf("pattern%d\n", i))...)
 	}
-	w := m.AddPatterns("", content)
-	if len(w) != 0 {
+	m.AddPatterns("", content)
+	if w := m.Warnings(); len(w) != 0 {
 		t.Errorf("unexpected warnings: %v", w)
 	}
 	if m.RuleCount() != 1000 {
@@ -773,8 +771,8 @@ func TestAddPatterns_MaxPatternLengthUnlimited(t *testing.T) {
 	m := NewWithOptions(MatcherOptions{MaxPatternLength: -1})
 
 	long := strings.Repeat("a", 5000)
-	w := m.AddPatterns("", []byte(long+"\n"))
-	if len(w) != 0 {
+	m.AddPatterns("", []byte(long+"\n"))
+	if w := m.Warnings(); len(w) != 0 {
 		t.Errorf("unexpected warnings: %v", w)
 	}
 	if m.RuleCount() != 1 {

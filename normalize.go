@@ -99,7 +99,7 @@ func normalizeContent(content []byte) []byte {
 	}
 
 	// Step 2: Normalize CRLF and standalone CR to LF in a single pass
-	if !bytes.ContainsRune(content, '\r') {
+	if bytes.IndexByte(content, '\r') < 0 {
 		return content // fast path: no CR at all
 	}
 	buf := make([]byte, 0, len(content))

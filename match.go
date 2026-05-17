@@ -29,7 +29,7 @@ type matchContext struct {
 
 // newMatchContext creates a new match context with the specified limit.
 // If maxIter is 0, uses DefaultMaxBacktrackIterations.
-// If maxIter is -1, uses hardMaxBacktrackIterations as a safety cap.
+// Any negative value is capped at hardMaxBacktrackIterations.
 func newMatchContext(maxIter int) matchContext {
 	if maxIter == 0 {
 		maxIter = DefaultMaxBacktrackIterations

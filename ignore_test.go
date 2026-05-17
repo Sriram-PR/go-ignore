@@ -159,12 +159,10 @@ func TestWarnings(t *testing.T) {
 
 func TestWarningHandler(t *testing.T) {
 	var received []ParseWarning
-	var receivedBasePaths []string
 
 	m := NewWithOptions(MatcherOptions{
-		WarningHandler: func(basePath string, w ParseWarning) {
+		WarningHandler: func(w ParseWarning) {
 			received = append(received, w)
-			receivedBasePaths = append(receivedBasePaths, basePath)
 		},
 	})
 
@@ -181,10 +179,10 @@ func TestWarningHandler(t *testing.T) {
 		t.Errorf("Handler received %d warnings, want 2", len(received))
 	}
 
-	// Check basePath was passed correctly
-	for _, bp := range receivedBasePaths {
-		if bp != "src" {
-			t.Errorf("Handler received basePath %q, want %q", bp, "src")
+	// BasePath should be set on each warning
+	for _, w := range received {
+		if w.BasePath != "src" {
+			t.Errorf("warning BasePath = %q, want %q", w.BasePath, "src")
 		}
 	}
 
@@ -487,7 +485,7 @@ func TestMatcher_ConcurrentHandlerDispatch(t *testing.T) {
 	var mu sync.Mutex
 	var warnings []ParseWarning
 	m := NewWithOptions(MatcherOptions{
-		WarningHandler: func(basePath string, w ParseWarning) {
+		WarningHandler: func(w ParseWarning) {
 			mu.Lock()
 			warnings = append(warnings, w)
 			mu.Unlock()

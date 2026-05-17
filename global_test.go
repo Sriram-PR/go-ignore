@@ -256,7 +256,7 @@ func TestAddGlobalPatterns_WithWarningHandler(t *testing.T) {
 
 	var warnings []ParseWarning
 	m := NewWithOptions(MatcherOptions{
-		WarningHandler: func(_ string, w ParseWarning) {
+		WarningHandler: func(w ParseWarning) {
 			warnings = append(warnings, w)
 		},
 	})

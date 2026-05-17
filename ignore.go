@@ -34,7 +34,8 @@ type MatchResult struct {
 }
 
 // WarningHandler is called for each parse warning if set.
-type WarningHandler func(basePath string, warning ParseWarning)
+// The warning includes BasePath; no separate basePath argument is provided.
+type WarningHandler func(warning ParseWarning)
 
 // Default resource limits for pattern parsing.
 const (
@@ -200,7 +201,7 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning {
 	if handler != nil {
 		m.handlerMu.Lock()
 		for _, w := range parseWarnings {
-			handler(normalizedBase, w)
+			handler(w)
 		}
 		m.handlerMu.Unlock()
 		return nil

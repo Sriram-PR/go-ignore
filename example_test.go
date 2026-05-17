@@ -39,7 +39,7 @@ func ExampleMatcher_MatchWithReason() {
 
 func ExampleMatcherOptions_warningHandler() {
 	m := ignore.NewWithOptions(ignore.MatcherOptions{
-		WarningHandler: func(basePath string, w ignore.ParseWarning) {
+		WarningHandler: func(w ignore.ParseWarning) {
 			fmt.Printf("line %d: %s\n", w.Line, w.Message)
 		},
 	})

@@ -56,12 +56,13 @@ type WarningHandler func(warning ParseWarning)
 // Default resource limits for pattern parsing.
 const (
 	// DefaultMaxPatterns is the maximum number of rules a Matcher will hold.
-	// Excess rules are silently dropped with a warning.
+	// Excess rules are dropped and a ParseWarning is emitted for each batch
+	// that is truncated or skipped.
 	// Set MaxPatterns to 0 to use this default, or -1 for unlimited.
 	DefaultMaxPatterns = 100_000
 
 	// DefaultMaxPatternLength is the maximum length of a single pattern line.
-	// Lines exceeding this are skipped with a warning.
+	// Lines exceeding this are skipped and a ParseWarning is emitted.
 	// Set MaxPatternLength to 0 to use this default, or -1 for unlimited.
 	DefaultMaxPatternLength = 4096
 )

@@ -48,10 +48,9 @@ func main() {
 
     // Load .gitignore (BOM and CRLF automatically handled)
     content, _ := os.ReadFile(".gitignore")
-    if warnings := m.AddPatterns("", content); len(warnings) > 0 {
-        for _, w := range warnings {
-            fmt.Printf("Warning line %d: %s\n", w.Line, w.Message)
-        }
+    m.AddPatterns("", content)
+    for _, w := range m.Warnings() {
+        fmt.Printf("Warning line %d: %s\n", w.Line, w.Message)
     }
 
     // Check paths (thread-safe)
@@ -148,20 +147,21 @@ m.Match("test.LOG", false)  // true
 ### Parse Warnings
 
 ```go
-// Option 1: Collect warnings
+// Option 1: Collect warnings via Warnings()
 m := ignore.New()
-warnings := m.AddPatterns("", content)
-for _, w := range warnings {
+m.AddPatterns("", content)
+for _, w := range m.Warnings() {
     fmt.Printf("Line %d: %s - %s\n", w.Line, w.Pattern, w.Message)
 }
 
-// Option 2: Use a handler (must be set BEFORE AddPatterns)
-m := ignore.New()
-m.SetWarningHandler(func(basePath string, w ignore.ParseWarning) {
-    log.Printf("[%s] line %d: %s", basePath, w.Line, w.Message)
+// Option 2: Configure a handler at construction (fixed for the matcher's lifetime)
+m := ignore.NewWithOptions(ignore.MatcherOptions{
+    WarningHandler: func(w ignore.ParseWarning) {
+        log.Printf("[%s] line %d: %s", w.BasePath, w.Line, w.Message)
+    },
 })
 m.AddPatterns("", content)       // warnings go to handler
-m.AddPatterns("src", srcContent) // warnings include "src" as basePath
+m.AddPatterns("src", srcContent) // w.BasePath == "src" for warnings from this call
 ```
 
 ### Windows Path Support
@@ -303,10 +303,11 @@ Set any limit to `-1` to disable it (not recommended for untrusted input).
 type Matcher struct { /* ... */ }
 
 type MatcherOptions struct {
-    MaxBacktrackIterations int  // Default: 10000, use -1 for unlimited
-    CaseInsensitive        bool // Default: false
-    MaxPatterns            int  // Default: 100000, use -1 for unlimited
-    MaxPatternLength       int  // Default: 4096, use -1 for unlimited
+    WarningHandler         WarningHandler // Default: nil (warnings collected via Warnings())
+    MaxBacktrackIterations int            // Default: 10000; any negative value caps at 10,000,000 (not truly unlimited)
+    CaseInsensitive        bool           // Default: false
+    MaxPatterns            int            // Default: 100000, use -1 for unlimited
+    MaxPatternLength       int            // Default: 4096, use -1 for unlimited
 }
 
 type MatchResult struct {
@@ -336,13 +337,14 @@ type WarningHandler func(warning ParseWarning)
 ```go
 func New() *Matcher
 func NewWithOptions(opts MatcherOptions) *Matcher
+func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error)
 
-func (m *Matcher) AddPatterns(basePath string, content []byte) []ParseWarning
+func (m *Matcher) AddPatterns(basePath string, content []byte)
+func (m *Matcher) AddPatternsReader(basePath string, r io.Reader) error
 func (m *Matcher) AddGlobalPatterns() error
 func (m *Matcher) AddExcludePatterns(gitDir string) error
 func (m *Matcher) Match(path string, isDir bool) bool
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult
-func (m *Matcher) SetWarningHandler(fn WarningHandler)
 func (m *Matcher) Warnings() []ParseWarning
 func (m *Matcher) RuleCount() int
 ```

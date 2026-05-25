@@ -25,6 +25,12 @@ const gitConfigTimeout = 5 * time.Second
 //  2. <repoRoot>/.git/info/exclude (see AddExcludePatterns)
 //  3. <repoRoot>/.gitignore (root scope)
 //
+// repoRoot is used only to locate the two on-disk files above; it is NOT
+// stripped from paths passed to Match. Paths supplied to Match must be
+// relative to repoRoot (e.g., "build/output.js"), matching git's own
+// convention. Passing absolute paths or paths with a different prefix will
+// produce surprising results.
+//
 // Missing files are silently skipped; only real read failures are returned.
 // Nested .gitignore files under subdirectories are NOT walked — callers that
 // need per-directory rules should call AddPatterns with the appropriate

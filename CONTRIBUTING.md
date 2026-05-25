@@ -70,11 +70,19 @@ If you find a discrepancy with Git, add a test case to `git_parity_test.go`.
 
 ### Fuzz Testing
 
-Run fuzz tests to catch edge cases:
+Run fuzz tests to catch edge cases. Each can only run one at a time per
+invocation; pick whichever surface your change touches, or run all of them
+via `make fuzz` (30s each):
 
 ```bash
-go test -fuzz=FuzzAddPatterns -fuzztime=1m
-go test -fuzz=FuzzMatch -fuzztime=1m
+go test -fuzz=FuzzAddPatterns      -fuzztime=1m .  # pattern parsing
+go test -fuzz=FuzzMatch            -fuzztime=1m .  # matching against fixed patterns
+go test -fuzz=FuzzPatternAndPath   -fuzztime=1m .  # pattern + path combinations
+go test -fuzz=FuzzGlob             -fuzztime=1m .  # glob fast-path vs slow-path invariant
+go test -fuzz=FuzzNormalizePath    -fuzztime=1m .  # path normalization
+go test -fuzz=FuzzNormalizeContent -fuzztime=1m .  # content normalization (BOM/CRLF)
+go test -fuzz=FuzzSegmentMatching  -fuzztime=1m .  # internal segment matcher
+go test -fuzz=FuzzConcurrentAccess -fuzztime=1m .  # concurrent Match/AddPatterns
 ```
 
 ## Pull Request Process
@@ -94,6 +102,10 @@ go test -fuzz=FuzzMatch -fuzztime=1m
    go test ./...
    go test -race ./...
    go vet ./...
+   golangci-lint run
+
+   # Or, equivalent shortcut:
+   make ci
    ```
 
 4. **Commit with a clear message**

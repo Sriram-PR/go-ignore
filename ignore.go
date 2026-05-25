@@ -73,6 +73,11 @@ type MatcherOptions struct {
 	// available through Warnings(). The handler is fixed at construction time
 	// and cannot be changed afterward; this prevents the ordering bug where a
 	// handler set after AddPatterns would silently miss earlier warnings.
+	//
+	// The handler may be invoked concurrently from multiple goroutines if
+	// AddPatterns is called concurrently; callers must make the handler safe
+	// for concurrent use. Handlers may safely call back into the matcher
+	// (including AddPatterns) — no library-side mutex is held during dispatch.
 	WarningHandler WarningHandler
 
 	// MaxBacktrackIterations limits ** pattern matching iterations.
@@ -106,11 +111,10 @@ type MatcherOptions struct {
 // performance, batch all AddPatterns calls before starting concurrent Match
 // operations.
 type Matcher struct {
-	mu        sync.RWMutex
-	handlerMu sync.Mutex // serializes WarningHandler dispatch across goroutines
-	rules     []rule
-	warnings  []ParseWarning
-	opts      MatcherOptions
+	mu       sync.RWMutex
+	rules    []rule
+	warnings []ParseWarning
+	opts     MatcherOptions
 }
 
 // New creates an empty Matcher with default options.
@@ -213,14 +217,14 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) {
 	}
 	m.mu.Unlock()
 
-	// Dispatch warnings outside main lock to prevent deadlock if handler calls back.
-	// Use handlerMu to serialize concurrent handler invocations.
+	// Dispatch warnings outside the main lock so handlers can safely call back
+	// into the matcher (including AddPatterns itself). The handler may be
+	// invoked concurrently from multiple goroutines; callers are responsible
+	// for making it safe for concurrent use.
 	if handler != nil {
-		m.handlerMu.Lock()
 		for _, w := range parseWarnings {
 			handler(w)
 		}
-		m.handlerMu.Unlock()
 	}
 }
 

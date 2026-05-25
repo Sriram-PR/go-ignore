@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestNew(t *testing.T) {
@@ -562,6 +563,47 @@ func TestMatcher_ConcurrentHandlerDispatch(t *testing.T) {
 	mu.Unlock()
 	if got != 20 {
 		t.Errorf("expected 20 warnings, got %d", got)
+	}
+}
+
+// TestMatcher_HandlerReentrancy guards against the deadlock where a
+// WarningHandler that calls back into AddPatterns blocks forever. The test
+// runs with a hard timeout via a goroutine + channel; if the handler causes a
+// deadlock the test fails rather than hangs the suite.
+func TestMatcher_HandlerReentrancy(t *testing.T) {
+	done := make(chan struct{})
+	var calls int
+	var callsMu sync.Mutex
+
+	go func() {
+		var m *Matcher
+		m = NewWithOptions(MatcherOptions{
+			WarningHandler: func(w ParseWarning) {
+				callsMu.Lock()
+				calls++
+				n := calls
+				callsMu.Unlock()
+				// Re-enter once with a warning-producing payload; further
+				// re-entries are prevented by the counter to avoid infinite
+				// recursion.
+				if n == 1 {
+					m.AddPatterns("", []byte("!\n"))
+				}
+			},
+		})
+		m.AddPatterns("", []byte("!\n"))
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		callsMu.Lock()
+		defer callsMu.Unlock()
+		if calls != 2 {
+			t.Errorf("expected 2 handler calls (outer + 1 reentrant), got %d", calls)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("WarningHandler reentrancy deadlocked")
 	}
 }
 

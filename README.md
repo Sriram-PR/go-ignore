@@ -242,6 +242,39 @@ m.AddPatterns("", content)
 
 If the exclude file does not exist, `AddExcludePatterns` returns nil (no error).
 
+### Load a Working Tree in One Call
+
+`LoadRepo` is a convenience constructor that pre-loads the three standard gitignore sources for a working tree in git's precedence order (lowest first):
+
+1. The user's global gitignore (`core.excludesFile` / XDG)
+2. `<repoRoot>/.git/info/exclude`
+3. `<repoRoot>/.gitignore` (root scope)
+
+```go
+m, err := ignore.LoadRepo(".", ignore.MatcherOptions{})
+if err != nil {
+    log.Fatal(err)
+}
+// Paths passed to Match must be relative to repoRoot:
+m.Match("build/output.js", false)
+```
+
+Missing files are silently skipped; only real read failures are returned. Nested per-directory `.gitignore` files are **not** walked — call `AddPatterns(basePath, ...)` for each subdirectory you want scoped rules for.
+
+### Streaming Patterns from an `io.Reader`
+
+`AddPatternsReader` accepts an `io.Reader` so callers don't have to `io.ReadAll` themselves:
+
+```go
+f, _ := os.Open(".gitignore")
+defer f.Close()
+if err := m.AddPatternsReader("", f); err != nil {
+    log.Fatal(err)
+}
+```
+
+Read errors are wrapped and returned; rules are added on a successful read. Equivalent to `io.ReadAll` followed by `AddPatterns`.
+
 ## Supported Syntax
 
 | Pattern | Meaning | Example Matches |

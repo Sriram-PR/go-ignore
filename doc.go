@@ -79,6 +79,31 @@
 //	    log.Fatal(err)
 //	}
 //
+// # Loading a Working Tree in One Call
+//
+// LoadRepo is a convenience constructor that pre-loads the three standard
+// gitignore sources for a working tree in git's precedence order:
+//
+//	m, err := ignore.LoadRepo(".", ignore.MatcherOptions{})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	m.Match("build/output.js", false)
+//
+// Paths passed to Match must be relative to repoRoot. Nested per-directory
+// .gitignore files are not walked.
+//
+// # Streaming Patterns from an io.Reader
+//
+// AddPatternsReader accepts an io.Reader so callers do not need to read the
+// whole file into a byte slice first:
+//
+//	f, _ := os.Open(".gitignore")
+//	defer f.Close()
+//	if err := m.AddPatternsReader("", f); err != nil {
+//	    log.Fatal(err)
+//	}
+//
 // # Path Normalization
 //
 // Input paths are automatically normalized:

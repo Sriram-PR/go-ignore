@@ -384,18 +384,30 @@ func (m *Matcher) RuleCount() int
 
 ## Performance
 
-Benchmarked on Intel i9-14900HX (Go 1.25, linux/amd64):
+Benchmarked on Intel i9-14900HX (Go 1.26, linux/amd64; median of 2× `-benchtime=3s` runs):
 
 | Operation | Time | Allocs |
 |-----------|------|--------|
-| Simple match (hit) | ~157ns | 0 |
-| Simple match (miss) | ~214ns | 0 |
-| Match with `**` (shallow) | ~174ns | 0 |
-| Match with `**` (deep path) | ~3.2µs | 0 |
-| Match against 200 rules | ~9–16µs | 0 |
-| Pathological `**` (bounded) | ~920ns–1.3µs | 1 |
-| Glob matching | ~58–91ns | 0 |
-| Path normalization | ~58ns | 0 |
+| Simple match (hit) | ~83ns | 0 |
+| Simple match (miss) | ~105ns | 0 |
+| Directory-only pattern | ~71ns | 0 |
+| Match with `**` (shallow) | ~85ns | 0 |
+| Match with `**` (20-segment path) | ~276ns | 0 |
+| Match with `**` (32-segment path) | ~450ns | 0 |
+| Match with `**` (50-segment path) | ~1.2µs | 0 |
+| `MatchWithReason` | ~74ns | 0 |
+| Negation rule | ~85ns | 0 |
+| Nested .gitignore (scoped basePath) | ~200ns | 0 |
+| Match against 200 rules (hit) | ~2.9µs | 0 |
+| Match against 200 rules (miss, all evaluated) | ~4.5µs | 0 |
+| Pathological `**` (bounded by budget) | ~210–370ns | 0 |
+| Case-insensitive (lowercase path) | ~86ns | 0 |
+| Case-insensitive (uppercase path, requires `ToLower`) | ~248ns | 1 (24 B) |
+| Concurrent match (RLock contention) | ~80ns | 0 |
+| Glob matching (simple/prefix/complex) | ~33–84ns | 0 |
+| Character class (`[abc]`, ranges, POSIX) | ~27–48ns | 0 |
+| Path normalization | ~46ns | 0 |
+| `AddPatterns` (small / medium / large) | ~1.2µs / ~5µs / ~97µs | 14 / 56 / 905 |
 
 The backtrack budget (`MaxBacktrackIterations`, default 10,000) is **shared across all rules** within a single `Match` call. A matcher with many complex `**` patterns will exhaust the budget faster than one with few patterns. When the budget is exceeded, remaining rules are treated as non-matching. Increase the budget via `MatcherOptions` if needed.
 

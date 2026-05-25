@@ -29,6 +29,8 @@ fuzz:
 	go test -fuzz=FuzzGlob -fuzztime=30s .
 	go test -fuzz=FuzzNormalizePath -fuzztime=30s .
 	go test -fuzz=FuzzNormalizeContent -fuzztime=30s .
+	go test -fuzz=FuzzSegmentMatching -fuzztime=30s .
+	go test -fuzz=FuzzConcurrentAccess -fuzztime=30s .
 
 # Run git parity tests
 test-git:

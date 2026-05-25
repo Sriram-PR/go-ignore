@@ -291,10 +291,12 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 		return MatchResult{Ignored: false, Matched: false}
 	}
 
+	// opts is fixed at construction (see Matcher.opts) and safe to read
+	// without holding mu. Doing the case-insensitive lowering and the
+	// backtrack-context setup outside the read lock keeps the critical
+	// section as tight as possible.
 	var segBuf [32]string
 	pathSegments := splitPathBuf(path, segBuf[:0])
-
-	m.mu.RLock()
 
 	// Pre-lowercase path and segments once for case-insensitive matching,
 	// instead of lowering per-segment per-rule in matchSingleSegment.
@@ -311,6 +313,8 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	// This prevents pathological patterns across many rules from causing
 	// excessive CPU usage — previously each rule got a fresh budget.
 	ctx := newMatchContext(m.opts.MaxBacktrackIterations)
+
+	m.mu.RLock()
 
 	result := evaluateRules(m.rules, path, pathSegments, isDir, &ctx)
 

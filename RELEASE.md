@@ -77,6 +77,34 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.7.1
+
+Post-v0.7.0 audit fixes. One observable behavior change in the `WarningHandler` concurrency contract; callers that relied on the library serializing handler dispatch must add their own synchronization (see below).
+
+**Behavior changes**
+
+- **`WarningHandler` may now be invoked concurrently** — v0.7.0 held an internal `handlerMu` while dispatching warnings, which serialized handler calls but also deadlocked any handler that called back into `AddPatterns`. The internal mutex has been removed: handlers must now be safe for concurrent use, but they may freely re-enter the matcher. Callers writing to non-thread-safe state from the handler (e.g., a bare `[]ParseWarning`) need to add their own lock. The new contract is documented on `WarningHandler` and verified by a regression test (`TestMatcher_HandlerReentrancy`).
+
+**Bug fixes**
+
+- **Interior `/./` segments now normalize** — `normalizePath("a/./b")` previously returned `"a/./b"`, so `m.Match("a/./b", false)` did not match the pattern `a/b`. Leading `./` was already stripped; interior `./` segments are now collapsed via `path.Clean`, matching git's own behavior.
+
+**Documentation**
+
+- **README synced with the v0.7.0 API** — code samples and the API Reference section still referenced `SetWarningHandler`, the old `func(basePath, w)` handler signature, and the old `AddPatterns` return value. All four call-sites updated.
+- **`LoadRepo` and `AddPatternsReader` documented** — both v0.7.0 additions are now described in `README.md` and `doc.go`; previously they appeared only in this file.
+- **`LoadRepo` path contract** — docstring now states explicitly that paths passed to `Match` must be relative to `repoRoot`; the parameter was used only to locate the on-disk files, never stripped from match input.
+- **`MaxBacktrackIterations: -1` wording** — README previously implied `-1` disabled the limit; corrected to state that the internal 10,000,000-iteration ceiling still applies. The canonical doc in `ignore.go` already said this.
+- **`DefaultMaxPatterns` / `DefaultMaxPatternLength`** — docstring said "silently dropped with a warning"; rephrased to "dropped and a `ParseWarning` is emitted".
+
+**Internal**
+
+- **`MatchWithReason` critical section tightened** — case-insensitive lowering and backtrack-context setup moved outside `m.mu.RLock`. `opts` is fixed at construction and safe to read without the lock; the lock now only covers rule iteration.
+
+**Tests**
+
+- **`MatchResult.IsIgnored` and `IsExplicit` covered** — both accessor methods were at 0% coverage. `TestMatchWithReason_Basic` now asserts them across the no-match / ignored / negated states. Total coverage 96.1% → 96.5%.
+
 ### v0.7.0
 
 API-shape cleanup before the v1.0 freeze. **Contains breaking changes** to the public API; migration is mechanical and the migration steps below cover every call-site pattern in the existing test suite.

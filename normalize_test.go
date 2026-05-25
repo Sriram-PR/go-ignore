@@ -63,7 +63,9 @@ func TestNormalizePath(t *testing.T) {
 
 		// Edge cases
 		{"just dot", ".", ".", false},
-		{"dot in middle", "foo/./bar", "foo/./bar", false}, // Only leading ./ is removed
+		{"dot in middle", "foo/./bar", "foo/bar", false},
+		{"multiple dot in middle", "a/./././b", "a/b", false},
+		{"dot middle deep", "src/./lib/./test.go", "src/lib/test.go", false},
 		{"hidden file", ".gitignore", ".gitignore", false},
 		{"hidden dir", ".git/config", ".git/config", false},
 	}

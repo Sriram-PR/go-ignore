@@ -105,6 +105,12 @@ Post-v0.7.0 audit fixes. One observable behavior change in the `WarningHandler` 
 
 - **`MatchResult.IsIgnored` and `IsExplicit` covered** — both accessor methods were at 0% coverage. `TestMatchWithReason_Basic` now asserts them across the no-match / ignored / negated states. Total coverage 96.1% → 96.5%.
 
+**Tooling**
+
+- **`CONTRIBUTING.md` fuzz list synced** — previously listed `FuzzAddPatterns` and `FuzzMatch` only; now lists all eight fuzz targets, matching what CI and `make fuzz` run.
+- **`CONTRIBUTING.md` PR checklist now mentions `golangci-lint run` / `make ci`** — the lint step is the actual CI gate but was missing from the contributor instructions.
+- **`Makefile` and CI fuzz job pick up `FuzzSegmentMatching` and `FuzzConcurrentAccess`** — both targets existed in `fuzz_test.go` but were never wired into the recurring fuzz runs.
+
 ### v0.7.0
 
 API-shape cleanup before the v1.0 freeze. **Contains breaking changes** to the public API; migration is mechanical and the migration steps below cover every call-site pattern in the existing test suite.

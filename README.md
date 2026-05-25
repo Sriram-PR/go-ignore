@@ -293,7 +293,7 @@ Default limits prevent resource exhaustion from untrusted input:
 | `MaxPatternLength` | 4,096 | Maximum length of a single pattern line. Longer lines are skipped with a warning. |
 | `MaxBacktrackIterations` | 10,000 | Iteration budget shared across all rules per `Match` call. Prevents pathological `**` patterns from causing excessive CPU. |
 
-Set any limit to `-1` to disable it (not recommended for untrusted input).
+`MaxPatterns` and `MaxPatternLength` accept `-1` to disable the limit entirely (not recommended for untrusted input). `MaxBacktrackIterations` accepts `-1` as well, but it does **not** disable the cap — it raises it to the internal safety ceiling of 10,000,000 iterations. True unlimited matching is not supported.
 
 ## API Reference
 

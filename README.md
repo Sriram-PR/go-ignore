@@ -351,9 +351,7 @@ type MatchResult struct {
     Line     int    // Line number (1-indexed)
 }
 
-func (r MatchResult) IsIgnored() bool  // r.Ignored
-func (r MatchResult) IsExplicit() bool // r.Matched
-func (r MatchResult) Negated() bool    // r.Matched && !r.Ignored
+func (r MatchResult) Negated() bool // derived: r.Matched && !r.Ignored
 
 type ParseWarning struct {
     Pattern  string

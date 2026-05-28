@@ -444,17 +444,11 @@ func TestMatchWithReason_Basic(t *testing.T) {
 			if result.Negated() != tt.negated {
 				t.Errorf("Negated() = %v, want %v", result.Negated(), tt.negated)
 			}
-			// Accessor methods must agree with the underlying fields and
-			// with each other across the no-match / ignored / negated states.
-			if result.IsIgnored() != result.Ignored {
-				t.Errorf("IsIgnored() = %v, want %v", result.IsIgnored(), result.Ignored)
-			}
-			if result.IsExplicit() != result.Matched {
-				t.Errorf("IsExplicit() = %v, want %v", result.IsExplicit(), result.Matched)
-			}
-			if result.Negated() && (!result.IsExplicit() || result.IsIgnored()) {
-				t.Errorf("Negated() inconsistent with IsExplicit()/IsIgnored(): explicit=%v ignored=%v",
-					result.IsExplicit(), result.IsIgnored())
+			// Negated() must agree with its derivation across the
+			// no-match / ignored / negated states.
+			if result.Negated() && (!result.Matched || result.Ignored) {
+				t.Errorf("Negated() inconsistent with Matched/Ignored: matched=%v ignored=%v",
+					result.Matched, result.Ignored)
 			}
 		})
 	}

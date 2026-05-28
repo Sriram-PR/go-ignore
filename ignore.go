@@ -9,10 +9,8 @@ import (
 
 // MatchResult provides detailed information about a match decision.
 //
-// Callers are encouraged to use the IsIgnored, IsExplicit, and Negated methods
-// rather than reading the bool fields directly; the methods provide a stable
-// accessor API even if the underlying struct layout changes in a future major
-// version.
+// Read the public fields directly. Negated is exposed only as a method since
+// it is a derived value (Matched && !Ignored) rather than stored state.
 type MatchResult struct {
 	// Rule is the pattern string of the last matching rule (empty if Matched == false).
 	// If multiple rules matched, this is the final decisive rule.
@@ -45,17 +43,9 @@ type MatchResult struct {
 	Matched bool
 }
 
-// IsIgnored reports whether the path is ignored by the final match decision.
-// Equivalent to reading the Ignored field, but stable across struct-layout changes.
-func (r MatchResult) IsIgnored() bool { return r.Ignored }
-
-// IsExplicit reports whether any rule matched the path (including negation rules).
-// When false, no rule matched and Ignored is false by default.
-// Equivalent to reading the Matched field, but stable across struct-layout changes.
-func (r MatchResult) IsExplicit() bool { return r.Matched }
-
-// Negated reports whether the final matching rule was a negation rule (i.e., the
-// path was re-included). True iff IsExplicit() && !IsIgnored().
+// Negated reports whether the final matching rule was a negation rule (i.e.,
+// the path was re-included). True iff Matched && !Ignored. The method form
+// documents the derivation so callers do not have to compute it themselves.
 func (r MatchResult) Negated() bool { return r.Matched && !r.Ignored }
 
 // WarningHandler is called for each parse warning if set.

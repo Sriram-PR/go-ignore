@@ -244,11 +244,12 @@ If the exclude file does not exist, `AddExcludePatterns` returns nil (no error).
 
 ### Load a Working Tree in One Call
 
-`LoadRepo` is a convenience constructor that pre-loads the three standard gitignore sources for a working tree in git's precedence order (lowest first):
+`LoadRepo` is a convenience constructor that pre-loads the four standard gitignore sources for a working tree in git's precedence order (lowest first):
 
-1. The user's global gitignore (`core.excludesFile` / XDG)
-2. `<repoRoot>/.git/info/exclude`
-3. `<repoRoot>/.gitignore` (root scope)
+1. The system gitignore (`git config --system core.excludesFile`)
+2. The user's global gitignore (`core.excludesFile` / XDG)
+3. `<repoRoot>/.git/info/exclude`
+4. `<repoRoot>/.gitignore` (root scope)
 
 ```go
 m, err := ignore.LoadRepo(".", ignore.MatcherOptions{})
@@ -259,9 +260,36 @@ if err != nil {
 m.Match("build/output.js", false)
 ```
 
-Missing files are silently skipped; only real read failures are returned. Nested per-directory `.gitignore` files are **not** walked — call `AddPatterns(basePath, ...)` for each subdirectory you want scoped rules for.
+Missing files are silently skipped; only real read failures are returned. Nested per-directory `.gitignore` files are **not** walked by `LoadRepo` — use `WalkDir` / `WalkRepo` (below) if you want nested discovery, or call `AddPatternsFromFile(basePath, path)` for each subdirectory explicitly.
+
+### Walking a Working Tree
+
+`WalkDir` (method on `Matcher`) and `WalkRepo` (standalone) walk a directory tree and call your callback only for files and directories that are **not** ignored. They auto-load nested `.gitignore` files as they descend, and prune `.git/` and any ignored directory without descending.
+
+The standard one-shot use case — "walk this repo, skip ignored files":
+
+```go
+err := ignore.WalkRepo(".", ignore.MatcherOptions{}, func(path string, d fs.DirEntry, err error) error {
+    if err != nil { return err }
+    if d.IsDir() { return nil }
+    process(path)
+    return nil
+})
+```
+
+Power user — pre-load extra patterns on top of `LoadRepo`'s sources, then walk:
+
+```go
+m, _ := ignore.LoadRepo(".", ignore.MatcherOptions{})
+m.AddPatterns("", []byte(".envrc\n")) // extra root-scope patterns
+m.WalkDir(".", walkFn)
+```
+
+`WalkDir` does **not** mutate the receiver: discovered nested rules are scoped to the call. The receiver can be safely reused for subsequent walks or `Match` queries.
 
 ### Streaming Patterns from an `io.Reader`
+
+#### Streaming Patterns from an `io.Reader`
 
 `AddPatternsReader` accepts an `io.Reader` so callers don't have to `io.ReadAll` themselves:
 
@@ -347,7 +375,8 @@ type MatchResult struct {
     Ignored  bool   // Final decision
     Matched  bool   // Whether any rule matched
     Rule     string // The matching pattern
-    BasePath string // Source .gitignore location
+    Source   string // Path to source file (empty if AddPatterns called without source info)
+    BasePath string // Directory scope of the matching rule
     Line     int    // Line number (1-indexed)
 }
 
@@ -369,13 +398,17 @@ type WarningHandler func(warning ParseWarning)
 func New() *Matcher
 func NewWithOptions(opts MatcherOptions) *Matcher
 func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error)
+func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error
 
 func (m *Matcher) AddPatterns(basePath string, content []byte)
 func (m *Matcher) AddPatternsReader(basePath string, r io.Reader) error
+func (m *Matcher) AddPatternsFromFile(basePath, path string) error
+func (m *Matcher) AddSystemPatterns() error
 func (m *Matcher) AddGlobalPatterns() error
 func (m *Matcher) AddExcludePatterns(gitDir string) error
 func (m *Matcher) Match(path string, isDir bool) bool
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult
+func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error
 func (m *Matcher) Warnings() []ParseWarning
 func (m *Matcher) RuleCount() int
 ```

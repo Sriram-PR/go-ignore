@@ -77,6 +77,35 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.8.0
+
+API-surface additions for the v1.0 push, plus one breaking simplification of `MatchResult`. The additions are the result of a research pass over real downstream consumers (Databricks CLI, gocodewalker, go-git, nektos/act, Pulumi) and recurring asks across the Go gitignore library ecosystem — the headline gap was the absence of a filesystem walker, which every consumer was reimplementing.
+
+**Non-breaking additions**
+
+- **`(*Matcher).WalkDir(root, fn)` and `WalkRepo(root, opts, fn)`** — walk a directory tree, auto-loading nested `.gitignore` files as descent happens and pruning ignored directories (no descent into them). `fn` is called only for entries that survive ignore checks. `WalkDir` does NOT mutate the receiver: discovered rules are scoped to the call via a forked child matcher. `.git/` is always pruned by `WalkDir` regardless of matcher state, to avoid traversing git internals (`Match` itself is unchanged and still requires `.git/` to be added explicitly). `fn` matches `fs.WalkDirFunc`, so callers can switch from `filepath.WalkDir` with a one-line change.
+- **`(*Matcher).AddSystemPatterns()`** — fourth standard gitignore source. Resolves via `git config --system core.excludesFile` and loads if the file exists. Missing config or file → returns nil. Symmetric with `AddGlobalPatterns` / `AddExcludePatterns`. `LoadRepo` now invokes this first in its precedence chain (system → global → `.git/info/exclude` → root `.gitignore`).
+- **`(*Matcher).AddPatternsFromFile(basePath, path)`** — convenience around `os.ReadFile` + `AddPatterns` that carries the file path as the source label so `MatchResult.Source` identifies it. Closes the provenance gap for callers using neither `LoadRepo` nor a walker.
+- **`MatchResult.Source` field** — path to the originating `.gitignore` (or `git config` excludes file) when the matcher knows it. Populated by `LoadRepo`, `WalkDir`'s nested discovery, and the four `Add*Patterns*` loaders that take a path. Empty for rules added via `AddPatterns` / `AddPatternsReader`, which carry only an in-memory blob.
+
+**Breaking changes**
+
+- **`MatchResult.IsIgnored()` and `IsExplicit()` methods removed.** Both were 12-day-old accessors added in v0.7.0 as a layout-stability hedge before the v1.0 freeze. With v1.0 imminent, the hedge is no longer load-bearing and the duplication with the underlying `Ignored` / `Matched` fields is a smell. Migrate by dropping the parens:
+  ```go
+  // before
+  if r.IsIgnored() { ... }
+  if r.IsExplicit() { ... }
+  // after
+  if r.Ignored { ... }
+  if r.Matched { ... }
+  ```
+  `Negated()` is retained because it is a derived value (`Matched && !Ignored`) rather than stored state, and the method form documents the derivation.
+
+**Documentation**
+
+- **README "Walking a Working Tree" section** added, showing the `WalkRepo` one-shot pattern and the `LoadRepo` + `m.WalkDir` power-user shape.
+- **API Reference** picks up the new functions and `MatchResult.Source`. `LoadRepo`'s precedence list updated to four sources.
+
 ### v0.7.1
 
 Post-v0.7.0 audit fixes. One observable behavior change in the `WarningHandler` concurrency contract; callers that relied on the library serializing handler dispatch must add their own synchronization (see below).

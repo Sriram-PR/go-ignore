@@ -81,8 +81,9 @@
 //
 // # Loading a Working Tree in One Call
 //
-// LoadRepo is a convenience constructor that pre-loads the three standard
-// gitignore sources for a working tree in git's precedence order:
+// LoadRepo is a convenience constructor that pre-loads the four standard
+// gitignore sources (system, global, .git/info/exclude, root .gitignore) for
+// a working tree in git's precedence order:
 //
 //	m, err := ignore.LoadRepo(".", ignore.MatcherOptions{})
 //	if err != nil {
@@ -90,8 +91,23 @@
 //	}
 //	m.Match("build/output.js", false)
 //
-// Paths passed to Match must be relative to repoRoot. Nested per-directory
-// .gitignore files are not walked.
+// Paths passed to Match must be relative to repoRoot. LoadRepo does NOT walk
+// nested per-directory .gitignore files; use WalkDir / WalkRepo for that.
+//
+// # Walking a Working Tree
+//
+// WalkDir and WalkRepo walk a directory tree, applying nested .gitignore
+// discovery automatically and skipping ignored entries before calling the
+// user callback. The .git/ directory is always pruned.
+//
+//	err := ignore.WalkRepo(".", ignore.MatcherOptions{}, func(path string, d fs.DirEntry, err error) error {
+//	    if err != nil { return err }
+//	    if !d.IsDir() { process(path) }
+//	    return nil
+//	})
+//
+// WalkDir does not mutate its receiver: discovered nested rules live only
+// for the duration of the call.
 //
 // # Streaming Patterns from an io.Reader
 //

@@ -155,6 +155,94 @@ func TestGitConfigExcludesFile_Success(t *testing.T) {
 	}
 }
 
+// TestAddSystemPatterns_Success points GIT_CONFIG_SYSTEM at a fake system
+// gitconfig and verifies the patterns it references load with Source set to
+// the resolved file path. Skips if git does not respect GIT_CONFIG_SYSTEM on
+// the host platform.
+func TestAddSystemPatterns_Success(t *testing.T) {
+	tmp := t.TempDir()
+
+	ignoreFile := filepath.Join(tmp, "system-ignore")
+	if err := os.WriteFile(ignoreFile, []byte("*.sys\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	gitconfig := filepath.Join(tmp, "system-gitconfig")
+	if err := os.WriteFile(gitconfig,
+		[]byte("[core]\n\texcludesFile = "+ignoreFile+"\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	t.Setenv("GIT_CONFIG_SYSTEM", gitconfig)
+	// Prevent global+XDG from interfering with this test's assertions.
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(tmp, "nonexistent"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "nonexistent-xdg"))
+	t.Setenv("HOME", tmp)
+
+	m := New()
+	if err := m.AddSystemPatterns(); err != nil {
+		t.Fatalf("AddSystemPatterns: %v", err)
+	}
+
+	if m.RuleCount() == 0 {
+		t.Skip("git does not respect GIT_CONFIG_SYSTEM on this platform")
+	}
+	if !m.Match("foo.sys", false) {
+		t.Error("expected *.sys to match foo.sys")
+	}
+	if r := m.MatchWithReason("foo.sys", false); r.Source != ignoreFile {
+		t.Errorf("Source = %q, want %q", r.Source, ignoreFile)
+	}
+}
+
+// TestAddSystemPatterns_NoConfig verifies the no-error path when no system
+// gitignore is configured.
+func TestAddSystemPatterns_NoConfig(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(tmp, "nonexistent"))
+
+	m := New()
+	if err := m.AddSystemPatterns(); err != nil {
+		t.Fatalf("AddSystemPatterns: %v", err)
+	}
+	if m.RuleCount() != 0 {
+		t.Errorf("RuleCount = %d, want 0 with no system config", m.RuleCount())
+	}
+}
+
+// TestAddPatternsFromFile verifies the file-based loader populates Source.
+func TestAddPatternsFromFile(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "sub.gitignore")
+	if err := os.WriteFile(path, []byte("*.tmp\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	m := New()
+	if err := m.AddPatternsFromFile("sub", path); err != nil {
+		t.Fatalf("AddPatternsFromFile: %v", err)
+	}
+
+	r := m.MatchWithReason("sub/foo.tmp", false)
+	if !r.Ignored {
+		t.Fatalf("expected sub/foo.tmp to be ignored")
+	}
+	if r.Source != path {
+		t.Errorf("Source = %q, want %q", r.Source, path)
+	}
+	if r.BasePath != "sub" {
+		t.Errorf("BasePath = %q, want %q", r.BasePath, "sub")
+	}
+}
+
+// TestAddPatternsFromFile_Missing verifies error wrapping for a missing file.
+func TestAddPatternsFromFile_Missing(t *testing.T) {
+	m := New()
+	err := m.AddPatternsFromFile("", filepath.Join(t.TempDir(), "does-not-exist"))
+	if err == nil {
+		t.Fatal("expected error for missing file, got nil")
+	}
+}
+
 func TestAddGlobalPatterns_WithXDGFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmp)

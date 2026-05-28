@@ -17,13 +17,14 @@ import (
 // AddGlobalPatterns indefinitely.
 const gitConfigTimeout = 5 * time.Second
 
-// LoadRepo creates a Matcher pre-loaded with the three standard gitignore
+// LoadRepo creates a Matcher pre-loaded with the four standard gitignore
 // sources for a working tree, in git's precedence order (lowest first, so the
 // last-loaded rule wins per the matcher's last-match-wins semantics):
 //
-//  1. The user's global gitignore (resolved via git config / XDG; see AddGlobalPatterns)
-//  2. <repoRoot>/.git/info/exclude (see AddExcludePatterns)
-//  3. <repoRoot>/.gitignore (root scope)
+//  1. The system gitignore (git config --system core.excludesFile; see AddSystemPatterns)
+//  2. The user's global gitignore (resolved via git config / XDG; see AddGlobalPatterns)
+//  3. <repoRoot>/.git/info/exclude (see AddExcludePatterns)
+//  4. <repoRoot>/.gitignore (root scope)
 //
 // repoRoot is used only to locate the two on-disk files above; it is NOT
 // stripped from paths passed to Match. Paths supplied to Match must be
@@ -39,6 +40,10 @@ const gitConfigTimeout = 5 * time.Second
 // Pass a zero-value MatcherOptions{} to accept all defaults.
 func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 	m := NewWithOptions(opts)
+
+	if err := m.AddSystemPatterns(); err != nil {
+		return nil, err
+	}
 
 	if err := m.AddGlobalPatterns(); err != nil {
 		return nil, err
@@ -103,6 +108,67 @@ func (m *Matcher) AddGlobalPatterns() error {
 	return nil
 }
 
+// AddSystemPatterns loads patterns from the system-scope gitignore file
+// (referenced by `git config --system core.excludesFile`, typically
+// configured via /etc/gitconfig) and adds them to the matcher.
+//
+// If git is unavailable, the system config does not set core.excludesFile, or
+// the referenced file does not exist, AddSystemPatterns returns nil (no error).
+// Only real read failures are returned as errors.
+//
+// Patterns are added with an empty basePath (root scope), matching Git's
+// behavior where system patterns apply to all paths.
+//
+// Trust model: this function trusts the file path returned by "git config
+// --system". On multi-tenant systems where /etc/gitconfig is not
+// administrator-controlled, callers should validate the configuration before
+// invoking this method.
+//
+// Thread-safe: can be called concurrently with Match.
+func (m *Matcher) AddSystemPatterns() error {
+	path, err := gitConfigExcludesFileScoped("--system")
+	if err != nil {
+		return fmt.Errorf("resolving system gitignore path: %w", err)
+	}
+	if path == "" {
+		return nil
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("reading system gitignore %s: %w", path, err)
+	}
+
+	m.addPatternsFromSource("", content, path)
+	return nil
+}
+
+// AddPatternsFromFile reads the file at path and adds its patterns under the
+// given basePath. It is equivalent to:
+//
+//	content, err := os.ReadFile(path)
+//	if err != nil { return err }
+//	m.AddPatterns(basePath, content)
+//
+// with one extra: the file's path is recorded so that MatchResult.Source
+// identifies it for any rule that originated here.
+//
+// If path does not exist or cannot be read, the error is returned wrapped.
+// Empty files add no rules.
+//
+// Thread-safe: can be called concurrently with Match.
+func (m *Matcher) AddPatternsFromFile(basePath, path string) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", path, err)
+	}
+	m.addPatternsFromSource(basePath, content, path)
+	return nil
+}
+
 // AddExcludePatterns loads patterns from the repository's .git/info/exclude
 // file and adds them to the matcher. The gitDir parameter is the path to the
 // .git directory (e.g., ".git" or an absolute path).
@@ -154,12 +220,19 @@ func resolveGlobalIgnorePath() (string, error) {
 	return xdgGlobalIgnorePath()
 }
 
-// gitConfigExcludesFile reads the global core.excludesFile from git config.
+// gitConfigExcludesFile reads core.excludesFile from --global git config.
 // Returns empty string if git is not available or the key is not set.
 func gitConfigExcludesFile() (string, error) {
+	return gitConfigExcludesFileScoped("--global")
+}
+
+// gitConfigExcludesFileScoped reads core.excludesFile from the given git config
+// scope. scope is the git config selector ("--global" or "--system"); other
+// values are passed through unchanged.
+func gitConfigExcludesFileScoped(scope string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "config", "--global", "core.excludesFile")
+	cmd := exec.CommandContext(ctx, "git", "config", scope, "core.excludesFile")
 	out, err := cmd.Output()
 	if err != nil {
 		// Timeout — treat as "git unavailable" and fall through to XDG.
@@ -167,7 +240,7 @@ func gitConfigExcludesFile() (string, error) {
 			return "", nil
 		}
 		// git not found, config key not set, or fatal git error (e.g., no
-		// global config file on Windows) — expected, fall through to XDG.
+		// global/system config file on Windows) — expected, fall through.
 		var exitErr *exec.ExitError
 		if errors.Is(err, exec.ErrNotFound) || errors.As(err, &exitErr) {
 			return "", nil

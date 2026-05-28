@@ -359,6 +359,68 @@ func TestLoadRepo(t *testing.T) {
 	}
 }
 
+// TestMatchResult_Source verifies that MatchResult.Source identifies which
+// file produced the winning rule for every loader that knows its source path:
+// LoadRepo's root .gitignore, AddGlobalPatterns, and AddExcludePatterns.
+// Rules added via the source-less AddPatterns API must leave Source empty.
+func TestMatchResult_Source(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+
+	// XDG global gitignore.
+	globalDir := filepath.Join(xdg, "git")
+	if err := os.MkdirAll(globalDir, 0o755); err != nil {
+		t.Fatalf("mkdir global: %v", err)
+	}
+	globalPath := filepath.Join(globalDir, "ignore")
+	if err := os.WriteFile(globalPath, []byte("*.global\n"), 0o644); err != nil {
+		t.Fatalf("write global: %v", err)
+	}
+
+	repo := t.TempDir()
+	rootIgnore := filepath.Join(repo, ".gitignore")
+	if err := os.WriteFile(rootIgnore, []byte("*.log\n"), 0o644); err != nil {
+		t.Fatalf("write .gitignore: %v", err)
+	}
+	infoDir := filepath.Join(repo, ".git", "info")
+	if err := os.MkdirAll(infoDir, 0o755); err != nil {
+		t.Fatalf("mkdir info: %v", err)
+	}
+	excludePath := filepath.Join(infoDir, "exclude")
+	if err := os.WriteFile(excludePath, []byte("scratch/\n"), 0o644); err != nil {
+		t.Fatalf("write exclude: %v", err)
+	}
+
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	// Source-less addition (AddPatterns) must NOT populate Source.
+	m.AddPatterns("", []byte("*.adhoc\n"))
+
+	cases := []struct {
+		path       string
+		isDir      bool
+		wantSource string
+	}{
+		{"a.log", false, rootIgnore},    // from root .gitignore
+		{"a.global", false, globalPath}, // from XDG global
+		{"scratch", true, excludePath},  // from .git/info/exclude
+		{"x.adhoc", false, ""},          // from AddPatterns — no source known
+	}
+	for _, tc := range cases {
+		r := m.MatchWithReason(tc.path, tc.isDir)
+		if !r.Matched {
+			t.Errorf("Match(%q): no rule matched, expected source %q", tc.path, tc.wantSource)
+			continue
+		}
+		if r.Source != tc.wantSource {
+			t.Errorf("Match(%q): Source = %q, want %q (rule=%q)", tc.path, r.Source, tc.wantSource, r.Rule)
+		}
+	}
+}
+
 func TestLoadRepo_MissingFiles(t *testing.T) {
 	// Isolate from any real global gitignore on the host.
 	t.Setenv("HOME", t.TempDir())

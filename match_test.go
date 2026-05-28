@@ -867,7 +867,7 @@ func TestMatchRule_Basic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := parseLine(tt.pattern, 1, "")
+			r, _ := parseLine(tt.pattern, 1, "", "")
 			if r == nil {
 				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
 			}
@@ -911,7 +911,7 @@ func TestMatchRule_BasePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := parseLine(tt.pattern, 1, tt.basePath)
+			r, _ := parseLine(tt.pattern, 1, tt.basePath, "")
 			if r == nil {
 				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
 			}
@@ -957,7 +957,7 @@ func TestMatchContext_Unlimited(t *testing.T) {
 func TestMatchRule_PathologicalPattern(t *testing.T) {
 	// Pattern with multiple ** that could cause exponential backtracking
 	pattern := "a/**/b/**/c/**/d"
-	r, _ := parseLine(pattern, 1, "")
+	r, _ := parseLine(pattern, 1, "", "")
 	if r == nil {
 		t.Fatal("parseLine returned nil")
 	}
@@ -1026,7 +1026,7 @@ func TestMatchRule_CaseInsensitive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.pattern+"_"+tt.path, func(t *testing.T) {
-			r, _ := parseLine(tt.pattern, 1, "")
+			r, _ := parseLine(tt.pattern, 1, "", "")
 			if r == nil {
 				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
 			}
@@ -1132,7 +1132,7 @@ func TestMatchRule_DirectoryContents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := parseLine(tt.pattern, 1, "")
+			r, _ := parseLine(tt.pattern, 1, "", "")
 			if r == nil {
 				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
 			}
@@ -1165,7 +1165,7 @@ func TestMatchRule_EscapedWildcards(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.pattern, 1, "")
+			r, w := parseLine(tt.pattern, 1, "", "")
 			if w != nil {
 				t.Fatalf("parseLine(%q) warning: %v", tt.pattern, w)
 			}
@@ -1231,7 +1231,7 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := parseLine(tt.pattern, 1, "")
+			r, _ := parseLine(tt.pattern, 1, "", "")
 			if r == nil {
 				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
 			}

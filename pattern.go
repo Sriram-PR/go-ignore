@@ -19,6 +19,7 @@ type rule struct {
 	pattern       string    // original pattern (for debugging/reporting)
 	basePath      string    // directory scope (empty = root)
 	basePathSlash string    // basePath + "/" (pre-computed, empty if basePath is empty)
+	source        string    // path/label of the source file that supplied this rule (may be empty)
 	baseSegCount  int       // number of segments in basePath (pre-computed)
 	segments      []segment // parsed pattern segments for matching
 	line          int       // line number in source file (1-indexed)
@@ -42,8 +43,11 @@ type segment struct {
 // parseLines parses gitignore content into rules.
 // It normalizes content (BOM, line endings) and processes each line.
 // maxPatternLength limits individual line length (-1 for unlimited).
+// source is an optional informational label (e.g., the path to the
+// originating .gitignore file) carried on each parsed rule and surfaced via
+// MatchResult.Source. Pass "" if no source label is available.
 // Returns parsed rules and any warnings for malformed patterns.
-func parseLines(basePath string, content []byte, maxPatternLength int) ([]rule, []ParseWarning) {
+func parseLines(basePath string, content []byte, maxPatternLength int, source string) ([]rule, []ParseWarning) {
 	// Normalize content (BOM, CRLF)
 	content = normalizeContent(content)
 
@@ -64,7 +68,7 @@ func parseLines(basePath string, content []byte, maxPatternLength int) ([]rule, 
 			continue
 		}
 
-		r, warning := parseLine(line, lineNum, basePath)
+		r, warning := parseLine(line, lineNum, basePath, source)
 		if warning != nil {
 			warning.BasePath = basePath
 			warnings = append(warnings, *warning)
@@ -80,7 +84,8 @@ func parseLines(basePath string, content []byte, maxPatternLength int) ([]rule, 
 // parseLine parses a single line from a .gitignore file.
 // Returns nil rule for empty lines, comments, and malformed patterns.
 // Returns a warning for patterns that become empty after processing.
-func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning) {
+// source is propagated onto the returned rule for provenance reporting.
+func parseLine(line string, lineNum int, basePath, source string) (*rule, *ParseWarning) {
 	// Step 1: Trim trailing whitespace (Git behavior)
 	line = trimTrailingWhitespace(line)
 
@@ -165,6 +170,7 @@ func parseLine(line string, lineNum int, basePath string) (*rule, *ParseWarning)
 	r := &rule{
 		pattern:  original,
 		basePath: basePath,
+		source:   source,
 		line:     lineNum,
 		negate:   negate,
 		dirOnly:  dirOnly,

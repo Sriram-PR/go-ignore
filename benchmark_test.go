@@ -348,7 +348,7 @@ src/**/test/
 `)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		parseLines("", content, -1)
+		parseLines("", content, -1, "")
 	}
 }
 

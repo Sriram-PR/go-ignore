@@ -56,7 +56,7 @@ func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 		}
 		return nil, fmt.Errorf("reading %s: %w", rootIgnore, err)
 	}
-	m.AddPatterns("", content)
+	m.addPatternsFromSource("", content, rootIgnore)
 	return m, nil
 }
 
@@ -99,7 +99,7 @@ func (m *Matcher) AddGlobalPatterns() error {
 		return fmt.Errorf("reading global gitignore %s: %w", path, err)
 	}
 
-	m.AddPatterns("", content)
+	m.addPatternsFromSource("", content, path)
 	return nil
 }
 
@@ -133,7 +133,7 @@ func (m *Matcher) AddExcludePatterns(gitDir string) error {
 		return fmt.Errorf("reading %s: %w", path, err)
 	}
 
-	m.AddPatterns("", content)
+	m.addPatternsFromSource("", content, path)
 	return nil
 }
 

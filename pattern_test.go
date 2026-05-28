@@ -47,7 +47,7 @@ func TestParseLine_Comments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.line, 1, "")
+			r, w := parseLine(tt.line, 1, "", "")
 			if tt.wantNil && r != nil {
 				t.Errorf("parseLine(%q) returned rule, want nil", tt.line)
 			}
@@ -71,7 +71,7 @@ func TestParseLine_EmptyLines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.line, 1, "")
+			r, w := parseLine(tt.line, 1, "", "")
 			if r != nil {
 				t.Errorf("parseLine(%q) returned rule, want nil", tt.line)
 			}
@@ -97,7 +97,7 @@ func TestParseLine_Negation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.line, 1, "")
+			r, w := parseLine(tt.line, 1, "", "")
 			if tt.wantNil {
 				if r != nil {
 					t.Errorf("parseLine(%q) returned rule, want nil", tt.line)
@@ -132,7 +132,7 @@ func TestParseLine_DirOnly(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := parseLine(tt.line, 1, "")
+			r, _ := parseLine(tt.line, 1, "", "")
 			if r == nil {
 				t.Fatalf("parseLine(%q) returned nil", tt.line)
 			}
@@ -178,7 +178,7 @@ func TestParseLine_Anchoring(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.line, 1, "")
+			r, w := parseLine(tt.line, 1, "", "")
 			if w != nil {
 				t.Errorf("parseLine(%q) warning: %v", tt.line, w)
 			}
@@ -206,7 +206,7 @@ func TestParseLine_EscapedHash(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := parseLine(tt.line, 1, "")
+			r, _ := parseLine(tt.line, 1, "", "")
 			if tt.wantNil {
 				if r != nil {
 					t.Errorf("parseLine(%q) returned rule, want nil", tt.line)
@@ -240,7 +240,7 @@ func TestParseLine_EscapedBang(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.line, 1, "")
+			r, w := parseLine(tt.line, 1, "", "")
 			if tt.wantNil {
 				if r != nil {
 					t.Errorf("parseLine(%q) returned rule, want nil", tt.line)
@@ -262,7 +262,7 @@ func TestParseLine_EscapedBang(t *testing.T) {
 
 func TestParseLine_EscapedBangMatching(t *testing.T) {
 	// \!important.txt should match a file named "!important.txt"
-	r, _ := parseLine("\\!important.txt", 1, "")
+	r, _ := parseLine("\\!important.txt", 1, "", "")
 	if r == nil {
 		t.Fatal("parseLine returned nil")
 	}
@@ -277,7 +277,7 @@ func TestParseLine_EscapedBangMatching(t *testing.T) {
 
 func TestParseLine_NegatedEscapedHash(t *testing.T) {
 	// !\#foo should negate the pattern for file "#foo"
-	r, _ := parseLine("!\\#foo", 1, "")
+	r, _ := parseLine("!\\#foo", 1, "", "")
 	if r == nil {
 		t.Fatal("parseLine returned nil")
 	}
@@ -315,7 +315,7 @@ func TestParseLine_DotSlashPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.line, 1, "")
+			r, w := parseLine(tt.line, 1, "", "")
 			if w != nil {
 				t.Errorf("parseLine(%q) unexpected warning: %v", tt.line, w)
 			}
@@ -353,7 +353,7 @@ func TestParseLine_TrailingWhitespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := parseLine(tt.line, 1, "")
+			r, _ := parseLine(tt.line, 1, "", "")
 			if r == nil {
 				t.Fatalf("parseLine(%q) returned nil", tt.line)
 			}
@@ -393,7 +393,7 @@ func TestParseLine_Warnings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.line, 1, "")
+			r, w := parseLine(tt.line, 1, "", "")
 			if tt.wantWarning {
 				if w == nil {
 					t.Errorf("parseLine(%q) should have warning", tt.line)
@@ -414,7 +414,7 @@ func TestParseLine_Warnings(t *testing.T) {
 }
 
 func TestParseLine_LineNumber(t *testing.T) {
-	r, _ := parseLine("*.log", 42, "")
+	r, _ := parseLine("*.log", 42, "", "")
 	if r == nil {
 		t.Fatal("parseLine returned nil")
 	}
@@ -422,7 +422,7 @@ func TestParseLine_LineNumber(t *testing.T) {
 		t.Errorf("r.line = %d, want 42", r.line)
 	}
 
-	_, w := parseLine("!", 17, "")
+	_, w := parseLine("!", 17, "", "")
 	if w == nil {
 		t.Fatal("parseLine should return warning")
 	}
@@ -432,7 +432,7 @@ func TestParseLine_LineNumber(t *testing.T) {
 }
 
 func TestParseLine_BasePath(t *testing.T) {
-	r, _ := parseLine("*.log", 1, "src/lib")
+	r, _ := parseLine("*.log", 1, "src/lib", "")
 	if r == nil {
 		t.Fatal("parseLine returned nil")
 	}
@@ -566,7 +566,7 @@ src/temp
 **/cache
 `)
 
-	rules, warnings := parseLines("", content, -1)
+	rules, warnings := parseLines("", content, -1, "")
 
 	if len(warnings) != 0 {
 		t.Errorf("parseLines returned %d warnings, want 0", len(warnings))
@@ -619,7 +619,7 @@ func TestParseLines_WithWarnings(t *testing.T) {
 valid.txt
 `)
 
-	rules, warnings := parseLines("", content, -1)
+	rules, warnings := parseLines("", content, -1, "")
 
 	// Should have 2 warnings (! and / become empty)
 	if len(warnings) != 2 {
@@ -639,7 +639,7 @@ func TestParseLines_CRLF(t *testing.T) {
 	// Windows line endings
 	content := []byte("*.log\r\nbuild/\r\n!important.log\r\n")
 
-	rules, warnings := parseLines("", content, -1)
+	rules, warnings := parseLines("", content, -1, "")
 
 	if len(warnings) != 0 {
 		t.Errorf("parseLines returned warnings: %v", warnings)
@@ -653,7 +653,7 @@ func TestParseLines_BOM(t *testing.T) {
 	// UTF-8 BOM
 	content := append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\nbuild/\n")...)
 
-	rules, warnings := parseLines("", content, -1)
+	rules, warnings := parseLines("", content, -1, "")
 
 	if len(warnings) != 0 {
 		t.Errorf("parseLines returned warnings: %v", warnings)
@@ -670,7 +670,7 @@ func TestParseLines_BOM(t *testing.T) {
 func TestParseLines_WithBasePath(t *testing.T) {
 	content := []byte("*.log\ntemp/\n")
 
-	rules, _ := parseLines("src/lib", content, -1)
+	rules, _ := parseLines("src/lib", content, -1, "")
 
 	for _, r := range rules {
 		if r.basePath != "src/lib" {
@@ -750,7 +750,7 @@ func TestAnchoringExamplesFromSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, w := parseLine(tt.pattern, 1, "")
+			r, w := parseLine(tt.pattern, 1, "", "")
 			if w != nil {
 				t.Fatalf("unexpected warning: %v", w)
 			}

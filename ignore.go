@@ -18,6 +18,15 @@ type MatchResult struct {
 	// If multiple rules matched, this is the final decisive rule.
 	Rule string
 
+	// Source identifies which file or stream supplied the matching rule. It is
+	// the absolute path of the originating .gitignore when the matcher knows it
+	// (set automatically by AddGlobalPatterns, AddSystemPatterns,
+	// AddExcludePatterns, AddPatternsFromFile, LoadRepo, and the nested
+	// .gitignore discovery done inside WalkDir). For rules added via
+	// AddPatterns or AddPatternsReader — which carry only an in-memory blob
+	// and no source path — Source is "". Empty if Matched == false.
+	Source string
+
 	// BasePath is the directory containing the .gitignore that had the matching rule.
 	// Empty string means the root .gitignore.
 	BasePath string
@@ -165,6 +174,15 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 // batch AddPatterns calls before starting concurrent Match operations to
 // reduce lock contention.
 func (m *Matcher) AddPatterns(basePath string, content []byte) {
+	m.addPatternsFromSource(basePath, content, "")
+}
+
+// addPatternsFromSource is the internal worker behind AddPatterns; helpers
+// that know the originating file (AddGlobalPatterns, AddExcludePatterns,
+// AddSystemPatterns, AddPatternsFromFile, LoadRepo, and the nested-gitignore
+// discovery inside WalkDir) call this directly so MatchResult.Source can
+// identify which file produced a rule.
+func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source string) {
 	if content == nil {
 		return
 	}
@@ -173,7 +191,7 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) {
 	normalizedBase := normalizePath(basePath)
 
 	// Parse rules (this doesn't need the lock)
-	newRules, parseWarnings := parseLines(normalizedBase, content, m.opts.MaxPatternLength)
+	newRules, parseWarnings := parseLines(normalizedBase, content, m.opts.MaxPatternLength, source)
 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
 	// This avoids calling strings.ToLower on every match call.
@@ -344,6 +362,7 @@ func evaluateRules(rules []rule, path string, pathSegments []string, isDir bool,
 		if matchRule(r, path, pathSegments, isDir, ctx) {
 			result.Matched = true
 			result.Rule = r.pattern
+			result.Source = r.source
 			result.BasePath = r.basePath
 			result.Line = r.line
 			result.Ignored = !r.negate

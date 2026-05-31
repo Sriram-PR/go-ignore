@@ -128,6 +128,40 @@ func TestAddPatterns_EmptyContent(t *testing.T) {
 	}
 }
 
+func TestAddPatternsWithSource(t *testing.T) {
+	const source = "embedded://rules.gitignore"
+	m := New()
+	m.AddPatternsWithSource("", source, []byte("*.log\n!important.log\n"))
+
+	r := m.MatchWithReason("debug.log", false)
+	if !r.Ignored {
+		t.Fatalf("debug.log should be ignored")
+	}
+	if r.Source != source {
+		t.Errorf("Source = %q, want %q", r.Source, source)
+	}
+
+	r = m.MatchWithReason("important.log", false)
+	if r.Ignored {
+		t.Fatalf("important.log should be re-included")
+	}
+	if r.Source != source {
+		t.Errorf("Source = %q, want %q (negation rule still carries source)", r.Source, source)
+	}
+
+	// Source labels must not bleed across calls: AddPatterns with no source
+	// should leave Source empty even when the rule wins.
+	m = New()
+	m.AddPatternsWithSource("", source, []byte("a\n"))
+	m.AddPatterns("", []byte("b\n"))
+	if r := m.MatchWithReason("b", false); r.Source != "" {
+		t.Errorf("Source = %q, want empty for AddPatterns-added rule", r.Source)
+	}
+	if r := m.MatchWithReason("a", false); r.Source != source {
+		t.Errorf("Source = %q, want %q for AddPatternsWithSource-added rule", r.Source, source)
+	}
+}
+
 func TestAddPatterns_WithWarnings(t *testing.T) {
 	m := New()
 	content := []byte("*.log\n!\n/\nvalid.txt\n")

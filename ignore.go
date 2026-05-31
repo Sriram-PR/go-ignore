@@ -167,11 +167,28 @@ func (m *Matcher) AddPatterns(basePath string, content []byte) {
 	m.addPatternsFromSource(basePath, content, "")
 }
 
-// addPatternsFromSource is the internal worker behind AddPatterns; helpers
-// that know the originating file (AddGlobalPatterns, AddExcludePatterns,
-// AddSystemPatterns, AddPatternsFromFile, LoadRepo, and the nested-gitignore
-// discovery inside WalkDir) call this directly so MatchResult.Source can
-// identify which file produced a rule.
+// AddPatternsWithSource is identical to AddPatterns except that the supplied
+// source label is recorded on every rule parsed from content and surfaced via
+// MatchResult.Source for any matching path. Use it when patterns originate
+// from somewhere with a meaningful logical name that is not a file on disk
+// (database row, embedded config, network response, etc.); AddPatternsFromFile
+// already handles the on-disk case.
+//
+// source is informational only — it is not parsed, normalized, or validated.
+// Empty source is permitted (equivalent to AddPatterns) but provides no
+// provenance, so callers should prefer AddPatterns in that case for clarity.
+//
+// Thread-safe: can be called concurrently with Match.
+func (m *Matcher) AddPatternsWithSource(basePath, source string, content []byte) {
+	m.addPatternsFromSource(basePath, content, source)
+}
+
+// addPatternsFromSource is the internal worker behind AddPatterns and
+// AddPatternsWithSource; helpers that know the originating file
+// (AddGlobalPatterns, AddExcludePatterns, AddSystemPatterns,
+// AddPatternsFromFile, LoadRepo, and the nested-gitignore discovery inside
+// WalkDir) call this directly so MatchResult.Source can identify which file
+// produced a rule.
 func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source string) {
 	if content == nil {
 		return

@@ -109,6 +109,11 @@
 // WalkDir does not mutate its receiver: discovered nested rules live only
 // for the duration of the call.
 //
+// For range-over-func ergonomics, Files (method) and RepoFiles (standalone)
+// yield only non-ignored files as an iter.Seq2[string, error]. For walking
+// an fs.FS (fstest.MapFS, embed.FS, etc.) instead of the OS filesystem,
+// use WalkDirFS.
+//
 // # Streaming Patterns from an io.Reader
 //
 // AddPatternsReader accepts an io.Reader so callers do not need to read the

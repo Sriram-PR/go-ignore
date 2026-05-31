@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 )
 
 // writeTree creates a directory tree from a map of relative path → file
@@ -492,6 +493,184 @@ func TestRepoFiles_LoadRepoErrorYielded(t *testing.T) {
 	}
 	if yields != 1 || firstErr == nil {
 		t.Errorf("yields=%d firstErr=%v; want exactly one yield carrying a LoadRepo error", yields, firstErr)
+	}
+}
+
+func TestWalkDirFS_BasicWithMapFS(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore":   {Data: []byte("*.log\n")},
+		"keep.txt":     {Data: []byte("x")},
+		"debug.log":    {Data: []byte("x")},
+		"sub/file.txt": {Data: []byte("x")},
+		"sub/err.log":  {Data: []byte("x")}, // ignored
+	}
+
+	// Pre-load the root .gitignore before walking — WalkDirFS discovers
+	// nested .gitignore files but the receiver still supplies the root rules.
+	m := New()
+	if err := m.AddPatternsReader("", strings.NewReader("*.log\n")); err != nil {
+		t.Fatalf("AddPatternsReader: %v", err)
+	}
+
+	var got []string
+	err := m.WalkDirFS(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		got = append(got, path)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDirFS: %v", err)
+	}
+	sort.Strings(got)
+
+	want := []string{
+		".gitignore",
+		"keep.txt",
+		"sub/file.txt",
+	}
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+func TestWalkDirFS_NestedDiscoveryInMapFS(t *testing.T) {
+	fsys := fstest.MapFS{
+		"sub/.gitignore":  {Data: []byte("*.tmp\n")},
+		"sub/keep.txt":    {Data: []byte("x")},
+		"sub/scratch.tmp": {Data: []byte("x")},
+		"top.tmp":         {Data: []byte("x")}, // not ignored at root
+	}
+
+	var got []string
+	err := New().WalkDirFS(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		got = append(got, path)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDirFS: %v", err)
+	}
+	sort.Strings(got)
+
+	want := []string{
+		"sub/.gitignore",
+		"sub/keep.txt",
+		"top.tmp",
+	}
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+func TestWalkDirFS_PathsAreForwardSlash(t *testing.T) {
+	// fs.FS paths are always forward-slash regardless of host OS. This test
+	// guards against a future refactor that accidentally passes the path
+	// through filepath.ToSlash twice or back through OS-native conversion.
+	fsys := fstest.MapFS{
+		"a/b/c.txt": {Data: []byte("x")},
+	}
+
+	var seen string
+	err := New().WalkDirFS(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			seen = path
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDirFS: %v", err)
+	}
+	if seen != "a/b/c.txt" {
+		t.Errorf("path = %q, want %q (forward slashes, no OS conversion)", seen, "a/b/c.txt")
+	}
+}
+
+func TestWalkDirFS_DotGitPruned(t *testing.T) {
+	fsys := fstest.MapFS{
+		"keep.txt":          {Data: []byte("x")},
+		".git/HEAD":         {Data: []byte("ref")},
+		".git/objects/pack": {Data: []byte("x")},
+	}
+
+	var got []string
+	err := New().WalkDirFS(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		got = append(got, path)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDirFS: %v", err)
+	}
+	for _, p := range got {
+		if strings.HasPrefix(p, ".git/") || p == ".git" {
+			t.Errorf("WalkDirFS descended into %q; .git must be pruned", p)
+		}
+	}
+}
+
+func TestWalkDirFS_DoesNotMutateReceiver(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore":     {Data: []byte("*.log\n")},
+		"sub/.gitignore": {Data: []byte("*.tmp\n")},
+		"sub/file.txt":   {Data: []byte("x")},
+	}
+	m := New()
+	m.AddPatterns("", []byte("manual.pattern\n"))
+	before := m.RuleCount()
+
+	err := m.WalkDirFS(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		return err
+	})
+	if err != nil {
+		t.Fatalf("WalkDirFS: %v", err)
+	}
+	if after := m.RuleCount(); before != after {
+		t.Errorf("WalkDirFS mutated receiver: %d → %d", before, after)
+	}
+}
+
+func TestWalkDirFS_SubrootWalk(t *testing.T) {
+	// Walking from a subroot (not "." or "") must produce paths under that
+	// subroot, with rel computed correctly via prefix-strip.
+	fsys := fstest.MapFS{
+		"a/x.txt":    {Data: []byte("x")},
+		"a/y.txt":    {Data: []byte("x")},
+		"b/skip.txt": {Data: []byte("x")},
+	}
+
+	var got []string
+	err := New().WalkDirFS(fsys, "a", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			got = append(got, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDirFS: %v", err)
+	}
+	sort.Strings(got)
+
+	want := []string{"a/x.txt", "a/y.txt"}
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
 

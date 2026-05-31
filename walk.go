@@ -1,11 +1,27 @@
 package ignore
 
 import (
+	"errors"
+	"fmt"
 	"io/fs"
 	"iter"
 	"os"
+	pathpkg "path"
 	"path/filepath"
+	"strings"
 )
+
+// walkBackend captures the filesystem-specific operations that differ between
+// the OS-backed WalkDir and the fs.FS-backed WalkDirFS: how to walk, how to
+// read a file, how to join path elements, and how to compute paths relative
+// to root. Both variants funnel through walkInternal with a backend chosen
+// at call time.
+type walkBackend struct {
+	walkDir  func(root string, fn fs.WalkDirFunc) error
+	readFile func(path string) ([]byte, error)
+	joinPath func(elem ...string) string
+	relPath  func(root, p string) (string, error)
+}
 
 // WalkDir walks the file tree rooted at root, calling fn for each entry that
 // is not ignored by the matcher's rules. As it descends, .gitignore files
@@ -34,6 +50,30 @@ import (
 // during a walk is permitted but will NOT affect the in-progress walk
 // (the walker uses a snapshot taken at WalkDir entry).
 func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
+	return m.walkInternal(osBackend, root, fn)
+}
+
+// WalkDirFS is the fs.FS-backed counterpart to WalkDir. It walks the tree at
+// root inside fsys, applying the same nested .gitignore discovery and
+// .git/-pruning behavior. Paths supplied to fn use forward slashes (fs.WalkDir
+// convention), regardless of host OS.
+//
+// Use cases: in-memory tests via fstest.MapFS, embedded filesystems via
+// embed.FS, in-process indexers backed by a custom fs.FS, and WASM contexts
+// without OS path semantics.
+//
+// Like WalkDir, the receiver matcher is NOT mutated; discovered rules live
+// only for the duration of the call. The .gitignore lookup uses fs.ReadFile
+// — symlink handling is whatever fsys provides (most fs.FS implementations,
+// including fstest.MapFS and embed.FS, have no concept of symlinks).
+//
+// Thread-safe: see WalkDir's concurrency notes.
+func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error {
+	return m.walkInternal(fsBackend(fsys), root, fn)
+}
+
+// walkInternal is the shared engine behind WalkDir and WalkDirFS.
+func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) error {
 	// Snapshot rules and opts under the read lock so the walker is unaffected
 	// by concurrent AddPatterns calls on the receiver.
 	m.mu.RLock()
@@ -43,17 +83,16 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 	}
 	m.mu.RUnlock()
 
-	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	return b.walkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fn(path, d, err)
 		}
 
 		// Compute path relative to root using forward slashes for matching.
-		rel, relErr := filepath.Rel(root, path)
+		rel, relErr := b.relPath(root, path)
 		if relErr != nil {
 			return fn(path, d, relErr)
 		}
-		rel = filepath.ToSlash(rel)
 
 		if d.IsDir() {
 			// Always prune .git (regardless of matcher state) so walks of real
@@ -69,18 +108,21 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 			}
 
 			// Discover a .gitignore in this directory and load it into the
-			// per-walk child matcher. Errors reading the file are reported
-			// through fn so callers can decide whether to abort.
-			gitignorePath := filepath.Join(path, ".gitignore")
-			if info, statErr := os.Lstat(gitignorePath); statErr == nil && !info.IsDir() {
+			// per-walk child matcher. ReadFile returns a not-exist error for
+			// directories without a .gitignore — that's the common case and
+			// silently ignored. Other read errors flow through fn.
+			gitignorePath := b.joinPath(path, ".gitignore")
+			content, readErr := b.readFile(gitignorePath)
+			switch {
+			case readErr == nil:
 				basePath := rel
 				if basePath == "." {
 					basePath = ""
 				}
-				if loadErr := child.AddPatternsFromFile(basePath, gitignorePath); loadErr != nil {
-					if cbErr := fn(path, d, loadErr); cbErr != nil {
-						return cbErr
-					}
+				child.addPatternsFromSource(basePath, content, gitignorePath)
+			case !errors.Is(readErr, fs.ErrNotExist):
+				if cbErr := fn(path, d, fmt.Errorf("reading %s: %w", gitignorePath, readErr)); cbErr != nil {
+					return cbErr
 				}
 			}
 
@@ -93,6 +135,43 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 		}
 		return fn(path, d, nil)
 	})
+}
+
+// osBackend is the walkBackend backed by the OS filesystem.
+var osBackend = walkBackend{
+	walkDir:  filepath.WalkDir,
+	readFile: os.ReadFile,
+	joinPath: filepath.Join,
+	relPath: func(root, p string) (string, error) {
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return "", err
+		}
+		return filepath.ToSlash(rel), nil
+	},
+}
+
+// fsBackend builds a walkBackend over the given fs.FS. fs.WalkDir paths are
+// already forward-slash, so relPath is a simple prefix-strip.
+func fsBackend(fsys fs.FS) walkBackend {
+	return walkBackend{
+		walkDir:  func(root string, fn fs.WalkDirFunc) error { return fs.WalkDir(fsys, root, fn) },
+		readFile: func(p string) ([]byte, error) { return fs.ReadFile(fsys, p) },
+		joinPath: pathpkg.Join,
+		relPath: func(root, p string) (string, error) {
+			if p == root {
+				return ".", nil
+			}
+			if root == "" || root == "." {
+				return p, nil
+			}
+			prefix := root + "/"
+			if !strings.HasPrefix(p, prefix) {
+				return "", fmt.Errorf("walk path %q is not under root %q", p, root)
+			}
+			return p[len(prefix):], nil
+		},
+	}
 }
 
 // WalkRepo is a convenience that combines LoadRepo and WalkDir. It is

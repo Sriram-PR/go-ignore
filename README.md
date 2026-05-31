@@ -346,6 +346,28 @@ for path, err := range ignore.RepoFiles(".", ignore.MatcherOptions{}) {
 
 Same nested-discovery and pruning behavior as `WalkDir`. If you need directory entries too, use `WalkDir` directly.
 
+#### Walking an `fs.FS` (`WalkDirFS`)
+
+For in-memory tests, `embed.FS` content, or any custom `fs.FS` implementation, use `WalkDirFS`:
+
+```go
+fsys := fstest.MapFS{
+    ".gitignore":   {Data: []byte("*.log\n")},
+    "keep.txt":     {Data: []byte("x")},
+    "debug.log":    {Data: []byte("x")},
+    "sub/file.txt": {Data: []byte("x")},
+}
+m := ignore.New()
+m.AddPatterns("", []byte("*.log\n"))
+m.WalkDirFS(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+    if err != nil { return err }
+    fmt.Println(path) // forward-slash, fs.WalkDir convention
+    return nil
+})
+```
+
+Same matching, discovery, and pruning behavior as `WalkDir`; only the filesystem backend differs. Paths supplied to `fn` always use forward slashes (the `fs.WalkDir` convention), regardless of host OS.
+
 ### Streaming Patterns from an `io.Reader`
 
 #### Streaming Patterns from an `io.Reader`
@@ -470,6 +492,7 @@ func (m *Matcher) AddExcludePatterns(gitDir string) error
 func (m *Matcher) Match(path string, isDir bool) bool
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult
 func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error
+func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error
 func (m *Matcher) Files(root string) iter.Seq2[string, error]
 func (m *Matcher) Warnings() []ParseWarning
 func (m *Matcher) RuleCount() int

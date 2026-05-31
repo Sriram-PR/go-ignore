@@ -2,6 +2,7 @@ package ignore
 
 import (
 	"io/fs"
+	"iter"
 	"os"
 	"path/filepath"
 )
@@ -109,4 +110,80 @@ func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error {
 		return err
 	}
 	return m.WalkDir(root, fn)
+}
+
+// Files returns a range-over-func iterator that yields the OS-native path of
+// every non-ignored regular file under root, in the same lexical order
+// filepath.WalkDir uses. Directories are not yielded — use WalkDir if you
+// need to observe them.
+//
+// Errors encountered during traversal are yielded as ("", err); after a
+// non-nil error is yielded, iteration ends. Breaking out of the range loop
+// stops iteration cleanly via fs.SkipAll.
+//
+// Files inherits WalkDir's behavior: nested .gitignore files are discovered
+// as descent happens, ignored directories are pruned, .git/ is always pruned,
+// and the receiver matcher is NOT mutated.
+//
+// Usage:
+//
+//	for path, err := range m.Files(root) {
+//	    if err != nil { return err }
+//	    process(path)
+//	}
+//
+// Thread-safe: see WalkDir's concurrency notes.
+func (m *Matcher) Files(root string) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
+		err := m.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				if !yield("", walkErr) {
+					return fs.SkipAll
+				}
+				return nil
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if !yield(path, nil) {
+				return fs.SkipAll
+			}
+			return nil
+		})
+		// fs.SkipAll is swallowed by filepath.WalkDir (returns nil), so any
+		// non-nil err here is a real traversal failure the callback never
+		// surfaced. Yield it as a best-effort tail signal.
+		if err != nil {
+			yield("", err)
+		}
+	}
+}
+
+// RepoFiles is a convenience that combines LoadRepo and Files. It is
+// equivalent to:
+//
+//	m, err := ignore.LoadRepo(root, opts)
+//	if err != nil { /* yield ("", err) and stop */ }
+//	for path, walkErr := range m.Files(root) { yield(path, walkErr) }
+//
+// Use it for the standard one-line "iterate the non-ignored files in this
+// repo" pattern:
+//
+//	for path, err := range ignore.RepoFiles(".", ignore.MatcherOptions{}) {
+//	    if err != nil { return err }
+//	    process(path)
+//	}
+func RepoFiles(root string, opts MatcherOptions) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
+		m, err := LoadRepo(root, opts)
+		if err != nil {
+			yield("", err)
+			return
+		}
+		for path, walkErr := range m.Files(root) {
+			if !yield(path, walkErr) {
+				return
+			}
+		}
+	}
 }

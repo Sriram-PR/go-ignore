@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -307,6 +308,191 @@ func TestWalkDir_ConcurrentMatchOnReceiver(t *testing.T) {
 		_ = m.Match("b.txt", false)
 	}
 	wg.Wait()
+}
+
+func TestFiles_BasicAndFilesOnly(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		".gitignore":    "*.log\n",
+		"keep.txt":      "x",
+		"debug.log":     "x",
+		"sub/inner.txt": "x",
+	})
+
+	var got []string
+	for path, err := range RepoFiles(root, MatcherOptions{}) {
+		if err != nil {
+			t.Fatalf("RepoFiles: %v", err)
+		}
+		rel, _ := filepath.Rel(root, path)
+		got = append(got, filepath.ToSlash(rel))
+	}
+	sort.Strings(got)
+
+	// Iterator yields files only — no directory entries.
+	want := []string{
+		".gitignore",
+		"keep.txt",
+		"sub/inner.txt",
+	}
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+func TestFiles_BreakStopsCleanly(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"a.txt": "x",
+		"b.txt": "x",
+		"c.txt": "x",
+		"d.txt": "x",
+	})
+
+	seen := 0
+	for path, err := range New().Files(root) {
+		if err != nil {
+			t.Fatalf("Files: %v", err)
+		}
+		_ = path
+		seen++
+		if seen == 2 {
+			break
+		}
+	}
+	if seen != 2 {
+		t.Errorf("seen = %d after break, want 2", seen)
+	}
+}
+
+func TestFiles_BreakDoesNotLeakSkipAll(t *testing.T) {
+	// After a break, the iterator must complete cleanly — no "skip all" or
+	// other sentinel error should reach the caller via a final yield. We
+	// verify by counting yields and confirming the last one was an actual file
+	// path (not ("", err)).
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"a.txt": "x",
+		"b.txt": "x",
+		"c.txt": "x",
+	})
+
+	var last struct {
+		path string
+		err  error
+	}
+	yields := 0
+	for path, err := range New().Files(root) {
+		yields++
+		last.path = path
+		last.err = err
+		if yields == 1 {
+			break
+		}
+	}
+	if yields != 1 {
+		t.Fatalf("yields = %d, want 1", yields)
+	}
+	if last.err != nil {
+		t.Errorf("last yield carried err = %v, want nil — fs.SkipAll must not leak", last.err)
+	}
+	if last.path == "" {
+		t.Errorf("last yield path empty, want a real file path")
+	}
+}
+
+func TestFiles_TraversalError(t *testing.T) {
+	// On Unix, a directory with mode 0o000 cannot be read; filepath.WalkDir
+	// surfaces the error to the callback. The iterator must yield it.
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 0o000 unreliable on Windows")
+	}
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"ok.txt": "x",
+	})
+	denied := filepath.Join(root, "denied")
+	if err := os.Mkdir(denied, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.Chmod(denied, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() {
+		// Restore so the temp-dir cleanup can remove it.
+		_ = os.Chmod(denied, 0o755)
+	})
+
+	sawErr := false
+	for _, err := range New().Files(root) {
+		if err != nil {
+			sawErr = true
+		}
+	}
+	if !sawErr {
+		t.Error("expected iterator to yield a traversal error for unreadable directory")
+	}
+}
+
+func TestFiles_NestedDiscoveryStillApplies(t *testing.T) {
+	// Files() uses WalkDir internally, so nested .gitignore discovery must
+	// still apply to its output.
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"sub/.gitignore":  "*.tmp\n",
+		"sub/keep.txt":    "x",
+		"sub/scratch.tmp": "x",
+		"other.tmp":       "x", // not ignored (sub/.gitignore scoped to sub/)
+	})
+
+	var got []string
+	for path, err := range RepoFiles(root, MatcherOptions{}) {
+		if err != nil {
+			t.Fatalf("RepoFiles: %v", err)
+		}
+		rel, _ := filepath.Rel(root, path)
+		got = append(got, filepath.ToSlash(rel))
+	}
+	sort.Strings(got)
+
+	want := []string{
+		"other.tmp",
+		"sub/.gitignore",
+		"sub/keep.txt",
+	}
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+func TestRepoFiles_LoadRepoErrorYielded(t *testing.T) {
+	// If LoadRepo cannot read a corrupt source, RepoFiles must yield that
+	// error once and stop. We force an error by making .gitignore unreadable.
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 0o000 unreliable on Windows")
+	}
+	root := t.TempDir()
+	gitignore := filepath.Join(root, ".gitignore")
+	if err := os.WriteFile(gitignore, []byte("*.log\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := os.Chmod(gitignore, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(gitignore, 0o644) })
+
+	yields := 0
+	var firstErr error
+	for path, err := range RepoFiles(root, MatcherOptions{}) {
+		yields++
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
+		_ = path
+	}
+	if yields != 1 || firstErr == nil {
+		t.Errorf("yields=%d firstErr=%v; want exactly one yield carrying a LoadRepo error", yields, firstErr)
+	}
 }
 
 func equalStrings(a, b []string) bool {

@@ -333,6 +333,19 @@ m.WalkDir(".", walkFn)
 
 `WalkDir` does **not** mutate the receiver: discovered nested rules are scoped to the call. The receiver can be safely reused for subsequent walks or `Match` queries.
 
+#### Iterator form (`Files` / `RepoFiles`)
+
+For the common "iterate non-ignored files" case, `Files` (method) and `RepoFiles` (standalone) return Go 1.23+ range-over-func iterators that yield only files — directories are not surfaced. Breaking out of the loop stops traversal cleanly.
+
+```go
+for path, err := range ignore.RepoFiles(".", ignore.MatcherOptions{}) {
+    if err != nil { return err }
+    process(path)
+}
+```
+
+Same nested-discovery and pruning behavior as `WalkDir`. If you need directory entries too, use `WalkDir` directly.
+
 ### Streaming Patterns from an `io.Reader`
 
 #### Streaming Patterns from an `io.Reader`
@@ -445,8 +458,10 @@ func New() *Matcher
 func NewWithOptions(opts MatcherOptions) *Matcher
 func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error)
 func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error
+func RepoFiles(root string, opts MatcherOptions) iter.Seq2[string, error]
 
 func (m *Matcher) AddPatterns(basePath string, content []byte)
+func (m *Matcher) AddPatternsWithSource(basePath, source string, content []byte)
 func (m *Matcher) AddPatternsReader(basePath string, r io.Reader) error
 func (m *Matcher) AddPatternsFromFile(basePath, path string) error
 func (m *Matcher) AddSystemPatterns() error
@@ -455,6 +470,7 @@ func (m *Matcher) AddExcludePatterns(gitDir string) error
 func (m *Matcher) Match(path string, isDir bool) bool
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult
 func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error
+func (m *Matcher) Files(root string) iter.Seq2[string, error]
 func (m *Matcher) Warnings() []ParseWarning
 func (m *Matcher) RuleCount() int
 ```

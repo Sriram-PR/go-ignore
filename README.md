@@ -368,6 +368,15 @@ m.WalkDirFS(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 
 Same matching, discovery, and pruning behavior as `WalkDir`; only the filesystem backend differs. Paths supplied to `fn` always use forward slashes (the `fs.WalkDir` convention), regardless of host OS.
 
+`FilesFS` is the iterator form of `WalkDirFS`:
+
+```go
+for path, err := range m.FilesFS(fsys, ".") {
+    if err != nil { return err }
+    process(path)
+}
+```
+
 ### Streaming Patterns from an `io.Reader`
 
 #### Streaming Patterns from an `io.Reader`
@@ -494,6 +503,7 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult
 func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error
 func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error
 func (m *Matcher) Files(root string) iter.Seq2[string, error]
+func (m *Matcher) FilesFS(fsys fs.FS, root string) iter.Seq2[string, error]
 func (m *Matcher) Warnings() []ParseWarning
 func (m *Matcher) RuleCount() int
 ```

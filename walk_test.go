@@ -674,6 +674,108 @@ func TestWalkDirFS_SubrootWalk(t *testing.T) {
 	}
 }
 
+func TestFilesFS_BasicWithMapFS(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore":   {Data: []byte("*.log\n")},
+		"keep.txt":     {Data: []byte("x")},
+		"debug.log":    {Data: []byte("x")}, // ignored
+		"sub/file.txt": {Data: []byte("x")},
+	}
+
+	m := New()
+	m.AddPatterns("", []byte("*.log\n"))
+
+	var got []string
+	for path, err := range m.FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("FilesFS: %v", err)
+		}
+		got = append(got, path)
+	}
+	sort.Strings(got)
+
+	want := []string{
+		".gitignore",
+		"keep.txt",
+		"sub/file.txt",
+	}
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+func TestFilesFS_NestedDiscoveryInMapFS(t *testing.T) {
+	// FilesFS is built on WalkDirFS — nested .gitignore discovery still applies.
+	fsys := fstest.MapFS{
+		"sub/.gitignore":  {Data: []byte("*.tmp\n")},
+		"sub/keep.txt":    {Data: []byte("x")},
+		"sub/scratch.tmp": {Data: []byte("x")}, // ignored by sub/.gitignore
+		"top.tmp":         {Data: []byte("x")}, // NOT ignored (scope is sub/)
+	}
+
+	var got []string
+	for path, err := range New().FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("FilesFS: %v", err)
+		}
+		got = append(got, path)
+	}
+	sort.Strings(got)
+
+	want := []string{
+		"sub/.gitignore",
+		"sub/keep.txt",
+		"top.tmp",
+	}
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+func TestFilesFS_BreakStopsCleanly(t *testing.T) {
+	fsys := fstest.MapFS{
+		"a.txt": {Data: []byte("x")},
+		"b.txt": {Data: []byte("x")},
+		"c.txt": {Data: []byte("x")},
+		"d.txt": {Data: []byte("x")},
+	}
+
+	seen := 0
+	for _, err := range New().FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("FilesFS: %v", err)
+		}
+		seen++
+		if seen == 2 {
+			break
+		}
+	}
+	if seen != 2 {
+		t.Errorf("seen = %d after break, want 2", seen)
+	}
+}
+
+func TestFilesFS_FilesOnly(t *testing.T) {
+	// FilesFS must not yield directory entries.
+	fsys := fstest.MapFS{
+		"a/b/c.txt": {Data: []byte("x")},
+	}
+
+	for path, err := range New().FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("FilesFS: %v", err)
+		}
+		// Every yielded path must be a file, never a directory.
+		info, statErr := fs.Stat(fsys, path)
+		if statErr != nil {
+			t.Fatalf("stat %q: %v", path, statErr)
+		}
+		if info.IsDir() {
+			t.Errorf("FilesFS yielded directory %q", path)
+		}
+	}
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

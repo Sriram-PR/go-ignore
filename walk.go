@@ -213,8 +213,36 @@ func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error {
 //
 // Thread-safe: see WalkDir's concurrency notes.
 func (m *Matcher) Files(root string) iter.Seq2[string, error] {
+	return filesFromWalker(func(fn fs.WalkDirFunc) error {
+		return m.WalkDir(root, fn)
+	})
+}
+
+// FilesFS is the fs.FS-backed counterpart to Files. It walks fsys rooted at
+// root and yields the forward-slash path of every non-ignored file (no
+// directories), suitable for in-memory tests with fstest.MapFS, embed.FS
+// content, or any custom fs.FS.
+//
+// Same nested-discovery, pruning, error-yielding, and break-via-fs.SkipAll
+// semantics as Files; only the filesystem backend differs.
+//
+// Usage:
+//
+//	for path, err := range m.FilesFS(fsys, ".") {
+//	    if err != nil { return err }
+//	    process(path)
+//	}
+func (m *Matcher) FilesFS(fsys fs.FS, root string) iter.Seq2[string, error] {
+	return filesFromWalker(func(fn fs.WalkDirFunc) error {
+		return m.WalkDirFS(fsys, root, fn)
+	})
+}
+
+// filesFromWalker is the shared body of Files and FilesFS: it adapts an
+// arbitrary fs.WalkDirFunc-driven walker into a files-only iter.Seq2.
+func filesFromWalker(walker func(fs.WalkDirFunc) error) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
-		err := m.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		err := walker(func(path string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				if !yield("", walkErr) {
 					return fs.SkipAll
@@ -229,9 +257,9 @@ func (m *Matcher) Files(root string) iter.Seq2[string, error] {
 			}
 			return nil
 		})
-		// fs.SkipAll is swallowed by filepath.WalkDir (returns nil), so any
-		// non-nil err here is a real traversal failure the callback never
-		// surfaced. Yield it as a best-effort tail signal.
+		// fs.SkipAll is swallowed by the walker (returns nil), so any non-nil
+		// err here is a real traversal failure the callback never surfaced.
+		// Yield it as a best-effort tail signal.
 		if err != nil {
 			yield("", err)
 		}

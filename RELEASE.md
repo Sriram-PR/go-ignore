@@ -77,9 +77,27 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.9.1
+
+Single bug fix for an adversarial deep-path matching scenario discovered by CI's `FuzzMatch` post-v0.9.0. Users on v0.9.0 should upgrade; the issue is a denial-of-service vector reachable from any caller that runs `Match` / `MatchWithReason` on attacker-controlled paths.
+
+**Bug fixes**
+
+- **Deep-path matching no longer pathological** — `FuzzMatch` triggered "context deadline exceeded" on inputs with many thousands of segments whose leaf matched a negation rule. Root cause: two compounding quadratic terms in `MatchWithReason`. The parent-excluded ancestor walk did `strings.Join` over growing segment prefixes (O(N²) allocations), and for every ancestor it re-evaluated every unanchored rule across all the ancestor's segments (O(M·N²) matching). Fixed in two parts:
+  1. The ancestor walk now slices the original `path` string at slash positions instead of joining segments — eliminates the allocation term.
+  2. New exported constant `MaxPathDepth` (4096, non-configurable) caps the segment count of paths supplied to `Match` / `MatchWithReason`. Paths exceeding this depth short-circuit to no-match without evaluating any rules. Realistic filesystem paths are nowhere near this limit (Linux `PATH_MAX` is 4096 *bytes*); the cap exists purely to bound DoS-style inputs.
+
+   A 100k-segment path that previously took ~40s now returns immediately. The CI fuzz repro (4 workers × 60s) now executes ~7.8M iterations with no failures.
+
+**Test coverage**
+
+- **`TestEdgeCases_DeepPath_BoundedByDepthCap`** added — asserts both that paths above the cap short-circuit and that under-cap deep paths complete in well under a second.
+
 ### v0.9.0
 
 Final polish release before the v1.0 API freeze. All additions are non-breaking; no behavior change for existing code. Focus is closing the API symmetry gap left by v0.8.0 (iterators + fs.FS) and removing the one misleading bit in the MatcherOptions surface.
+
+**Note:** v0.9.0 ships with a known performance issue on adversarial deep-path inputs (DoS-style); upgrade to v0.9.1 if `Match` is invoked on untrusted path input.
 
 **Non-breaking additions**
 
@@ -93,14 +111,6 @@ Final polish release before the v1.0 API freeze. All additions are non-breaking;
 - **`(*Matcher).WalkDirFS(fsys fs.FS, root, fn)` and `(*Matcher).FilesFS(fsys fs.FS, root)`** — `fs.FS`-backed counterparts to `WalkDir`/`Files`. Lets the library work with `fstest.MapFS` for tests, `embed.FS` for compiled-in content, and any custom `fs.FS` implementation (WASM, in-memory indexers, etc.). Paths are forward-slash (`fs.WalkDir` convention) regardless of host OS. Implementation shares a single walk engine with `WalkDir` via a small private `walkBackend` indirection — no behavior divergence between the OS and `fs.FS` paths.
 - **`(*Matcher).AddPatternsWithSource(basePath, source, content)`** — public form of the internal source-labelled adder. For callers whose patterns originate from a non-file source with a meaningful logical name (embedded config, database row, network response): the supplied label flows through to `MatchResult.Source` for every rule it produces. `AddPatternsFromFile` continues to be the right call for on-disk files.
 - **`HardMaxBacktrackIterations` exported constant (10,000,000)** — the absolute ceiling the library enforces on backtracking iterations per `Match` call. Previously an internal `hardMaxBacktrackIterations`; now exported so callers can reason about worst-case CPU and reference it in their own configuration. The `MaxBacktrackIterations` field doc was rewritten to use the constant explicitly: setting it to `-1` raises the soft limit to this ceiling (truly unlimited backtracking is intentionally not offered — pathological glob patterns can blow up exponentially).
-
-**Bug fixes**
-
-- **Deep-path matching no longer pathological** — CI's `FuzzMatch` discovered a "context deadline exceeded" failure on adversarial inputs (a path with many thousands of segments whose leaf matched a negation rule). Root cause was two compounding quadratic terms in `MatchWithReason`: the parent-excluded ancestor walk did `strings.Join` over growing segment prefixes (O(N²) allocations), and for every ancestor it re-evaluated every unanchored rule across all the ancestor's segments (O(M·N²) matching). Fixed via two changes:
-  1. The ancestor walk now slices the original `path` string at slash positions instead of joining segments — eliminates the allocation term.
-  2. New exported constant `MaxPathDepth` (4096, non-configurable) caps the segment count of paths supplied to `Match` / `MatchWithReason`. Paths exceeding this depth short-circuit to no-match without evaluating any rules. Realistic filesystem paths are nowhere near this limit (Linux `PATH_MAX` is 4096 *bytes*); the cap exists purely to bound DoS-style inputs.
-
-   A 100k-segment path that previously took ~40s now returns immediately. The fuzz repro that hit the CI timeout (4 workers × 60s) now executes ~7.8M iterations with no failures.
 
 **Internal**
 

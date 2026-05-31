@@ -10,14 +10,60 @@ A minimal, zero-dependency Go library for matching file paths against `.gitignor
 ## Features
 
 - **Zero dependencies** — stdlib only
-- **Common gitignore syntax** — `*`, `?`, `**`, `!`, `/`, trailing `/`, `\` escapes, `[abc]`, `[a-z]`
-- **Nested .gitignore support** — scoped base paths
-- **Cross-platform** — Windows backslash normalization, Unix-correct literal backslash
-- **Automatic encoding handling** — UTF-8 BOM, CRLF/CR/LF line endings
-- **Thread-safe** — concurrent access supported
-- **Parse warnings** — malformed pattern diagnostics
-- **Match debugging** — `MatchWithReason` for troubleshooting
-- **Configurable** — case sensitivity, backtrack limits
+- **Full gitignore syntax** — `*`, `?`, `**`, `!`, `/`, trailing `/`, `\` escapes, `[abc]`, `[a-z]`, negated classes, and all 12 POSIX classes (`[[:alpha:]]` etc.)
+- **Filesystem walker** — `WalkDir` / `WalkRepo` traverse a tree, auto-discover nested `.gitignore` files, and prune ignored directories
+- **All four gitignore sources** — system, global, `.git/info/exclude`, root `.gitignore` loaded by `LoadRepo`
+- **Match provenance** — `MatchResult` reports which file and line produced the matching rule
+- **Cross-platform** — Windows backslash normalization, Unix-correct literal backslash, BOM and CRLF/CR/LF auto-handled
+- **Thread-safe** — concurrent `Match` and `AddPatterns` supported, including during `WalkDir`
+- **Zero-allocation match path** — typical `Match` calls allocate zero heap memory
+- **Verified correctness** — git-parity tests against `git check-ignore`, fuzz tests, race-tested
+- **Configurable** — case sensitivity, backtrack limits, max-pattern guards for untrusted input
+
+## Why this library?
+
+The Go ecosystem has several `.gitignore` libraries. Here's the case for picking this one — written in 2026 with awareness of the alternatives.
+
+### Correctness, not "mostly works"
+
+Every matcher passes an automated parity test against the system `git check-ignore`. Specifically:
+
+- **`*` does not cross `/` boundaries**, **`**` matches zero-or-more directories**. Several popular libraries get one or both wrong ([sabhiram #21](https://github.com/sabhiram/go-gitignore/issues/21), [monochromegane #12/#13](https://github.com/monochromegane/go-gitignore/issues/12)).
+- **`?` and character-class semantics** match git byte-for-byte, including `[!abc]`, `[^abc]`, ranges, and all 12 POSIX classes ([sabhiram #20](https://github.com/sabhiram/go-gitignore/issues/20) is still open here).
+- **Parent-excluded negation** — a file cannot be re-included by `!` if a parent directory is already ignored. This subtle spec corner has [an open issue in go-git](https://github.com/go-git/go-git/issues/2112).
+- **Trailing-whitespace and escape rules** — `foo\ ` preserves a trailing space; `\!foo` is a literal `!foo`; trailing backslashes are reported as warnings rather than silently matching nothing.
+- **Windows-authored content** — UTF-8 BOM and CRLF/CR line endings auto-normalized.
+
+### Operational quality for high-throughput tools
+
+- **Zero allocations on the match path** for paths up to 32 segments (typical). Verified by benchmarks in `benchmark_test.go`; preserved through the v0.x line.
+- **Zero dependencies** — drop it into any project without weighing the import graph.
+- **Walker that doesn't mutate its receiver** — `WalkDir` can be called repeatedly without rule accumulation; safe for long-lived matchers in services.
+- **Cross-platform CI** — Windows, macOS, Linux, on Go 1.25 and 1.26.
+- **Resource limits** — `MaxPatterns`, `MaxPatternLength`, `MaxBacktrackIterations` for safe handling of untrusted input.
+
+### How it compares
+
+| | go-ignore | [sabhiram](https://github.com/sabhiram/go-gitignore) | [git-pkgs](https://pkg.go.dev/github.com/git-pkgs/gitignore) | [go-git](https://pkg.go.dev/github.com/go-git/go-git/v5/plumbing/format/gitignore) |
+|---|:---:|:---:|:---:|:---:|
+| Zero dependencies | ✓ | ✓ | ✓ | ✗ (billy.Filesystem) |
+| `**` semantics correct | ✓ | [#21](https://github.com/sabhiram/go-gitignore/issues/21) | ✓ | ✓ |
+| `?` and character classes | ✓ (all 12 POSIX) | [#20](https://github.com/sabhiram/go-gitignore/issues/20) | ✓ | ✓ |
+| Parent-excluded negation | ✓ | — | ✓ | [#2112](https://github.com/go-git/go-git/issues/2112) |
+| Filesystem walker | ✓ | ✗ | ✓ | partial |
+| Nested `.gitignore` auto-discovery | ✓ | ✗ (callers hand-roll) | ✓ | ✓ |
+| Match provenance (Source + Line) | ✓ | ✗ (bool only) | ✓ | ✗ |
+| Zero-alloc match path | ✓ | — | — | — |
+| Git-parity test suite | ✓ | — | — | — |
+| Cross-platform CI (Win/Mac/Linux) | ✓ | — | — | ✓ |
+
+`✓` = supported, `✗` = unsupported, `—` = not advertised / not verified, issue number = known open bug.
+
+### When *not* to use this library
+
+- You need `.dockerignore`, `.npmignore`, or another similar-but-different file format. This library implements git's spec; the other formats overlap heavily but diverge on edge cases.
+- You need full git repository access (reading the index, writing packfiles, etc.). Use [`go-git`](https://github.com/go-git/go-git) — `go-ignore` is path-matching only.
+- You want a one-line regex-equivalent. Just use `path/filepath.Match` from the stdlib if your needs are simple.
 
 ## Installation
 

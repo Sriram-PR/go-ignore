@@ -100,6 +100,7 @@ Final polish release before the v1.0 API freeze. All additions are non-breaking;
 
 **Documentation**
 
+- **README "Why this library?" positioning section** added — concrete correctness, operational-quality, and feature-completeness bullets, plus a comparison table against `sabhiram/go-gitignore`, `git-pkgs/gitignore`, and `go-git`'s gitignore package (with linked open issues in their trackers rather than vague claims). Closes the "yet another gitignore lib" framing for evaluators landing on the repo.
 - **README "Walking a Working Tree" section** picks up subsections for the iterator form (`Files` / `RepoFiles`) and the `fs.FS` variant (`WalkDirFS` / `FilesFS`).
 - **README "Resource Limits" paragraph** rewritten to call out the `HardMaxBacktrackIterations` ceiling explicitly rather than describing it as an "internal safety cap".
 - **API Reference table** updated with all six v0.9 additions.

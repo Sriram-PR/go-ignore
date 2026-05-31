@@ -446,6 +446,8 @@ Default limits prevent resource exhaustion from untrusted input:
 
 `MaxPatterns` and `MaxPatternLength` accept `-1` to disable the limit entirely (not recommended for untrusted input). `MaxBacktrackIterations` accepts `-1` as well, but it does **not** disable the cap — it raises the soft limit to the exported constant `HardMaxBacktrackIterations` (10,000,000). Truly unlimited backtracking is intentionally not offered: pathological glob patterns can blow up exponentially and hang a process, so the library always enforces a ceiling.
 
+There is also a non-configurable, exported constant `MaxPathDepth` (4096) that caps the segment count of paths passed to `Match` / `MatchWithReason`. Paths exceeding this depth short-circuit to "no match" without evaluating any rules. The cap exists because the spec-required parent-excluded negation walk is inherently O(M·N²) in path depth — without it, pathological inputs (constructible by fuzzers or malicious callers) could peg CPU for minutes. Realistic filesystem paths are nowhere near 4096 segments.
+
 ## API Reference
 
 ### Types

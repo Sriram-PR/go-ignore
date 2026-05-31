@@ -332,6 +332,14 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	var segBuf [32]string
 	pathSegments := splitPathBuf(path, segBuf[:0])
 
+	// Defensive: paths past MaxPathDepth short-circuit. The parent-excluded
+	// negation walk is inherently O(M·N²), so without this cap a fuzzer or
+	// malicious caller can construct a path that pegs CPU for minutes.
+	// Realistic paths are nowhere near this limit; see MaxPathDepth's docs.
+	if len(pathSegments) > MaxPathDepth {
+		return MatchResult{Ignored: false, Matched: false}
+	}
+
 	// Pre-lowercase path and segments once for case-insensitive matching,
 	// instead of lowering per-segment per-rule in matchSingleSegment.
 	// Re-split after lowering so segments point into the lowered string (1 alloc vs N+1).
@@ -355,13 +363,34 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	// Spec: a file cannot be re-included if a parent directory is excluded.
 	// Only walk ancestors when negation tried to re-include the path —
 	// otherwise the result is already correct and we'd waste budget.
+	//
+	// We slice the original `path` at internal slash positions rather than
+	// strings.Join'ing slices of pathSegments. Joining was O(i) per ancestor
+	// and O(N²) overall; a 100k-segment path with a matching negation took
+	// tens of seconds before this fix (observed via FuzzMatch timeout in CI).
+	// Slicing is O(N) total and zero-alloc on the hot path.
 	if result.Matched && !result.Ignored && len(pathSegments) > 1 {
-		for i := 1; i < len(pathSegments); i++ {
-			ancestor := strings.Join(pathSegments[:i], "/")
-			ancRes := evaluateRules(m.rules, ancestor, pathSegments[:i], true, &ctx)
+		// Skip any leading slash so ancestor[:j] is a name, not "/" prefix.
+		start := 0
+		if len(path) > 0 && path[0] == '/' {
+			start = 1
+		}
+		segCount := 0
+		for j := start; j < len(path); j++ {
+			if path[j] != '/' {
+				continue
+			}
+			segCount++
+			ancestor := path[start:j]
+			ancRes := evaluateRules(m.rules, ancestor, pathSegments[:segCount], true, &ctx)
 			if ancRes.Matched && ancRes.Ignored {
 				m.mu.RUnlock()
 				return ancRes
+			}
+			// Budget exhaustion can happen mid-walk on deep paths; bail
+			// rather than spin doing no-op matchRule calls for the rest.
+			if ctx.exhausted() {
+				break
 			}
 		}
 	}

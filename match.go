@@ -27,6 +27,21 @@ const HardMaxBacktrackIterations = 10_000_000
 // as non-matching once the limit is reached.
 const maxRecursionDepth = 200
 
+// MaxPathDepth is the hard upper bound on the segment count of a path
+// supplied to Match / MatchWithReason. Paths exceeding this depth short-
+// circuit to "no match" without evaluating any rules. The cap exists because
+// the parent-excluded negation walk required by the gitignore spec is
+// inherently O(M·N²) where N is the depth and M is the number of unanchored
+// rules — exponentially deep inputs (constructible by fuzzers or malicious
+// callers) would otherwise be a denial-of-service vector.
+//
+// 4096 was chosen as ~the byte limit of PATH_MAX on Linux, vastly more than
+// any realistic filesystem depth (typical: <30, deeply nested: <100). If
+// you have a legitimate use case for matching beyond this depth, please
+// open an issue describing it so we can consider exposing the cap as a
+// MatcherOptions field.
+const MaxPathDepth = 4096
+
 // matchContext tracks state during matching to prevent runaway backtracking.
 type matchContext struct {
 	iterations int

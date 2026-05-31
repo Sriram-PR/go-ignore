@@ -2,7 +2,9 @@ package ignore
 
 import (
 	"runtime"
+	"strings"
 	"testing"
+	"time"
 )
 
 // TestEdgeCases_LineEndings tests various line ending formats
@@ -504,6 +506,76 @@ func TestEdgeCases_VeryLongPaths(t *testing.T) {
 	if !m.Match(longName, false) {
 		t.Error("should match very long filename")
 	}
+}
+
+// TestEdgeCases_DeepPath_BoundedByDepthCap guards against quadratic blowup on
+// extremely deep paths. Two issues compounded in CI's FuzzMatch:
+//
+//   - the parent-excluded ancestor walk did strings.Join on growing prefix
+//     slices, giving O(N²) string allocations;
+//   - for every ancestor, evaluateRules re-ran every unanchored rule across
+//     all ancestor segments, giving O(M·N²) matching work.
+//
+// The fix combines two changes: the ancestor walk now slices `path` at slash
+// positions instead of joining segments, and a defensive depth cap
+// (MaxPathDepth, default 4096) makes pathological inputs short-circuit
+// rather than exhibit quadratic behavior. This test asserts the cap fires
+// on a deep path and that legitimately-deep paths under the cap still
+// complete in well under a second.
+func TestEdgeCases_DeepPath_BoundedByDepthCap(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping deep-path perf guard in -short mode")
+	}
+	m := New()
+	m.AddPatterns("", []byte(`
+*.log
+build/
+!important.log
+node_modules/
+`))
+
+	// Above the cap: must short-circuit (Match returns false, no walk).
+	tooDeep := buildDeepPath(50_000, "important.log")
+	deadline := time.NewTimer(500 * time.Millisecond)
+	defer deadline.Stop()
+	done := make(chan bool)
+	go func() {
+		done <- m.Match(tooDeep, false)
+	}()
+	select {
+	case got := <-done:
+		if got {
+			t.Errorf("path past depth cap should return Match=false (short-circuit), got true")
+		}
+	case <-deadline.C:
+		t.Fatalf("Match on path past depth cap did not return within 500ms")
+	}
+
+	// Just under the cap: must complete in a reasonable time even when
+	// the ancestor walk runs in full.
+	underCap := buildDeepPath(1000, "important.log")
+	deadline2 := time.NewTimer(1 * time.Second)
+	defer deadline2.Stop()
+	done2 := make(chan struct{})
+	go func() {
+		_ = m.Match(underCap, false)
+		close(done2)
+	}()
+	select {
+	case <-done2:
+	case <-deadline2.C:
+		t.Fatalf("Match on 1000-segment path did not return within 1s — ancestor walk regression")
+	}
+}
+
+func buildDeepPath(n int, leaf string) string {
+	var b strings.Builder
+	b.Grow(n*2 + len(leaf))
+	for i := 0; i < n; i++ {
+		b.WriteString("a/")
+	}
+	b.WriteString(leaf)
+	return b.String()
 }
 
 // TestEdgeCases_ManyPatterns tests handling of many patterns

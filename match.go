@@ -11,10 +11,14 @@ import (
 // Can be overridden via MatcherOptions.
 const DefaultMaxBacktrackIterations = 10000
 
-// hardMaxBacktrackIterations is an absolute safety cap applied even when
-// MaxBacktrackIterations is set to -1 ("unlimited"). This prevents exponential
-// backtracking in pathological glob patterns (e.g., *a*a*a*...*b) from hanging.
-const hardMaxBacktrackIterations = 10_000_000
+// HardMaxBacktrackIterations is the absolute upper bound the library enforces
+// on backtracking iterations per Match call. It is applied even when the
+// caller sets MaxBacktrackIterations to -1; "truly unlimited" backtracking is
+// intentionally not offered because exponential blow-up in pathological glob
+// patterns (e.g., *a*a*a*...*b) can hang a process indefinitely. Callers who
+// need to reason about worst-case CPU per Match can use this constant as the
+// upper bound.
+const HardMaxBacktrackIterations = 10_000_000
 
 // maxRecursionDepth bounds recursion in segment-matching functions to prevent
 // stack overflow. It applies to every recursive call in matchSegmentsExact and
@@ -32,12 +36,12 @@ type matchContext struct {
 
 // newMatchContext creates a new match context with the specified limit.
 // If maxIter is 0, uses DefaultMaxBacktrackIterations.
-// Any negative value is capped at hardMaxBacktrackIterations.
+// Any negative value is raised to HardMaxBacktrackIterations.
 func newMatchContext(maxIter int) matchContext {
 	if maxIter == 0 {
 		maxIter = DefaultMaxBacktrackIterations
 	} else if maxIter < 0 {
-		maxIter = hardMaxBacktrackIterations
+		maxIter = HardMaxBacktrackIterations
 	}
 	return matchContext{
 		maxIter: maxIter,

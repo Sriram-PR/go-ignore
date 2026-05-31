@@ -80,11 +80,20 @@ type MatcherOptions struct {
 	// (including AddPatterns) — no library-side mutex is held during dispatch.
 	WarningHandler WarningHandler
 
-	// MaxBacktrackIterations limits ** pattern matching iterations.
-	// Default: DefaultMaxBacktrackIterations (10000).
-	// Set to 0 to use the default. Any negative value raises the limit to the
-	// internal safety cap (10,000,000 iterations) — true unlimited is not
-	// supported and the cap still applies even with -1.
+	// MaxBacktrackIterations limits ** pattern matching iterations per Match
+	// call. The budget is shared across all rules and covers both segment-level
+	// ** matching and character-level glob matching (*, ?).
+	//
+	//   - Default (0):   DefaultMaxBacktrackIterations (10,000). Safe for
+	//                    untrusted input; raise it if your rules legitimately
+	//                    need more backtracking and exhaust the budget.
+	//   - Negative (-1): the soft limit is raised to HardMaxBacktrackIterations
+	//                    (10,000,000). Truly unlimited backtracking is NOT
+	//                    offered because pathological patterns can otherwise
+	//                    hang the process. Use this only when you trust the
+	//                    pattern source.
+	//   - Positive:      exact soft limit. Match returns no-match for any rule
+	//                    whose evaluation would exceed it.
 	MaxBacktrackIterations int
 
 	// CaseInsensitive enables case-insensitive matching.

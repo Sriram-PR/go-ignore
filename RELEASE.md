@@ -77,6 +77,33 @@ Use this checklist before tagging a new release.
 
 ## Version History
 
+### v0.9.0
+
+Final polish release before the v1.0 API freeze. All additions are non-breaking; no behavior change for existing code. Focus is closing the API symmetry gap left by v0.8.0 (iterators + fs.FS) and removing the one misleading bit in the MatcherOptions surface.
+
+**Non-breaking additions**
+
+- **`(*Matcher).Files(root) iter.Seq2[string, error]` and `RepoFiles(root, opts) iter.Seq2[string, error]`** — Go 1.23+ range-over-func iterators that yield non-ignored files (no directories). Built on `WalkDir`/`LoadRepo`, with the same nested `.gitignore` discovery and `.git/` pruning. Breaking out of the loop stops traversal cleanly via `fs.SkipAll`; errors are yielded as `("", err)`. The standard one-liner becomes:
+  ```go
+  for path, err := range ignore.RepoFiles(".", ignore.MatcherOptions{}) {
+      if err != nil { return err }
+      process(path)
+  }
+  ```
+- **`(*Matcher).WalkDirFS(fsys fs.FS, root, fn)` and `(*Matcher).FilesFS(fsys fs.FS, root)`** — `fs.FS`-backed counterparts to `WalkDir`/`Files`. Lets the library work with `fstest.MapFS` for tests, `embed.FS` for compiled-in content, and any custom `fs.FS` implementation (WASM, in-memory indexers, etc.). Paths are forward-slash (`fs.WalkDir` convention) regardless of host OS. Implementation shares a single walk engine with `WalkDir` via a small private `walkBackend` indirection — no behavior divergence between the OS and `fs.FS` paths.
+- **`(*Matcher).AddPatternsWithSource(basePath, source, content)`** — public form of the internal source-labelled adder. For callers whose patterns originate from a non-file source with a meaningful logical name (embedded config, database row, network response): the supplied label flows through to `MatchResult.Source` for every rule it produces. `AddPatternsFromFile` continues to be the right call for on-disk files.
+- **`HardMaxBacktrackIterations` exported constant (10,000,000)** — the absolute ceiling the library enforces on backtracking iterations per `Match` call. Previously an internal `hardMaxBacktrackIterations`; now exported so callers can reason about worst-case CPU and reference it in their own configuration. The `MaxBacktrackIterations` field doc was rewritten to use the constant explicitly: setting it to `-1` raises the soft limit to this ceiling (truly unlimited backtracking is intentionally not offered — pathological glob patterns can blow up exponentially).
+
+**Internal**
+
+- **`walk.go` refactored to a private `walkBackend`** carrying the four filesystem operations that differ between OS and `fs.FS` paths (`walkDir`, `readFile`, `joinPath`, `relPath`). Both `WalkDir` and `WalkDirFS` route through a shared `walkInternal` engine; no public behavior change.
+
+**Documentation**
+
+- **README "Walking a Working Tree" section** picks up subsections for the iterator form (`Files` / `RepoFiles`) and the `fs.FS` variant (`WalkDirFS` / `FilesFS`).
+- **README "Resource Limits" paragraph** rewritten to call out the `HardMaxBacktrackIterations` ceiling explicitly rather than describing it as an "internal safety cap".
+- **API Reference table** updated with all six v0.9 additions.
+
 ### v0.8.0
 
 API-surface additions for the v1.0 push, plus one breaking simplification of `MatchResult`. The additions are the result of a research pass over real downstream consumers (Databricks CLI, gocodewalker, go-git, nektos/act, Pulumi) and recurring asks across the Go gitignore library ecosystem — the headline gap was the absence of a filesystem walker, which every consumer was reimplementing.

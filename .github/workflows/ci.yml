@@ -17,6 +17,7 @@ on:
           - test
           - lint
           - fuzz
+          - fuzz-long
           - benchmark
 
 permissions:
@@ -109,6 +110,41 @@ jobs:
           go test -fuzz=FuzzNormalizeContent -fuzztime=30s
           go test -fuzz=FuzzSegmentMatching -fuzztime=30s
           go test -fuzz=FuzzConcurrentAccess -fuzztime=30s
+
+  # Long-form fuzz: 30 minutes per fuzzer, ~4 hours total. Runs only when
+  # explicitly dispatched (never on push/PR) — burns hours of CI compute and
+  # is intended for pre-release verification of stable tags.
+  fuzz-long:
+    name: Fuzz Tests (long)
+    if: ${{ github.event_name == 'workflow_dispatch' && contains(fromJson('["fuzz-long"]'), github.event.inputs.job) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Run long-form fuzz tests
+        run: |
+          go test -fuzz=FuzzAddPatterns -fuzztime=30m
+          go test -fuzz=FuzzMatch -fuzztime=30m
+          go test -fuzz=FuzzPatternAndPath -fuzztime=30m
+          go test -fuzz=FuzzGlob -fuzztime=30m
+          go test -fuzz=FuzzNormalizePath -fuzztime=30m
+          go test -fuzz=FuzzNormalizeContent -fuzztime=30m
+          go test -fuzz=FuzzSegmentMatching -fuzztime=30m
+          go test -fuzz=FuzzConcurrentAccess -fuzztime=30m
+
+      - name: Upload corpus on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-on-failure
+          path: testdata/fuzz/
 
   benchmark:
     name: Benchmarks

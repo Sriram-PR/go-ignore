@@ -1,4 +1,4 @@
-.PHONY: all test test-race test-cover bench fuzz lint fmt vet clean help
+.PHONY: all test test-race test-cover bench fuzz fuzz-long lint fmt vet clean help
 
 # Default target
 all: fmt vet test
@@ -31,6 +31,19 @@ fuzz:
 	go test -fuzz=FuzzNormalizeContent -fuzztime=30s .
 	go test -fuzz=FuzzSegmentMatching -fuzztime=30s .
 	go test -fuzz=FuzzConcurrentAccess -fuzztime=30s .
+
+# Run fuzz tests in long-form (30 minutes each — ~4 hours total).
+# Intended for pre-release verification before tagging stable releases.
+# The standard 30s `fuzz` target is a smoke check; this is the real one.
+fuzz-long:
+	go test -fuzz=FuzzAddPatterns -fuzztime=30m .
+	go test -fuzz=FuzzMatch -fuzztime=30m .
+	go test -fuzz=FuzzPatternAndPath -fuzztime=30m .
+	go test -fuzz=FuzzGlob -fuzztime=30m .
+	go test -fuzz=FuzzNormalizePath -fuzztime=30m .
+	go test -fuzz=FuzzNormalizeContent -fuzztime=30m .
+	go test -fuzz=FuzzSegmentMatching -fuzztime=30m .
+	go test -fuzz=FuzzConcurrentAccess -fuzztime=30m .
 
 # Run git parity tests
 test-git:
@@ -70,7 +83,8 @@ help:
 	@echo "  test-cover - Run tests with coverage report"
 	@echo "  test-git   - Run git parity tests"
 	@echo "  bench      - Run benchmarks"
-	@echo "  fuzz       - Run fuzz tests (30s each)"
+	@echo "  fuzz       - Run fuzz tests (30s each, smoke)"
+	@echo "  fuzz-long  - Run fuzz tests (30m each, pre-release)"
 	@echo "  lint       - Run golangci-lint"
 	@echo "  fmt        - Format code"
 	@echo "  vet        - Run go vet"

@@ -548,6 +548,37 @@ The backtrack budget (`MaxBacktrackIterations`, default 10,000) is **shared acro
 
 **Best practice**: Batch all `AddPatterns` calls before starting concurrent `Match` operations to minimize lock contention.
 
+## Stability Guarantees
+
+Starting with v1.0, this library follows [semantic versioning](https://semver.org/) strictly. The compatibility contract within the v1.x line:
+
+**Will NOT change:**
+
+- Names and signatures of exported types (`Matcher`, `MatcherOptions`, `MatchResult`, `ParseWarning`, `WarningHandler`).
+- Names and signatures of exported functions (`New`, `NewWithOptions`, `LoadRepo`, `WalkRepo`, `RepoFiles`).
+- Names and signatures of exported methods on `*Matcher` and `MatchResult`.
+- Names and types of exported constants (`DefaultMaxPatterns`, `DefaultMaxPatternLength`, `DefaultMaxBacktrackIterations`, `HardMaxBacktrackIterations`, `MaxPathDepth`).
+- Default values for the three `Default*` constants.
+- Documented matching semantics — `**` globstar, character-class behavior, parent-excluded negation, anchoring rules, basePath scoping.
+
+**May change (non-breaking only):**
+
+- New exported types, functions, methods, fields, and constants may be added.
+- Existing defensive limit constants (`HardMaxBacktrackIterations`, `MaxPathDepth`) may be **raised** to accommodate larger workloads, but will not be lowered (callers relying on a current ceiling will keep working).
+- Performance improvements that do not alter observable matching behavior.
+- Documentation, error messages, warning text.
+
+**Reserves the right to change (rare, with notes in the release):**
+
+- Bug fixes that correct previously-incorrect behavior. If the prior behavior diverged from git's spec (verified via the parity tests), the fix is shipped under a minor or patch tag with a documented note in `RELEASE.md`. Callers depending on the buggy behavior should pin the affected version.
+
+**Not part of the API:**
+
+- Unexported types, methods, functions, fields, and constants — anything not visible to a caller via `import`. The internal `walkBackend`, `addPatternsFromSource`, `rule`, `segment`, `matchContext`, etc. may be refactored or removed at any time.
+- The exact text of `ParseWarning.Message` strings (the structured fields — `Line`, `Pattern`, `BasePath` — are stable; the human-readable `Message` may be reworded).
+
+If a v1.x release breaks any of the "will not change" guarantees, it is a bug — please file an issue.
+
 ## Contributing
 
 Contributions are welcome! Please ensure:

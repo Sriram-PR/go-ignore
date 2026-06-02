@@ -510,6 +510,19 @@ func (m *Matcher) Warnings() []ParseWarning
 func (m *Matcher) RuleCount() int
 ```
 
+### Constants
+
+```go
+// Defaults used when the corresponding MatcherOptions field is 0:
+const DefaultMaxPatterns             = 100_000      // total rules a Matcher will hold
+const DefaultMaxPatternLength        = 4096         // bytes per pattern line
+const DefaultMaxBacktrackIterations  = 10000        // shared budget per Match call
+
+// Library-enforced ceilings (raised, never lowered, within the v1.x line):
+const HardMaxBacktrackIterations     = 10_000_000   // upper bound even when MaxBacktrackIterations is -1
+const MaxPathDepth                   = 4096         // segments — paths deeper than this short-circuit
+```
+
 ## Performance
 
 Benchmarked on Intel i9-14900HX (Go 1.26, linux/amd64; median of 2× `-benchtime=3s` runs):

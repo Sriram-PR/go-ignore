@@ -2,8 +2,10 @@ package ignore_test
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 
 	ignore "github.com/Sriram-PR/go-ignore"
 )
@@ -89,6 +91,84 @@ func ExampleMatcher_AddExcludePatterns() {
 	// Output:
 	// true
 	// false
+}
+
+func ExampleWalkRepo() {
+	// Build a small repo on disk: a .gitignore plus some files, some ignored.
+	root, err := os.MkdirTemp("", "go-ignore-walkrepo-*")
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	defer os.RemoveAll(root)
+
+	must := func(rel, content string) {
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		_ = os.MkdirAll(filepath.Dir(full), 0o755)
+		_ = os.WriteFile(full, []byte(content), 0o644)
+	}
+	must(".gitignore", "*.log\nbuild/\n")
+	must("keep.txt", "x")
+	must("debug.log", "x")    // ignored
+	must("build/out.js", "x") // ignored (parent dir)
+	must("src/main.go", "x")
+
+	// WalkRepo loads global + .git/info/exclude + root .gitignore, then walks
+	// the tree skipping any path the matcher considers ignored.
+	var got []string
+	_ = ignore.WalkRepo(root, ignore.MatcherOptions{}, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		got = append(got, filepath.ToSlash(rel))
+		return nil
+	})
+	sort.Strings(got)
+	for _, p := range got {
+		fmt.Println(p)
+	}
+	// Output:
+	// .gitignore
+	// keep.txt
+	// src/main.go
+}
+
+func ExampleRepoFiles() {
+	root, err := os.MkdirTemp("", "go-ignore-repofiles-*")
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	defer os.RemoveAll(root)
+
+	must := func(rel, content string) {
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		_ = os.MkdirAll(filepath.Dir(full), 0o755)
+		_ = os.WriteFile(full, []byte(content), 0o644)
+	}
+	must(".gitignore", "*.log\n")
+	must("keep.txt", "x")
+	must("debug.log", "x")
+
+	// RepoFiles is the iterator form of WalkRepo — yields only non-ignored
+	// files, suitable for "for path, err := range ..." loops.
+	var got []string
+	for path, err := range ignore.RepoFiles(root, ignore.MatcherOptions{}) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+		rel, _ := filepath.Rel(root, path)
+		got = append(got, filepath.ToSlash(rel))
+	}
+	sort.Strings(got)
+	for _, p := range got {
+		fmt.Println(p)
+	}
+	// Output:
+	// .gitignore
+	// keep.txt
 }
 
 func ExampleNewWithOptions() {

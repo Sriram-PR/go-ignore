@@ -153,6 +153,36 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 	}
 }
 
+// The three resource limits (MaxPatterns, MaxPatternLength,
+// MaxBacktrackIterations) treat a zero value as "use the documented default".
+// New and NewWithOptions bake the defaults into opts at construction, but a
+// Matcher obtained another way (notably the zero value, var m Matcher) skips
+// that step. Resolving the limits again at each use site through these helpers
+// keeps such a Matcher usable: without this, a zero limit would be taken
+// literally (max 0 rules / 0 bytes) and every pattern would be silently
+// dropped. A negative value (unlimited, or the raised backtrack cap) passes
+// through unchanged.
+func (m *Matcher) effectiveMaxPatterns() int {
+	if m.opts.MaxPatterns == 0 {
+		return DefaultMaxPatterns
+	}
+	return m.opts.MaxPatterns
+}
+
+func (m *Matcher) effectiveMaxPatternLength() int {
+	if m.opts.MaxPatternLength == 0 {
+		return DefaultMaxPatternLength
+	}
+	return m.opts.MaxPatternLength
+}
+
+func (m *Matcher) effectiveMaxBacktrackIterations() int {
+	if m.opts.MaxBacktrackIterations == 0 {
+		return DefaultMaxBacktrackIterations
+	}
+	return m.opts.MaxBacktrackIterations
+}
+
 // AddPatterns parses gitignore content and adds rules.
 // basePath is the directory containing the .gitignore (empty string for root).
 //
@@ -207,7 +237,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	normalizedBase := normalizePath(basePath)
 
 	// Parse rules (this doesn't need the lock)
-	newRules, parseWarnings := parseLines(normalizedBase, content, m.opts.MaxPatternLength, source)
+	newRules, parseWarnings := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), source)
 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
 	// This avoids calling strings.ToLower on every match call.
@@ -226,8 +256,8 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	m.mu.Lock()
 
 	// Enforce max patterns limit
-	if m.opts.MaxPatterns >= 0 {
-		remaining := m.opts.MaxPatterns - len(m.rules)
+	if maxPatterns := m.effectiveMaxPatterns(); maxPatterns >= 0 {
+		remaining := maxPatterns - len(m.rules)
 		if remaining <= 0 {
 			parseWarnings = append(parseWarnings, ParseWarning{
 				Pattern:  "",
@@ -354,7 +384,7 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	// Single shared backtrack budget for the entire Match call.
 	// This prevents pathological patterns across many rules from causing
 	// excessive CPU usage — previously each rule got a fresh budget.
-	ctx := newMatchContext(m.opts.MaxBacktrackIterations)
+	ctx := newMatchContext(m.effectiveMaxBacktrackIterations())
 
 	m.mu.RLock()
 

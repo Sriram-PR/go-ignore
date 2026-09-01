@@ -939,6 +939,31 @@ func TestMatcher_BudgetDoesNotChargePerRule(t *testing.T) {
 	}
 }
 
+// TestZeroValueMatcher verifies that a Matcher obtained without New /
+// NewWithOptions (the zero value) still enforces the default resource limits
+// instead of treating a zero limit literally and silently dropping every
+// pattern.
+func TestZeroValueMatcher(t *testing.T) {
+	var m Matcher
+	m.AddPatterns("", []byte("*.log\nbuild/\n"))
+
+	if got := m.RuleCount(); got != 2 {
+		t.Fatalf("zero-value Matcher RuleCount = %d, want 2 (patterns were dropped)", got)
+	}
+	if ws := m.Warnings(); len(ws) != 0 {
+		t.Fatalf("zero-value Matcher produced %d unexpected warnings: %+v", len(ws), ws)
+	}
+	if !m.Match("debug.log", false) {
+		t.Error(`zero-value Matcher Match("debug.log") = false, want true`)
+	}
+	if !m.Match("build", true) {
+		t.Error(`zero-value Matcher Match("build", dir) = false, want true`)
+	}
+	if m.Match("src/main.go", false) {
+		t.Error(`zero-value Matcher Match("src/main.go") = true, want false`)
+	}
+}
+
 func BenchmarkMatch_Simple(b *testing.B) {
 	b.ReportAllocs()
 	m := New()

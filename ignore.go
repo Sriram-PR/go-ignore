@@ -329,7 +329,10 @@ func (m *Matcher) Warnings() []ParseWarning {
 // On Windows, backslashes are automatically normalized to forward slashes.
 // On Linux/macOS, backslashes are treated as literal filename characters
 // (matching Git's behavior).
-// isDir indicates whether the path is a directory.
+// isDir indicates whether the path is a directory, and must be accurate:
+// directory-only patterns (those ending in "/") match a directory only when
+// isDir is true. Passing false for a path that is really a directory can make
+// that directory be reported as not ignored (git needs the same information).
 // Thread-safe: can be called concurrently.
 func (m *Matcher) Match(path string, isDir bool) bool {
 	result := m.MatchWithReason(path, isDir)
@@ -338,6 +341,7 @@ func (m *Matcher) Match(path string, isDir bool) bool {
 
 // MatchWithReason returns detailed information about why a path matches.
 // Useful for debugging complex .gitignore setups.
+// isDir must be accurate for the same reason as in Match.
 // Thread-safe: can be called concurrently.
 //
 // Result interpretation:

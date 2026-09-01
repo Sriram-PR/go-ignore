@@ -2,7 +2,6 @@
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Sriram-PR/go-ignore)](https://golang.org/)
 [![Go Reference](https://pkg.go.dev/badge/github.com/Sriram-PR/go-ignore.svg)](https://pkg.go.dev/github.com/Sriram-PR/go-ignore)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Sriram-PR/go-ignore)](https://goreportcard.com/report/github.com/Sriram-PR/go-ignore)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Zero-dependency `.gitignore` matching for Go, verified byte-for-byte against `git check-ignore`.

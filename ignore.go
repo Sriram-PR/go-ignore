@@ -253,7 +253,6 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 		}
 	}
 
-	// Acquire write lock to add rules and capture handler ref
 	m.mu.Lock()
 
 	// Enforce max patterns limit
@@ -335,7 +334,6 @@ func (m *Matcher) Warnings() []ParseWarning {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Return a copy to prevent external mutation.
 	return slices.Clone(m.warnings)
 }
 
@@ -364,7 +362,6 @@ func (m *Matcher) Match(path string, isDir bool) bool {
 //   - Matched == true, Ignored == true: Path is ignored by Rule
 //   - Matched == true, Ignored == false: Path was ignored but re-included by negation Rule
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
-	// Normalize path
 	path = normalizePath(path)
 	if path == "" {
 		return MatchResult{Ignored: false, Matched: false}

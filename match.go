@@ -50,8 +50,6 @@ type matchContext struct {
 }
 
 // newMatchContext creates a new match context with the specified limit.
-// If maxIter is 0, uses DefaultMaxBacktrackIterations.
-// Any negative value is raised to HardMaxBacktrackIterations.
 func newMatchContext(maxIter int) matchContext {
 	if maxIter == 0 {
 		maxIter = DefaultMaxBacktrackIterations
@@ -63,7 +61,7 @@ func newMatchContext(maxIter int) matchContext {
 	}
 }
 
-// tick increments the iteration counter and returns false if limit exceeded.
+// tick consumes one unit of the backtrack budget, returning false once spent.
 func (ctx *matchContext) tick() bool {
 	ctx.iterations++
 	return ctx.iterations <= ctx.maxIter
@@ -106,7 +104,6 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, ctx *mat
 	// For the "inside dir" case, we use prefix matching
 	prefixMatch := r.dirOnly && !isDir
 
-	// Handle anchored vs floating patterns
 	if r.anchored {
 		if prefixMatch {
 			return matchSegmentsPrefix(r.segments, matchSegments, ctx)
@@ -123,7 +120,6 @@ func resolveMatchSegments(r *rule, path string, pathSegments []string) []string 
 	if r.basePath == "" {
 		return pathSegments
 	}
-	// Path must be under basePath
 	if !strings.HasPrefix(path, r.basePathSlash) && path != r.basePath {
 		return nil
 	}
@@ -174,14 +170,12 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) boo
 		return false
 	}
 
-	// Base cases
 	if len(pattern) == 0 {
 		return len(path) == 0
 	}
 
 	seg := pattern[0]
 
-	// Handle ** (double-star)
 	if seg.doubleStar {
 		// ** can match zero or more path segments.
 		// Trailing ** (last segment) must consume at least one segment:
@@ -205,17 +199,14 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) boo
 		return false
 	}
 
-	// No more path segments but still have pattern segments (non-**)
 	if len(path) == 0 {
 		return false
 	}
 
-	// Match current segment
 	if !matchSingleSegment(seg, path[0], ctx) {
 		return false
 	}
 
-	// Recurse for remaining segments
 	ctx.depth++
 	result := matchSegmentsExact(pattern[1:], path[1:], ctx)
 	ctx.depth--
@@ -232,7 +223,6 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bo
 		return false
 	}
 
-	// Base case: pattern exhausted
 	if len(pattern) == 0 {
 		// For prefix matching, we need at least one more path segment
 		// (the file must be INSIDE the directory, not the directory itself)
@@ -241,10 +231,8 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bo
 
 	seg := pattern[0]
 
-	// Handle ** (double-star)
 	if seg.doubleStar {
 		// ** can match zero or more path segments
-		// Try matching remaining pattern against path starting at each position
 		ctx.depth++
 		for i := 0; i <= len(path); i++ {
 			if matchSegmentsPrefix(pattern[1:], path[i:], ctx) {
@@ -260,17 +248,14 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bo
 		return false
 	}
 
-	// No more path segments but still have pattern segments (non-**)
 	if len(path) == 0 {
 		return false
 	}
 
-	// Match current segment
 	if !matchSingleSegment(seg, path[0], ctx) {
 		return false
 	}
 
-	// Recurse for remaining segments
 	ctx.depth++
 	result := matchSegmentsPrefix(pattern[1:], path[1:], ctx)
 	ctx.depth--
@@ -293,11 +278,9 @@ func matchSingleSegment(seg segment, pathSeg string, ctx *matchContext) bool {
 	// not per-segment-per-rule here. Pattern values are pre-lowered at AddPatterns time.
 
 	if !seg.wildcard {
-		// Literal match
 		return pattern == pathSeg
 	}
 
-	// Wildcard matching (glob-style *, ?, \)
 	return matchGlobSeg(&seg, pathSeg, ctx)
 }
 
@@ -338,7 +321,7 @@ func matchGlobSeg(seg *segment, s string, ctx *matchContext) bool {
 func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 	for len(pattern) > 0 {
 		if ctx.exhausted() {
-			return false // Backtrack limit exceeded
+			return false
 		}
 
 		if pattern[0] == '*' {
@@ -378,16 +361,14 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 
 		if pattern[0] == '\\' && len(pattern) > 1 {
 			// Backslash escapes the next character (literal match)
-			pattern = pattern[1:] // skip the backslash
+			pattern = pattern[1:]
 			// Fall through to literal character comparison below
 		}
 
-		// No more string to match
 		if len(s) == 0 {
 			return false
 		}
 
-		// Characters must match
 		if pattern[0] != s[0] {
 			return false
 		}
@@ -403,7 +384,6 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 // It skips consecutive stars, then tries matching the remaining pattern
 // against increasingly longer consumed prefixes of s.
 func matchGlobStar(pattern, s string, ctx *matchContext) bool {
-	// Skip consecutive stars
 	for len(pattern) > 0 && pattern[0] == '*' {
 		pattern = pattern[1:]
 	}
@@ -432,7 +412,6 @@ func matchGlobStar(pattern, s string, ctx *matchContext) bool {
 //
 // If valid is false, the caller should treat '[' as a literal character.
 func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int, valid bool) {
-	// pos points at '['
 	i := pos + 1
 	if i >= len(pattern) {
 		return false, 0, false // unclosed
@@ -453,7 +432,6 @@ func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int,
 		c := pattern[i]
 
 		if c == ']' && !first {
-			// End of class
 			result := inClass
 			if negate {
 				result = !inClass
@@ -496,7 +474,6 @@ func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int,
 			continue
 		}
 
-		// Literal character
 		if ch == c {
 			inClass = true
 		}

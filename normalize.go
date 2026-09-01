@@ -93,13 +93,11 @@ func normalizeContent(content []byte) []byte {
 		return content
 	}
 
-	// Step 1: Strip UTF-8 BOM if present (EF BB BF)
-	// Loop to handle edge case of multiple BOMs for idempotency
 	for len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
 		content = content[3:]
 	}
 
-	// Step 2: Normalize CRLF and standalone CR to LF in a single pass
+	// Normalize CRLF and standalone CR to LF in a single pass
 	if bytes.IndexByte(content, '\r') < 0 {
 		return content // fast path: no CR at all
 	}
@@ -129,7 +127,6 @@ func normalizeContent(content []byte) []byte {
 //
 // Note: This does not trim newlines; those are handled during line splitting.
 func trimTrailingWhitespace(line string) string {
-	// Find end of non-whitespace content
 	end := len(line)
 	for end > 0 && (line[end-1] == ' ' || line[end-1] == '\t') {
 		end--
@@ -139,7 +136,6 @@ func trimTrailingWhitespace(line string) string {
 		return line // No trailing whitespace
 	}
 
-	// Count consecutive backslashes immediately before the whitespace
 	bs := 0
 	for i := end - 1; i >= 0 && line[i] == '\\'; i-- {
 		bs++

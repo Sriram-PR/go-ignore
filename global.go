@@ -207,7 +207,6 @@ func (m *Matcher) AddExcludePatterns(gitDir string) error {
 // It tries git config first, then falls back to XDG conventions.
 // Returns an empty string if no path can be determined.
 func resolveGlobalIgnorePath() (string, error) {
-	// Try git config --global core.excludesFile first
 	path, err := gitConfigExcludesFile()
 	if err != nil {
 		return "", err
@@ -216,7 +215,6 @@ func resolveGlobalIgnorePath() (string, error) {
 		return path, nil
 	}
 
-	// Fall back to XDG path
 	return xdgGlobalIgnorePath()
 }
 
@@ -277,7 +275,6 @@ func expandTilde(path string) (string, error) {
 		return path, nil
 	}
 
-	// Split at first separator
 	var userPart, rest string
 	if i := strings.IndexByte(path, '/'); i >= 0 {
 		userPart = path[:i]

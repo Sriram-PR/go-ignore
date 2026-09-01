@@ -48,7 +48,6 @@ type segment struct {
 // MatchResult.Source. Pass "" if no source label is available.
 // Returns parsed rules and any warnings for malformed patterns.
 func parseLines(basePath string, content []byte, maxPatternLength int, source string) ([]rule, []ParseWarning) {
-	// Normalize content (BOM, CRLF)
 	content = normalizeContent(content)
 
 	lines := strings.Split(string(content), "\n")
@@ -86,15 +85,14 @@ func parseLines(basePath string, content []byte, maxPatternLength int, source st
 // Returns a warning for patterns that become empty after processing.
 // source is propagated onto the returned rule for provenance reporting.
 func parseLine(line string, lineNum int, basePath, source string) (*rule, *ParseWarning) {
-	// Step 1: Trim trailing whitespace (Git behavior)
+	// Trim trailing whitespace (Git behavior)
 	line = trimTrailingWhitespace(line)
 
-	// Step 2: Skip empty lines (no warning)
+	// Skip empty lines (no warning)
 	if line == "" {
 		return nil, nil
 	}
 
-	// Step 3: Skip comments
 	if strings.HasPrefix(line, "#") {
 		return nil, nil
 	}
@@ -102,7 +100,7 @@ func parseLine(line string, lineNum int, basePath, source string) (*rule, *Parse
 	// Store original for warning messages
 	original := line
 
-	// Step 4: Handle negation and \! escape
+	// Handle negation and \! escape
 	// \! at start escapes the bang, treating it as literal (not negation).
 	// Must check \! before ! to prevent misinterpreting escaped bangs.
 	negate := false
@@ -113,23 +111,22 @@ func parseLine(line string, lineNum int, basePath, source string) (*rule, *Parse
 		line = line[1:]
 	}
 
-	// Step 5: Handle \# escape (after negation to support !\#foo)
+	// Handle \# escape (after negation to support !\#foo)
 	if strings.HasPrefix(line, "\\#") {
 		line = line[1:] // Remove backslash, keep literal #
 	}
 
-	// Step 6: Check for directory-only (trailing /)
 	dirOnly := false
 	if strings.HasSuffix(line, "/") {
 		dirOnly = true
 		line = strings.TrimSuffix(line, "/")
 	}
 
-	// Step 7: No ./ prefix stripping.
+	// No ./ prefix stripping.
 	// Git does NOT normalize ./ in patterns — ./foo matches nothing in git.
 	// Users should not use ./ in patterns; if they do, it will be treated literally.
 
-	// Step 8: Check if pattern is empty after stripping
+	// Check if pattern is empty after stripping
 	if line == "" {
 		return nil, &ParseWarning{
 			Line:    lineNum,
@@ -138,7 +135,7 @@ func parseLine(line string, lineNum int, basePath, source string) (*rule, *Parse
 		}
 	}
 
-	// Step 8b: Trailing backslash is an invalid pattern (per spec, never matches).
+	// Trailing backslash is an invalid pattern (per spec, never matches).
 	// Count consecutive trailing backslashes: odd means a lone trailing \.
 	if strings.HasSuffix(line, "\\") {
 		bs := 0
@@ -154,7 +151,6 @@ func parseLine(line string, lineNum int, basePath, source string) (*rule, *Parse
 		}
 	}
 
-	// Step 9: Determine anchoring
 	anchored, line, emptyAfterSlash := determineAnchoring(line)
 	if emptyAfterSlash {
 		return nil, &ParseWarning{
@@ -164,7 +160,6 @@ func parseLine(line string, lineNum int, basePath, source string) (*rule, *Parse
 		}
 	}
 
-	// Step 10: Parse into segments
 	segments := parseSegments(line)
 
 	r := &rule{

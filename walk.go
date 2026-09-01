@@ -99,7 +99,7 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 			return fn(path, d, err)
 		}
 
-		// Compute path relative to root using forward slashes for matching.
+		// rel uses forward slashes, as required for matching against rules.
 		rel, relErr := b.relPath(root, path)
 		if relErr != nil {
 			return fn(path, d, relErr)

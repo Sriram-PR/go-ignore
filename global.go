@@ -33,9 +33,9 @@ const gitConfigTimeout = 5 * time.Second
 // produce surprising results.
 //
 // Missing files are silently skipped; only real read failures are returned.
-// Nested .gitignore files under subdirectories are NOT walked — callers that
-// need per-directory rules should call AddPatterns with the appropriate
-// basePath after LoadRepo returns.
+// Nested .gitignore files under subdirectories are NOT walked — use WalkDir or
+// WalkRepo for that (they auto-discover per-directory .gitignore files), or call
+// AddPatterns with the appropriate basePath yourself if you need finer control.
 //
 // Pass a zero-value MatcherOptions{} to accept all defaults.
 func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {

@@ -32,7 +32,7 @@ type rule struct {
 // Each segment can be a literal string, contain wildcards, or be a double-star.
 type segment struct {
 	value        string // literal or pattern text (empty for **)
-	wildcard     bool   // contains * (but not **) - requires glob matching
+	wildcard     bool   // needs glob matching (contains *, ?, \, or [; not **)
 	doubleStar   bool   // is ** - matches zero or more directories
 	hasQuestion  bool   // contains ?
 	hasEscape    bool   // contains backslash

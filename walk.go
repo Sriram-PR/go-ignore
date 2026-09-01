@@ -37,10 +37,11 @@ type walkBackend struct {
 //     fs.DirEntry, and a non-nil err if the entry could not be read. Ignored
 //     entries are silently skipped — fn is not called for them.
 //   - Ignored directories are pruned (their contents are not visited).
-//   - The .git directory at the repository root is always pruned, regardless
-//     of matcher rules, to avoid walking git internals. Match itself does NOT
-//     treat .git as special — this prune is a WalkDir-specific behavior. To
-//     walk .git anyway, use filepath.WalkDir directly with Match for filtering.
+//   - Any directory named .git is pruned wherever it is encountered (not just
+//     at the repository root), regardless of matcher rules, to avoid walking
+//     git internals. Match itself does NOT treat .git as special — this prune
+//     is a WalkDir-specific behavior. To walk .git anyway, use filepath.WalkDir
+//     directly with Match for filtering.
 //   - Symlinks are not followed (filepath.WalkDir Lstat semantics).
 //
 // Paths supplied to user fn are OS-native (the same as filepath.WalkDir).

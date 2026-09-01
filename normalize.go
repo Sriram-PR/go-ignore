@@ -11,6 +11,7 @@ import (
 // It converts Windows-style paths to Unix-style and removes redundant elements.
 //
 // Normalization steps (applied in order):
+//  0. Reject paths containing a null byte, returning "" (invalid on all filesystems)
 //  1. Convert backslashes to forward slashes (Windows only — on Linux, \ is valid in filenames)
 //  2. Collapse consecutive slashes
 //  3. Remove leading "./" prefix (all occurrences for idempotency)

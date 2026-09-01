@@ -45,6 +45,12 @@ type walkBackend struct {
 // Paths supplied to user fn are OS-native (the same as filepath.WalkDir).
 // Internally the matcher receives the slash-normalised relative path.
 //
+// Parse warnings from the nested .gitignore files discovered during the walk
+// are delivered only to a configured WarningHandler (MatcherOptions). Because
+// discovery happens on a per-walk internal matcher that is discarded when
+// WalkDir returns, such warnings do NOT appear in the receiver's Warnings().
+// Set a WarningHandler if you need to observe them.
+//
 // Thread-safe: the receiver matcher may be queried via Match from other
 // goroutines while WalkDir runs; concurrent AddPatterns on the receiver
 // during a walk is permitted but will NOT affect the in-progress walk
@@ -66,6 +72,9 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 // only for the duration of the call. The .gitignore lookup uses fs.ReadFile
 // — symlink handling is whatever fsys provides (most fs.FS implementations,
 // including fstest.MapFS and embed.FS, have no concept of symlinks).
+//
+// As with WalkDir, parse warnings from discovered nested .gitignore files
+// reach only a configured WarningHandler, not the receiver's Warnings().
 //
 // Thread-safe: see WalkDir's concurrency notes.
 func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error {

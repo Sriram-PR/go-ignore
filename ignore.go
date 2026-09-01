@@ -303,6 +303,21 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddPatternsReader(basePath string, r io.Reader) error {
+	return m.AddPatternsReaderWithSource(basePath, "", r)
+}
+
+// AddPatternsReaderWithSource is identical to AddPatternsReader except that the
+// supplied source label is recorded on every rule read from r and surfaced via
+// MatchResult.Source. Use it when patterns stream from something with a
+// meaningful logical name that is not a file on disk (an HTTP response, a
+// database row, an embedded asset); AddPatternsFromFile already handles the
+// on-disk case.
+//
+// source is informational only — it is not parsed, normalized, or validated.
+// If reading r fails, no rules are added and the read error is returned wrapped.
+//
+// Thread-safe: can be called concurrently with Match.
+func (m *Matcher) AddPatternsReaderWithSource(basePath, source string, r io.Reader) error {
 	if r == nil {
 		return nil
 	}
@@ -310,7 +325,7 @@ func (m *Matcher) AddPatternsReader(basePath string, r io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("reading patterns: %w", err)
 	}
-	m.AddPatterns(basePath, content)
+	m.AddPatternsWithSource(basePath, source, content)
 	return nil
 }
 

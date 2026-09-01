@@ -939,6 +939,26 @@ func TestMatcher_BudgetDoesNotChargePerRule(t *testing.T) {
 	}
 }
 
+// TestAddPatternsReaderWithSource verifies the source label is recorded on
+// rules streamed from an io.Reader and surfaced via MatchResult.Source.
+func TestAddPatternsReaderWithSource(t *testing.T) {
+	m := New()
+	if err := m.AddPatternsReaderWithSource("", "cfg://ignore", strings.NewReader("*.log\n")); err != nil {
+		t.Fatalf("AddPatternsReaderWithSource: %v", err)
+	}
+	r := m.MatchWithReason("debug.log", false)
+	if !r.Ignored {
+		t.Fatal(`MatchWithReason("debug.log"): not ignored, want ignored`)
+	}
+	if r.Source != "cfg://ignore" {
+		t.Errorf("Source = %q, want %q", r.Source, "cfg://ignore")
+	}
+	// A nil reader is a no-op, not an error (parity with AddPatternsReader).
+	if err := m.AddPatternsReaderWithSource("", "x", nil); err != nil {
+		t.Errorf("nil reader returned error: %v", err)
+	}
+}
+
 // TestZeroValueMatcher verifies that a Matcher obtained without New /
 // NewWithOptions (the zero value) still enforces the default resource limits
 // instead of treating a zero limit literally and silently dropping every

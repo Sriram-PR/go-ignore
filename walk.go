@@ -8,6 +8,7 @@ import (
 	"os"
 	pathpkg "path"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -88,7 +89,7 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 	m.mu.RLock()
 	child := &Matcher{
 		opts:  m.opts,
-		rules: append([]rule(nil), m.rules...),
+		rules: slices.Clone(m.rules),
 	}
 	m.mu.RUnlock()
 

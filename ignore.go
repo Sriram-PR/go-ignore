@@ -3,6 +3,7 @@ package ignore
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -319,13 +320,8 @@ func (m *Matcher) Warnings() []ParseWarning {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Return a copy to prevent external mutation
-	if len(m.warnings) == 0 {
-		return nil
-	}
-	result := make([]ParseWarning, len(m.warnings))
-	copy(result, m.warnings)
-	return result
+	// Return a copy to prevent external mutation.
+	return slices.Clone(m.warnings)
 }
 
 // Match returns true if the path should be ignored.

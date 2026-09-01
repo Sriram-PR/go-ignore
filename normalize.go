@@ -1,4 +1,3 @@
-// Package ignore provides gitignore pattern matching for file paths.
 package ignore
 
 import (

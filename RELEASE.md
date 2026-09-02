@@ -90,6 +90,26 @@ If a critical bug is discovered AFTER a tag is pushed:
 
 ## Version History
 
+### v1.0.0
+
+First stable release and the start of the v1.x semver contract: within the 1.x line there will be no breaking changes to exported types, functions, methods, fields, or constants. New functionality may be added; the defensive limit constants (`MaxPathDepth`, `HardMaxBacktrackIterations`) may be raised but never lowered. See the README's "Stability Guarantees" section for the full contract.
+
+This release folds in the changes made since v0.9.1.
+
+**Additions**
+
+- **`AddPatternsReaderWithSource`** — streams patterns from an `io.Reader` while recording a source label surfaced via `MatchResult.Source`, completing the `…WithSource` symmetry across the `AddPatterns*` family.
+
+**Bug fixes**
+
+- **Zero-value `Matcher` is now usable** — a `Matcher` obtained without `New` / `NewWithOptions` (e.g. `var m Matcher`) previously read its resource limits as a literal 0 and silently dropped every pattern. The three limits are now resolved per use, treating 0 as the documented default. Covered by `TestZeroValueMatcher`.
+
+**Documentation**
+
+- README slimmed to a lean front-door (the full reference now lives on pkg.go.dev); Go Report Card badge removed; internal flow-narration comments trimmed in favor of why/context; several stale doc comments corrected (`.git` pruning depth, and character-class support in `matchSingleSegment` / `matchGlobRecursive`).
+
+No behavioral changes to matching semantics from v0.9.1: the `**` globstar, character-class, parent-excluded-negation, anchoring, and basePath-scoping rules are unchanged and remain verified against `git check-ignore`.
+
 ### v0.9.1
 
 Single bug fix for an adversarial deep-path matching scenario discovered by CI's `FuzzMatch` post-v0.9.0. Users on v0.9.0 should upgrade; the issue is a denial-of-service vector reachable from any caller that runs `Match` / `MatchWithReason` on attacker-controlled paths.

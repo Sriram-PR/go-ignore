@@ -6,23 +6,23 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ### v1.0.0
 
-First stable release and the start of the v1.x semver contract: within the 1.x line there will be no breaking changes to exported types, functions, methods, fields, or constants. New functionality may be added; the defensive limit constants (`MaxPathDepth`, `HardMaxBacktrackIterations`) may be raised but never lowered. See the README's "Stability Guarantees" section for the full contract.
+go-ignore is now stable. This release freezes the exported API for the v1.x line — types, functions, methods, fields, and constants are settled, and future releases add to them rather than break them. The README's "Stability Guarantees" section spells out the full contract.
 
-This release folds in the changes made since v0.9.1.
+Everything since v0.9.1 lands here too.
 
-**Additions**
+**Added**
 
-- **`AddPatternsReaderWithSource`** — streams patterns from an `io.Reader` while recording a source label surfaced via `MatchResult.Source`, completing the `…WithSource` symmetry across the `AddPatterns*` family.
+- **`AddPatternsReaderWithSource`** streams patterns from an `io.Reader` and records a source label, surfaced through `MatchResult.Source` — rounding out the `…WithSource` variants across the `AddPatterns*` family.
 
-**Bug fixes**
+**Fixed**
 
-- **Zero-value `Matcher` is now usable** — a `Matcher` obtained without `New` / `NewWithOptions` (e.g. `var m Matcher`) previously read its resource limits as a literal 0 and silently dropped every pattern. The three limits are now resolved per use, treating 0 as the documented default. Covered by `TestZeroValueMatcher`.
+- **A zero-value `Matcher` now works.** A `Matcher` created without `New` / `NewWithOptions` (for example `var m Matcher`) used to read its resource limits as a literal `0` and silently drop every pattern. The limits now fall back to their defaults on use. Covered by `TestZeroValueMatcher`.
 
 **Documentation**
 
-- README slimmed to a lean front-door (the full reference now lives on pkg.go.dev); Go Report Card badge removed; internal flow-narration comments trimmed in favor of why/context; several stale doc comments corrected (`.git` pruning depth, and character-class support in `matchSingleSegment` / `matchGlobRecursive`).
+- Trimmed the README to a lean front-door (the full reference lives on pkg.go.dev), dropped the offline Go Report Card badge, and tidied the code comments — cutting step-by-step narration and correcting a few stale doc comments.
 
-No behavioral changes to matching semantics from v0.9.1: the `**` globstar, character-class, parent-excluded-negation, anchoring, and basePath-scoping rules are unchanged and remain verified against `git check-ignore`.
+Matching behavior is unchanged from v0.9.1 and stays verified byte-for-byte against `git check-ignore`.
 
 ### v0.9.1
 

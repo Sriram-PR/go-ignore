@@ -20,7 +20,7 @@ Use this checklist before tagging a new release.
 
 ### Documentation
 
-- [ ] README.md API Reference matches actual exported surface — run `go doc -all` and compare
+- [ ] README examples and key entry points match the current API; the full reference is godoc — spot-check `go doc -all` output against the README
 - [ ] RELEASE.md has an entry for the new version above the previous one
 - [ ] CONTRIBUTING.md fuzz list and lint commands are current
 - [ ] All exported functions/methods/types/constants/fields have GoDoc comments

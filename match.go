@@ -263,7 +263,7 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bo
 }
 
 // matchSingleSegment matches a single pattern segment against a path segment.
-// Handles literal strings, * wildcards, ? wildcards, and \ escapes.
+// Handles literal strings, * wildcards, ? wildcards, \ escapes, and [ character classes.
 // The matchContext is shared with the caller so glob-level backtracking
 // counts against the same budget as segment-level matching.
 func matchSingleSegment(seg segment, pathSeg string, ctx *matchContext) bool {
@@ -315,7 +315,7 @@ func matchGlobSeg(seg *segment, s string, ctx *matchContext) bool {
 
 // matchGlobRecursive performs recursive glob matching.
 // This handles patterns with * (zero or more chars), ? (exactly one char),
-// and \ (escape next character for literal matching).
+// \ (escape next character for literal matching), and [ character classes.
 // Backtracking is bounded by the shared matchContext to prevent pathological
 // patterns (e.g., *a*a*a*a*b) from causing excessive CPU usage.
 func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {

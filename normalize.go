@@ -7,36 +7,26 @@ import (
 	"strings"
 )
 
-// normalizePath normalizes a file path for consistent matching.
-// It converts Windows-style paths to Unix-style and removes redundant elements.
+// normalizePath canonicalizes a path for matching: on Windows backslashes
+// become slashes; repeated and trailing slashes and leading "./" are removed;
+// and "."/".." are resolved via path.Clean so "src/../secret.txt" cannot bypass
+// a "src/"-scoped rule. A path containing a null byte, or one resolving above
+// the root, returns "".
 //
-// Normalization steps (applied in order):
-//  0. Reject paths containing a null byte, returning "" (invalid on all filesystems)
-//  1. Convert backslashes to forward slashes (Windows only — on Linux, \ is valid in filenames)
-//  2. Collapse consecutive slashes
-//  3. Remove leading "./" prefix (all occurrences for idempotency)
-//  4. Remove trailing slash
-//  5. Resolve interior "." segments and ".." components via path.Clean.
-//     Paths that resolve above the repository root (e.g., "../secret.txt")
-//     are treated as empty (no match).
-//
-// This function is applied to input paths (in Match/MatchWithReason) and base
-// paths (in parseLines). It is NOT applied to patterns during parsing — patterns
-// are parsed as-is and matched with their original escape sequences intact.
+// Applied to input and base paths, never to patterns — patterns keep their
+// original escape sequences.
 func normalizePath(p string) string {
-	// Step 0: Reject paths containing null bytes (invalid on all filesystems).
 	if strings.IndexByte(p, 0) >= 0 {
 		return ""
 	}
 
-	// Step 1: Convert backslashes to forward slashes (Windows only).
-	// On Linux/macOS, backslash is a valid filename character and should not
-	// be converted. Git only performs this conversion on Windows.
+	// On Linux/macOS backslash is a valid filename character; git converts it
+	// to a slash only on Windows.
 	if runtime.GOOS == "windows" {
 		p = strings.ReplaceAll(p, "\\", "/")
 	}
 
-	// Step 2: Collapse consecutive slashes (must happen before trailing slash removal)
+	// Collapse repeated slashes before trailing-slash removal.
 	if strings.Contains(p, "//") {
 		var b strings.Builder
 		b.Grow(len(p))
@@ -55,23 +45,19 @@ func normalizePath(p string) string {
 		p = b.String()
 	}
 
-	// Step 3: Remove leading ./ (all occurrences for idempotency)
-	for strings.HasPrefix(p, "./") {
+	for strings.HasPrefix(p, "./") { // repeat for idempotency
 		p = p[2:]
 	}
 
-	// Step 4: Remove trailing slash
 	p = strings.TrimSuffix(p, "/")
 
-	// Step 5: Resolve ".." components (basePath bypass guard) and interior
-	// "." segments (e.g., "a/./b" → "a/b") via path.Clean.
-	// "src/../secret.txt" → "secret.txt" won't match patterns scoped to "src/".
+	// path.Clean resolves "."/".." so a path can't climb out of its scope; one
+	// resolving to the root or above (".", "..", "../…") is treated as no match.
 	if strings.Contains(p, "..") || strings.Contains(p, "/./") {
 		p = path.Clean(p)
 		if p == "." || p == "/" {
 			return ""
 		}
-		// Paths that resolve above repo root are invalid
 		if p == ".." || strings.HasPrefix(p, "../") {
 			return ""
 		}
@@ -80,24 +66,19 @@ func normalizePath(p string) string {
 	return p
 }
 
-// normalizeContent normalizes .gitignore file content for parsing.
-// It handles platform-specific encoding variations.
-//
-// Normalization steps (applied in order):
-//  1. Strip UTF-8 BOM if present (EF BB BF) - loops for idempotency
-//  2. Normalize CRLF and standalone CR to LF (single pass)
-//
-// This ensures consistent parsing regardless of the file's origin platform.
+// normalizeContent prepares .gitignore bytes for parsing: it strips a UTF-8 BOM
+// and converts CRLF/CR line endings to LF, so files authored on any platform
+// parse identically.
 func normalizeContent(content []byte) []byte {
 	if len(content) == 0 {
 		return content
 	}
 
+	// The loop handles the (degenerate) case of repeated BOMs for idempotency.
 	for len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
 		content = content[3:]
 	}
 
-	// Normalize CRLF and standalone CR to LF in a single pass
 	if bytes.IndexByte(content, '\r') < 0 {
 		return content // fast path: no CR at all
 	}

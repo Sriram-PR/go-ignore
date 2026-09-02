@@ -329,7 +329,6 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 		}
 
 		if pattern[0] == '?' {
-			// ? matches exactly one character
 			if len(s) == 0 {
 				return false
 			}
@@ -339,7 +338,6 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 		}
 
 		if pattern[0] == '[' {
-			// Character class
 			if len(s) == 0 {
 				return false
 			}
@@ -360,9 +358,7 @@ func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
 		}
 
 		if pattern[0] == '\\' && len(pattern) > 1 {
-			// Backslash escapes the next character (literal match)
-			pattern = pattern[1:]
-			// Fall through to literal character comparison below
+			pattern = pattern[1:] // escape: compare the next char literally below
 		}
 
 		if len(s) == 0 {
@@ -391,7 +387,6 @@ func matchGlobStar(pattern, s string, ctx *matchContext) bool {
 	if len(pattern) == 0 {
 		return true
 	}
-	// Try matching * with increasing number of characters
 	for i := 0; i <= len(s); i++ {
 		if matchGlobRecursive(pattern, s[i:], ctx) {
 			return true
@@ -417,7 +412,6 @@ func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int,
 		return false, 0, false // unclosed
 	}
 
-	// Check for negation
 	negate := false
 	if i < len(pattern) && (pattern[i] == '!' || pattern[i] == '^') {
 		negate = true
@@ -453,7 +447,7 @@ func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int,
 
 		// Backslash escape inside class
 		if c == '\\' && i+1 < len(pattern) {
-			i++ // skip backslash
+			i++
 			c = pattern[i]
 			matched, advance := matchCharClassRange(pattern, i, c, ch)
 			if matched {

@@ -286,15 +286,13 @@ func expandTilde(path string) (string, error) {
 
 	var homeDir string
 	if userPart == "~" {
-		// Current user
 		dir, err := os.UserHomeDir()
 		if err != nil {
 			return "", fmt.Errorf("expanding ~: %w", err)
 		}
 		homeDir = dir
 	} else {
-		// ~otheruser
-		username := userPart[1:]
+		username := userPart[1:] // strip the leading "~" from "~user"
 		u, err := user.Lookup(username)
 		if err != nil {
 			return "", fmt.Errorf("expanding %s: %w", userPart, err)

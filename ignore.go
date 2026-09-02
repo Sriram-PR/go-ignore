@@ -154,15 +154,11 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 	}
 }
 
-// The three resource limits (MaxPatterns, MaxPatternLength,
-// MaxBacktrackIterations) treat a zero value as "use the documented default".
-// New and NewWithOptions bake the defaults into opts at construction, but a
-// Matcher obtained another way (notably the zero value, var m Matcher) skips
-// that step. Resolving the limits again at each use site through these helpers
-// keeps such a Matcher usable: without this, a zero limit would be taken
-// literally (max 0 rules / 0 bytes) and every pattern would be silently
-// dropped. A negative value (unlimited, or the raised backtrack cap) passes
-// through unchanged.
+// The three resource limits treat a zero value as "use the documented default".
+// New/NewWithOptions bake the defaults into opts, but a Matcher built another
+// way (notably the zero value) skips that; resolving them per use keeps such a
+// Matcher usable instead of taking a 0 limit literally and dropping every rule.
+// A negative value (unlimited, or the raised backtrack cap) passes through.
 func (m *Matcher) effectiveMaxPatterns() int {
 	if m.opts.MaxPatterns == 0 {
 		return DefaultMaxPatterns
@@ -237,7 +233,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	// Normalize basePath once for consistent rule scoping and warning reporting.
 	normalizedBase := normalizePath(basePath)
 
-	// Parse rules (this doesn't need the lock)
+	// Parse before locking; parsing touches no shared state.
 	newRules, parseWarnings := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), source)
 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
@@ -255,7 +251,6 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 
 	m.mu.Lock()
 
-	// Enforce max patterns limit
 	if maxPatterns := m.effectiveMaxPatterns(); maxPatterns >= 0 {
 		remaining := maxPatterns - len(m.rules)
 		if remaining <= 0 {

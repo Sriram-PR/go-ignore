@@ -1,92 +1,6 @@
-# Release Checklist
+# Changelog
 
-Use this checklist before tagging a new release.
-
-**Tags are immutable once pushed.** Go's module proxy, pkg.go.dev, and any user who has run `go get @vX.Y.Z` cache the tag's contents. Force-pushing a tag to "fix" a bug breaks every downstream consumer that pinned that version. If a tag was pushed with a bug, accept it as immutable and ship the fix in the next patch version (v0.9.0 → v0.9.1 in this project's history is an example of the right move).
-
-## Pre-Tag Verification (every release)
-
-### Code Quality
-
-- [ ] `make ci` passes — equivalent to `fmt + vet + test + test-race + lint`
-- [ ] No new diagnostics from `golangci-lint run --timeout=300s`
-- [ ] Coverage has not regressed: `go test -cover ./...`
-
-### Test Coverage
-
-- [ ] Edge case tests pass: `go test -run TestEdgeCases`
-- [ ] Git parity tests pass: `go test -run TestGitParity`
-- [ ] Standard fuzz smoke pass: `make fuzz` (30s per fuzzer, 4 min total)
-
-### Documentation
-
-- [ ] README examples and key entry points match the current API; the full reference is godoc — spot-check `go doc -all` output against the README
-- [ ] RELEASE.md has an entry for the new version above the previous one
-- [ ] CONTRIBUTING.md fuzz list and lint commands are current
-- [ ] All exported functions/methods/types/constants/fields have GoDoc comments
-- [ ] No `TODO`/`FIXME`/`XXX` in production code (test fixtures may contain `XXX` as data)
-
-## Extra steps for stable / minor releases (vX.Y.0 where Y ≥ 1)
-
-### Extended Fuzz
-
-- [ ] Long-form fuzz pass clean: `make fuzz-long` (30 min per fuzzer, ~4 hours total) **or** trigger the GitHub Actions `fuzz-long` job via workflow_dispatch
-- [ ] No new crash inputs persisted to `testdata/fuzz/` (or, if any, fix them and patch the failing scenario before tagging)
-
-### Benchmarks
-
-- [ ] Run `make bench` and compare numbers to the README table — update if any operation moved by ≥20%
-- [ ] Match path remains 0 allocs/op on typical inputs
-
-### Stability Audit
-
-- [ ] No breaking changes to the API surface listed in README's "Stability Guarantees" section (skip for v0.x where breaking changes are allowed)
-- [ ] If any defensive limit constant (`MaxPathDepth`, `HardMaxBacktrackIterations`) changed, ensure it was *raised*, never lowered
-
-## Release Process
-
-1. **Write the RELEASE.md entry** for the new version. Be specific about what changed and why. Include migration notes if anything is breaking.
-
-2. **Create the annotated tag locally** (do NOT push yet):
-
-   ```bash
-   git tag -a vX.Y.Z -m "vX.Y.Z: one-line summary"
-   git log -1 --oneline vX.Y.Z   # confirm it points where you expect
-   ```
-
-3. **Sleep on it.** Genuinely. Step away for at least a few hours, ideally overnight. The v0.9.0 → v0.9.1 patch in this project happened because a tag was pushed within minutes of completing the work and a fuzz failure surfaced on the next CI run. A delay would have caught it before the immutable-tag commitment.
-
-4. **Re-run the full verification** the next morning:
-
-   ```bash
-   make ci && make fuzz   # plus make fuzz-long for vX.Y.0 releases
-   ```
-
-5. **Push commits, then push the tag**:
-
-   ```bash
-   git push origin main
-   git push origin vX.Y.Z
-   ```
-
-6. **Verify pkg.go.dev within 30 minutes**:
-   - Visit `https://pkg.go.dev/github.com/Sriram-PR/go-ignore@vX.Y.Z`
-   - Confirm documentation renders, examples appear in the Examples tab
-   - If pkg.go.dev fails to fetch (rare), it may take up to an hour; do not panic-tag a "fix"
-
-7. **Create the GitHub Release** from the tag:
-   - Title: `vX.Y.Z`
-   - Body: paste the RELEASE.md entry for this version
-
-## Post-Push Mistakes
-
-If a critical bug is discovered AFTER a tag is pushed:
-
-- **DO** tag the fix as the next patch version (`vX.Y.Z+1`)
-- **DO** mark the buggy version in RELEASE.md with a "**Note:** known issue, upgrade to vX.Y.Z+1" callout
-- **DO NOT** force-push the tag to overwrite the bad version
-- **DO NOT** delete the GitHub Release for the buggy version
-
+Release history for go-ignore. The maintainer release checklist follows the version history.
 
 ## Version History
 
@@ -345,3 +259,92 @@ Internal hygiene and documentation polish release. No public API change, no beha
 - Fuzz testing
 - Git parity tests
 - Requires Go 1.25+
+
+## Release Checklist
+
+Use this checklist before tagging a new release.
+
+**Tags are immutable once pushed.** Go's module proxy, pkg.go.dev, and any user who has run `go get @vX.Y.Z` cache the tag's contents. Force-pushing a tag to "fix" a bug breaks every downstream consumer that pinned that version. If a tag was pushed with a bug, accept it as immutable and ship the fix in the next patch version (v0.9.0 → v0.9.1 in this project's history is an example of the right move).
+
+### Pre-Tag Verification (every release)
+
+#### Code Quality
+
+- [ ] `make ci` passes — equivalent to `fmt + vet + test + test-race + lint`
+- [ ] No new diagnostics from `golangci-lint run --timeout=300s`
+- [ ] Coverage has not regressed: `go test -cover ./...`
+
+#### Test Coverage
+
+- [ ] Edge case tests pass: `go test -run TestEdgeCases`
+- [ ] Git parity tests pass: `go test -run TestGitParity`
+- [ ] Standard fuzz smoke pass: `make fuzz` (30s per fuzzer, 4 min total)
+
+#### Documentation
+
+- [ ] README examples and key entry points match the current API; the full reference is godoc — spot-check `go doc -all` output against the README
+- [ ] The Version History above has an entry for the new version, above the previous one
+- [ ] CONTRIBUTING.md fuzz list and lint commands are current
+- [ ] All exported functions/methods/types/constants/fields have GoDoc comments
+- [ ] No `TODO`/`FIXME`/`XXX` in production code (test fixtures may contain `XXX` as data)
+
+### Extra steps for stable / minor releases (vX.Y.0 where Y ≥ 1)
+
+#### Extended Fuzz
+
+- [ ] Long-form fuzz pass clean: `make fuzz-long` (30 min per fuzzer, ~4 hours total) **or** trigger the GitHub Actions `fuzz-long` job via workflow_dispatch
+- [ ] No new crash inputs persisted to `testdata/fuzz/` (or, if any, fix them and patch the failing scenario before tagging)
+
+#### Benchmarks
+
+- [ ] Run `make bench` and compare numbers to the README table — update if any operation moved by ≥20%
+- [ ] Match path remains 0 allocs/op on typical inputs
+
+#### Stability Audit
+
+- [ ] No breaking changes to the API surface listed in README's "Stability Guarantees" section (skip for v0.x where breaking changes are allowed)
+- [ ] If any defensive limit constant (`MaxPathDepth`, `HardMaxBacktrackIterations`) changed, ensure it was *raised*, never lowered
+
+### Release Process
+
+1. **Write the Version History entry** for the new version. Be specific about what changed and why. Include migration notes if anything is breaking.
+
+2. **Create the annotated tag locally** (do NOT push yet):
+
+   ```bash
+   git tag -a vX.Y.Z -m "vX.Y.Z: one-line summary"
+   git log -1 --oneline vX.Y.Z   # confirm it points where you expect
+   ```
+
+3. **Sleep on it.** Genuinely. Step away for at least a few hours, ideally overnight. The v0.9.0 → v0.9.1 patch in this project happened because a tag was pushed within minutes of completing the work and a fuzz failure surfaced on the next CI run. A delay would have caught it before the immutable-tag commitment.
+
+4. **Re-run the full verification** the next morning:
+
+   ```bash
+   make ci && make fuzz   # plus make fuzz-long for vX.Y.0 releases
+   ```
+
+5. **Push commits, then push the tag**:
+
+   ```bash
+   git push origin main
+   git push origin vX.Y.Z
+   ```
+
+6. **Verify pkg.go.dev within 30 minutes**:
+   - Visit `https://pkg.go.dev/github.com/Sriram-PR/go-ignore@vX.Y.Z`
+   - Confirm documentation renders, examples appear in the Examples tab
+   - If pkg.go.dev fails to fetch (rare), it may take up to an hour; do not panic-tag a "fix"
+
+7. **Create the GitHub Release** from the tag:
+   - Title: `vX.Y.Z`
+   - Body: paste the Version History entry for this version
+
+### Post-Push Mistakes
+
+If a critical bug is discovered AFTER a tag is pushed:
+
+- **DO** tag the fix as the next patch version (`vX.Y.Z+1`)
+- **DO** mark the buggy version in the Version History with a "**Note:** known issue, upgrade to vX.Y.Z+1" callout
+- **DO NOT** force-push the tag to overwrite the bad version
+- **DO NOT** delete the GitHub Release for the buggy version

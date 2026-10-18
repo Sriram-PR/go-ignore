@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -778,5 +779,46 @@ func TestLoadRepo_UnreadableGitFileErrors(t *testing.T) {
 
 	if _, err := LoadRepo(repo, MatcherOptions{}); err == nil {
 		t.Error("LoadRepo succeeded; want an error for an unreadable .git file")
+	}
+}
+
+// LoadRepo does not follow a symlinked root .gitignore, as git does not.
+func TestLoadRepo_SymlinkedRootGitignoreRefused(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs extra privileges on Windows")
+	}
+	outside := filepath.Join(t.TempDir(), "rules")
+	if err := os.WriteFile(outside, []byte("*.log\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repo := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(repo, ".gitignore")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadRepo(repo, MatcherOptions{}); !errors.Is(err, ErrPatternFileSkipped) {
+		t.Errorf("LoadRepo err = %v, want ErrPatternFileSkipped", err)
+	}
+}
+
+// info/exclude is followed through a symlink, as git does.
+func TestAddExcludePatterns_SymlinkFollowed(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks needs extra privileges on Windows")
+	}
+	outside := filepath.Join(t.TempDir(), "rules")
+	if err := os.WriteFile(outside, []byte("*.log\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitDir := filepath.Join(t.TempDir(), ".git")
+	writeTree(t, gitDir, map[string]string{"info": "DIR"})
+	if err := os.Symlink(outside, filepath.Join(gitDir, "info", "exclude")); err != nil {
+		t.Fatal(err)
+	}
+	m := New()
+	if err := m.AddExcludePatterns(gitDir); err != nil {
+		t.Fatalf("AddExcludePatterns: %v", err)
+	}
+	if !m.Match("a.log", false) {
+		t.Error("a.log not ignored; want the symlinked exclude file's rules applied")
 	}
 }

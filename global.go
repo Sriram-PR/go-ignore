@@ -34,7 +34,9 @@ var gitConfigTimeout = 5 * time.Second
 // produce surprising results.
 //
 // Missing files are silently skipped; only real read failures are returned.
-// Nested .gitignore files under subdirectories are NOT walked — use WalkDir or
+// Every file must be a regular file of at most 100 MB, and the root
+// .gitignore must not be a symlink (git does not follow one); otherwise the
+// error wraps ErrPatternFileSkipped. Nested .gitignore files under subdirectories are NOT walked — use WalkDir or
 // WalkRepo for that (they auto-discover per-directory .gitignore files), or call
 // AddPatterns with the appropriate basePath yourself if you need finer control.
 //
@@ -55,7 +57,7 @@ func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 	}
 
 	rootIgnore := filepath.Join(repoRoot, ".gitignore")
-	content, err := os.ReadFile(rootIgnore)
+	content, err := readPatternFile(osSource{}, rootIgnore, false, maxPatternFileSize)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return m, nil
@@ -74,7 +76,9 @@ func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 //  3. ~/.config/git/ignore (default fallback)
 //
 // If the resolved file does not exist, AddGlobalPatterns returns nil (no error).
-// Only real read failures are returned as errors.
+// Only real read failures are returned as errors. A symlink is followed; a
+// target that is not a regular file, or is larger than 100 MB, is an error
+// wrapping ErrPatternFileSkipped.
 //
 // Patterns are added with an empty basePath (root scope), matching Git's
 // behavior where global patterns apply to all paths.
@@ -97,7 +101,7 @@ func (m *Matcher) AddGlobalPatterns() error {
 		return nil
 	}
 
-	content, err := os.ReadFile(path)
+	content, err := readPatternFile(osSource{}, path, true, maxPatternFileSize)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -115,7 +119,9 @@ func (m *Matcher) AddGlobalPatterns() error {
 //
 // If git is unavailable, the system config does not set core.excludesFile, or
 // the referenced file does not exist, AddSystemPatterns returns nil (no error).
-// Only real read failures are returned as errors.
+// Only real read failures are returned as errors. A symlink is followed; a
+// target that is not a regular file, or is larger than 100 MB, is an error
+// wrapping ErrPatternFileSkipped.
 //
 // Patterns are added with an empty basePath (root scope), matching Git's
 // behavior where system patterns apply to all paths.
@@ -135,7 +141,7 @@ func (m *Matcher) AddSystemPatterns() error {
 		return nil
 	}
 
-	content, err := os.ReadFile(path)
+	content, err := readPatternFile(osSource{}, path, true, maxPatternFileSize)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -154,15 +160,18 @@ func (m *Matcher) AddSystemPatterns() error {
 //	if err != nil { return err }
 //	m.AddPatterns(basePath, content)
 //
-// with one extra: the file's path is recorded so that MatchResult.Source
-// identifies it for any rule that originated here.
+// with two extras: the file's path is recorded so that MatchResult.Source
+// identifies it for any rule that originated here, and the file is checked
+// before it is read, as described below.
 //
 // If path does not exist or cannot be read, the error is returned wrapped.
-// Empty files add no rules.
+// A symlink is followed; a target that is not a regular file, or is larger
+// than 100 MB, is an error wrapping ErrPatternFileSkipped. Empty files add no
+// rules.
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddPatternsFromFile(basePath, path string) error {
-	content, err := os.ReadFile(path)
+	content, err := readPatternFile(osSource{}, path, true, maxPatternFileSize)
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", path, err)
 	}
@@ -179,7 +188,9 @@ func (m *Matcher) AddPatternsFromFile(basePath, path string) error {
 // file without a "gitdir:" line has no exclude file.
 //
 // If the exclude file does not exist, AddExcludePatterns returns nil (no error).
-// Only real read failures are returned as errors.
+// Only real read failures are returned as errors. A symlink is followed, as
+// in git; a target that is not a regular file, or is larger than 100 MB, is
+// an error wrapping ErrPatternFileSkipped.
 //
 // Patterns are added with an empty basePath (root scope), matching Git's
 // behavior where exclude patterns apply to all paths.
@@ -200,7 +211,7 @@ func (m *Matcher) AddExcludePatterns(gitDir string) error {
 	}
 	path := filepath.Join(dir, "info", "exclude")
 
-	content, err := os.ReadFile(path)
+	content, err := readPatternFile(osSource{}, path, true, maxPatternFileSize)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -226,7 +237,7 @@ func resolveExcludeDir(gitPath string) (dir string, ok bool, err error) {
 
 	gitDir := gitPath
 	if !fi.IsDir() {
-		content, readErr := os.ReadFile(gitPath)
+		content, readErr := readPatternFile(osSource{}, gitPath, true, maxPatternFileSize)
 		if readErr != nil {
 			return "", false, fmt.Errorf("reading %s: %w", gitPath, readErr)
 		}
@@ -237,7 +248,7 @@ func resolveExcludeDir(gitPath string) (dir string, ok bool, err error) {
 		gitDir = resolveRelative(filepath.Dir(gitPath), strings.TrimSpace(target))
 	}
 
-	common, err := os.ReadFile(filepath.Join(gitDir, "commondir"))
+	common, err := readPatternFile(osSource{}, filepath.Join(gitDir, "commondir"), true, maxPatternFileSize)
 	switch {
 	case err == nil:
 		return resolveRelative(gitDir, strings.TrimSpace(string(common))), true, nil

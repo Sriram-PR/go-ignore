@@ -1097,3 +1097,25 @@ func TestMatch_BudgetExhaustedInParentCheckKeepsOwnResult(t *testing.T) {
 		t.Errorf("MatchWithReason = %+v, want the path's own result, re-included by !*.go", got)
 	}
 }
+
+type endlessReader struct{}
+
+func (endlessReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 'a'
+	}
+	return len(p), nil
+}
+
+// The reader path stops at its limit instead of reading forever. The limit
+// is 8 bytes here; AddPatternsReader passes git's 100 MB.
+func TestAddPatternsReader_EndlessReaderRefused(t *testing.T) {
+	m := New()
+	err := m.addPatternsReader("", "", endlessReader{}, 8)
+	if !errors.Is(err, ErrPatternFileSkipped) {
+		t.Errorf("err = %v, want ErrPatternFileSkipped", err)
+	}
+	if n := m.RuleCount(); n != 0 {
+		t.Errorf("RuleCount = %d, want 0", n)
+	}
+}

@@ -294,10 +294,13 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 }
 
 // AddPatternsReader reads gitignore content from r and calls AddPatterns.
-// It is equivalent to io.ReadAll followed by AddPatterns, but avoids forcing
-// callers to buffer the entire file themselves.
+// It is equivalent to io.ReadAll followed by AddPatterns, with the 100 MB
+// limit below, but avoids forcing callers to buffer the entire file
+// themselves.
 //
 // If reading r fails, no rules are added and the read error is returned wrapped.
+// Reading stops after 100 MB, git's limit for a pattern file: more adds no
+// rules and returns an error wrapping ErrPatternFileSkipped.
 // A successful read with empty content is treated the same as AddPatterns(basePath, nil).
 //
 // Thread-safe: can be called concurrently with Match.
@@ -317,10 +320,16 @@ func (m *Matcher) AddPatternsReader(basePath string, r io.Reader) error {
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddPatternsReaderWithSource(basePath, source string, r io.Reader) error {
+	return m.addPatternsReader(basePath, source, r, maxPatternFileSize)
+}
+
+// addPatternsReader is AddPatternsReaderWithSource with the size limit as a
+// parameter, for tests.
+func (m *Matcher) addPatternsReader(basePath, source string, r io.Reader, limit int64) error {
 	if r == nil {
 		return nil
 	}
-	content, err := io.ReadAll(r)
+	content, err := readLimited(r, limit)
 	if err != nil {
 		return fmt.Errorf("reading patterns: %w", err)
 	}

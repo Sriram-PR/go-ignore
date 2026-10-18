@@ -10,7 +10,7 @@ Thank you for your interest in contributing! This document provides guidelines a
    cd go-ignore
    ```
 
-2. **Ensure Go 1.25+ is installed**
+2. **Ensure Go 1.26+ is installed**
    ```bash
    go version
    ```

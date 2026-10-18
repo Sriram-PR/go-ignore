@@ -6,6 +6,10 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ### Unreleased
 
+**Requirements**
+
+- Minimum Go version is now 1.26 (1.25 is out of support). CI tests 1.26 and 1.27.
+
 **Tests**
 
 - Git parity harness (`make parity`): compares `Match`, case-insensitive `Match` and `WalkDir` with git on curated and seeded scenarios, against a checked-in baseline of known divergences. Runs in CI.

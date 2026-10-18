@@ -19,7 +19,7 @@ Zero-dependency `.gitignore` matching for Go, verified byte-for-byte against `gi
 go get github.com/Sriram-PR/go-ignore
 ```
 
-Requires Go 1.25 or later.
+Requires Go 1.26 or later.
 
 ## Quick Start
 

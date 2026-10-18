@@ -66,38 +66,21 @@ func normalizePath(p string) string {
 	return p
 }
 
-// normalizeContent prepares .gitignore bytes for parsing: it strips a UTF-8 BOM
-// and converts CRLF/CR line endings to LF, so files authored on any platform
-// parse identically.
+// normalizeContent prepares .gitignore bytes for parsing the way git's
+// add_patterns does: it strips one leading UTF-8 BOM and drops a CR that
+// precedes LF or ends the content. Any other CR is pattern text.
 func normalizeContent(content []byte) []byte {
-	if len(content) == 0 {
-		return content
-	}
-
-	// The loop handles the (degenerate) case of repeated BOMs for idempotency.
-	for len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
-		content = content[3:]
-	}
+	content = bytes.TrimPrefix(content, []byte{0xEF, 0xBB, 0xBF})
 
 	if bytes.IndexByte(content, '\r') < 0 {
 		return content // fast path: no CR at all
 	}
-	buf := make([]byte, 0, len(content))
-	for i := 0; i < len(content); i++ {
-		if content[i] == '\r' {
-			buf = append(buf, '\n')
-			if i+1 < len(content) && content[i+1] == '\n' {
-				i++ // skip the \n after \r
-			}
-		} else {
-			buf = append(buf, content[i])
-		}
-	}
-	return buf
+	content = bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n"))
+	return bytes.TrimSuffix(content, []byte("\r"))
 }
 
-// trimTrailingWhitespace removes trailing spaces and tabs from a line,
-// respecting backslash-escaped spaces per the gitignore spec.
+// trimTrailingWhitespace removes trailing spaces (not tabs, matching git) from
+// a line, respecting backslash-escaped spaces per the gitignore spec.
 //
 // Git behavior: "Trailing spaces are ignored unless they are quoted with backslash."
 // A backslash before a trailing space preserves that space:
@@ -109,7 +92,7 @@ func normalizeContent(content []byte) []byte {
 // Note: This does not trim newlines; those are handled during line splitting.
 func trimTrailingWhitespace(line string) string {
 	end := len(line)
-	for end > 0 && (line[end-1] == ' ' || line[end-1] == '\t') {
+	for end > 0 && line[end-1] == ' ' {
 		end--
 	}
 

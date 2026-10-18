@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"bytes"
 	"runtime"
 	"testing"
 )
@@ -319,17 +320,13 @@ func FuzzNormalizeContent(f *testing.F) {
 		// Should never panic
 		result := normalizeContent(content)
 
-		// Result should be idempotent
-		result2 := normalizeContent(result)
-		if string(result) != string(result2) {
-			t.Errorf("normalizeContent not idempotent")
+		// Like git, only one leading BOM, a CR per CRLF, and one final CR may go.
+		maxRemoved := 3 + bytes.Count(content, []byte("\r\n")) + 1
+		if removed := len(content) - len(result); removed < 0 || removed > maxRemoved {
+			t.Errorf("removed %d bytes, want 0..%d: %q -> %q", removed, maxRemoved, content, result)
 		}
-
-		// Result should not contain CRLF or CR
-		for i := 0; i < len(result); i++ {
-			if result[i] == '\r' {
-				t.Errorf("result contains CR at position %d", i)
-			}
+		if bytes.IndexByte(content, '\r') < 0 && !bytes.HasPrefix(content, []byte{0xEF, 0xBB, 0xBF}) && !bytes.Equal(result, content) {
+			t.Errorf("content without CR or BOM changed: %q -> %q", content, result)
 		}
 	})
 }

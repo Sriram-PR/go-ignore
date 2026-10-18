@@ -38,12 +38,13 @@ func TestEdgeCases_LineEndings(t *testing.T) {
 			true,
 			false, // file inside directory
 		},
-		// CR only (old Mac)
+		// A lone CR is pattern text, not a line ending (git strips CR only
+		// before LF or at end of file).
 		{
-			"CR only line endings",
+			"lone CR is not a line ending",
 			[]byte("*.log\rbuild/\r"),
 			"test.log",
-			true,
+			false,
 			false,
 		},
 		// Mixed line endings
@@ -200,7 +201,7 @@ func TestEdgeCases_Whitespace(t *testing.T) {
 	}{
 		// Trailing whitespace (should be trimmed)
 		{"trailing spaces trimmed", "*.log   ", "test.log", true},
-		{"trailing tabs trimmed", "*.log\t\t", "test.log", true},
+		{"trailing tabs are pattern text", "*.log\t\t", "test.log", false},
 
 		// Spaces in filenames (valid)
 		{"space in filename", "foo bar.txt", "foo bar.txt", true},

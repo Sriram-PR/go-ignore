@@ -101,20 +101,21 @@ func TestNormalizeContent(t *testing.T) {
 		{"with BOM", []byte{0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'}, []byte("*.log")},
 		{"BOM only", []byte{0xEF, 0xBB, 0xBF}, []byte{}},
 		{"BOM with newlines", append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\nbuild/")...), []byte("*.log\nbuild/")},
-		{"double BOM", []byte{0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'}, []byte("*.log")},
+		{"double BOM strips one", []byte{0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'}, []byte{0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'}},
 
 		// CRLF normalization (Windows)
 		{"CRLF endings", []byte("*.log\r\nbuild/\r\n"), []byte("*.log\nbuild/\n")},
 		{"single CRLF", []byte("foo\r\nbar"), []byte("foo\nbar")},
 		{"multiple CRLF", []byte("a\r\nb\r\nc\r\n"), []byte("a\nb\nc\n")},
 
-		// CR only normalization (old Mac)
-		{"CR only", []byte("*.log\rbuild/\r"), []byte("*.log\nbuild/\n")},
-		{"single CR", []byte("foo\rbar"), []byte("foo\nbar")},
+		// Lone CR is pattern text; only a CR at end of content is dropped
+		{"CR only", []byte("*.log\rbuild/\r"), []byte("*.log\rbuild/")},
+		{"single CR", []byte("foo\rbar"), []byte("foo\rbar")},
+		{"CR CR LF strips one", []byte("foo\r\r\n"), []byte("foo\r\n")},
 
 		// Mixed line endings
 		{"mixed CRLF and LF", []byte("a\r\nb\nc\r\n"), []byte("a\nb\nc\n")},
-		{"mixed all", []byte("a\r\nb\rc\n"), []byte("a\nb\nc\n")},
+		{"mixed all", []byte("a\r\nb\rc\n"), []byte("a\nb\rc\n")},
 
 		// BOM with CRLF
 		{"BOM and CRLF", append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\r\nbuild/\r\n")...), []byte("*.log\nbuild/\n")},
@@ -152,13 +153,13 @@ func TestTrimTrailingWhitespace(t *testing.T) {
 		{"trailing space", "*.log ", "*.log"},
 		{"multiple trailing spaces", "*.log   ", "*.log"},
 
-		// Trailing tabs
-		{"trailing tab", "*.log\t", "*.log"},
-		{"multiple trailing tabs", "*.log\t\t", "*.log"},
+		// Tabs are not trimmed (git trims spaces only)
+		{"trailing tab", "*.log\t", "*.log\t"},
+		{"multiple trailing tabs", "*.log\t\t", "*.log\t\t"},
 
-		// Mixed trailing whitespace
-		{"mixed space and tab", "*.log \t", "*.log"},
-		{"mixed tab and space", "*.log\t ", "*.log"},
+		// Mixed trailing whitespace: only spaces after the last tab go
+		{"mixed space and tab", "*.log \t", "*.log \t"},
+		{"mixed tab and space", "*.log\t ", "*.log\t"},
 
 		// Leading whitespace preserved
 		{"leading space", " *.log", " *.log"},
@@ -170,7 +171,7 @@ func TestTrimTrailingWhitespace(t *testing.T) {
 
 		// Only whitespace
 		{"only spaces", "   ", ""},
-		{"only tabs", "\t\t", ""},
+		{"only tabs", "\t\t", "\t\t"},
 
 		// Backslash-escaped trailing spaces (git spec)
 		{"escaped trailing space", "foo\\ ", "foo "},         // \<space> preserved, backslash removed
@@ -178,7 +179,7 @@ func TestTrimTrailingWhitespace(t *testing.T) {
 		{"double backslash space", "foo\\\\ ", "foo\\\\"},    // \\ = literal \, trailing space unescaped
 		{"triple backslash space", "foo\\\\\\ ", "foo\\\\ "}, // \\\ = literal \ + escaped space
 		{"backslash no space", "foo\\", "foo\\"},             // No trailing space, nothing to do
-		{"backslash tab", "foo\\\t", "foo\\"},                // Backslash before tab doesn't escape
+		{"backslash tab", "foo\\\t", "foo\\\t"},              // Tabs are never trimmed
 	}
 
 	for _, tt := range tests {
@@ -217,24 +218,40 @@ func TestNormalizePathIdempotent(t *testing.T) {
 	}
 }
 
-// TestNormalizeContentIdempotent verifies that normalizing twice produces same result
-func TestNormalizeContentIdempotent(t *testing.T) {
-	contents := [][]byte{
-		[]byte("*.log\n"),
-		[]byte("*.log\r\n"),
-		{0xEF, 0xBB, 0xBF, '*', '.', 'l', 'o', 'g'},
-		append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\r\nbuild/\r\n")...),
-		// Double BOM - this was the fuzz-discovered edge case
-		{0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF},
-		{0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF},
+// Expectations were recorded from git 2.56 `git check-ignore` with each
+// content as the root .gitignore. Git trims trailing spaces only (not tabs),
+// strips a CR only before LF or at end of file, and strips a single BOM.
+func TestPatternContent_LineHandlingMatchesGit(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		path    string
+		want    bool
+	}{
+		{"trailing tab is part of pattern", "foo\t\n", "foo", false},
+		{"trailing tab matches tab name", "foo\t\n", "foo\t", true},
+		{"space before tab not trimmed", "foo \t\n", "foo \t", true},
+		{"space before tab: bare name", "foo \t\n", "foo", false},
+		{"escaped tab", "foo\\\t\n", "foo\t", true},
+		{"lone CR is not a line break", "foo\rbar\n", "foo", false},
+		{"lone CR is not a line break (2)", "foo\rbar\n", "bar", false},
+		{"lone CR kept in pattern", "foo\rbar\n", "foo\rbar", true},
+		{"CRLF stripped", "foo\r\nbar\r\n", "bar", true},
+		{"CR at EOF stripped", "foo\nbar\r", "bar", true},
+		{"only one CR stripped before LF", "foo\r\r\n", "foo\r", true},
+		{"only one CR stripped before LF (2)", "foo\r\r\n", "foo", false},
+		{"only one CR stripped at EOF", "foo\r\r", "foo\r", true},
+		{"single BOM stripped", "\xef\xbb\xbffoo\n", "foo", true},
+		{"second BOM is pattern text", "\xef\xbb\xbf\xef\xbb\xbffoo\n", "foo", false},
+		{"second BOM is pattern text (2)", "\xef\xbb\xbf\xef\xbb\xbffoo\n", "\xef\xbb\xbffoo", true},
 	}
-
-	for i, c := range contents {
-		first := normalizeContent(c)
-		second := normalizeContent(first)
-		if !bytes.Equal(first, second) {
-			t.Errorf("normalizeContent not idempotent for case %d: first=%v, second=%v",
-				i, first, second)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := New()
+			m.AddPatterns("", []byte(tt.content))
+			if got := m.Match(tt.path, false); got != tt.want {
+				t.Errorf("content %q: Match(%q) = %v, want %v", tt.content, tt.path, got, tt.want)
+			}
+		})
 	}
 }

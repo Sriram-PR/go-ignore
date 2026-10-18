@@ -65,8 +65,6 @@ func TestParseLine_EmptyLines(t *testing.T) {
 	}{
 		{"empty", ""},
 		{"spaces only", "   "},
-		{"tabs only", "\t\t"},
-		{"mixed whitespace", " \t "},
 	}
 
 	for _, tt := range tests {
@@ -343,8 +341,8 @@ func TestParseLine_TrailingWhitespace(t *testing.T) {
 		wantSegValue string
 	}{
 		{"trailing space", "foo.log   ", "foo.log"},
-		{"trailing tab", "foo.log\t", "foo.log"},
-		{"mixed trailing", "foo.log \t ", "foo.log"},
+		{"trailing tab kept", "foo.log\t", "foo.log\t"},
+		{"mixed trailing", "foo.log \t ", "foo.log \t"},
 		// Note: "build /" has space BEFORE slash, not trailing whitespace
 		// After stripping trailing /, we get "build " which is valid
 		// Git treats this as matching a directory named "build " (with space)

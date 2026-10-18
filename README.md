@@ -9,7 +9,7 @@ Zero-dependency `.gitignore` matching for Go, verified byte-for-byte against `gi
 ## Highlights
 
 - **Correct** — full gitignore syntax (`*`, `?`, `**`, `!`, `/`, `\` escapes, character classes, and all 12 POSIX classes), with an automated parity test suite against the system `git`.
-- **Batteries included** — a filesystem walker with nested `.gitignore` auto-discovery and directory pruning, plus one-call loading of all four gitignore sources (system, global, `.git/info/exclude`, and the repo root).
+- **Batteries included** — a filesystem walker with nested `.gitignore` auto-discovery and directory pruning, plus one-call loading of the standard gitignore sources (`core.excludesFile` as git resolves it, `.git/info/exclude`, and the repo root).
 - **Fast and safe** — a zero-allocation match path, safe for concurrent use, fuzz- and race-tested.
 - **Zero dependencies** — the standard library only.
 

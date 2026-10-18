@@ -33,9 +33,9 @@ var gitConfigTimeout = 5 * time.Second
 //
 // The value comes from running "git config" in repoRoot, with GIT_DIR and
 // GIT_WORK_TREE removed from its environment. If git is not installed or does
-// not answer within 5 seconds, the XDG default is used. If git rejects
-// repoRoot's .git (a malformed .git file, say), the value is read without the
-// repository's own config. Any other git config failure, such as a malformed
+// not answer within 5 seconds, the XDG default is used. If git rejects the
+// repository (a malformed .git file or .git/config, say), the value is read
+// without the repository's own config. Any other git config failure, such as a malformed
 // system or global gitconfig, is returned as an error.
 //
 // repoRoot locates the repository and the two on-disk files above; it is NOT
@@ -98,7 +98,8 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 // AddGlobalPatterns loads the user's global gitignore file and adds its
 // patterns to the matcher. The path is core.excludesFile from the global git
 // config (git config --global, with include and includeIf followed). If git
-// is unavailable or the global config does not set it, the path is
+// is unavailable, does not answer within 5 seconds, fails (a malformed global
+// config, say), or the global config does not set it, the path is
 // $XDG_CONFIG_HOME/git/ignore, or ~/.config/git/ignore when XDG_CONFIG_HOME
 // is unset. A global value set to the empty string loads nothing.
 //
@@ -140,8 +141,10 @@ func (m *Matcher) AddGlobalPatterns() error {
 // configured via /etc/gitconfig, with include and includeIf followed) and
 // adds them to the matcher.
 //
-// If git is unavailable, the system config does not set core.excludesFile, or
-// the referenced file does not exist, AddSystemPatterns returns nil (no error).
+// If git is unavailable, does not answer within 5 seconds, or fails (a
+// malformed system config, say), the system config does not set
+// core.excludesFile, or the referenced file does not exist, AddSystemPatterns
+// returns nil (no error).
 // Only real read failures are returned as errors. A symlink is followed; a
 // target that is not a regular file, or is larger than 100 MB, is an error
 // wrapping ErrPatternFileSkipped.
@@ -350,6 +353,7 @@ func gitConfigGetNoRepo(args ...string) (value string, found bool, err error) {
 	return runGitConfig("", env, args)
 }
 
+// runGitConfig runs git config in dir with env; see gitConfigGet for results.
 func runGitConfig(dir string, env, args []string) (value string, found bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
 	defer cancel()

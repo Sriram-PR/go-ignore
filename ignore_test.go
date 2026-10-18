@@ -1021,3 +1021,17 @@ func BenchmarkMatch_Simple(b *testing.B) {
 		m.Match("src/main.go", false)
 	}
 }
+
+// With checkParents off, match skips the parent-directory check, so a
+// negation inside an ignored directory stands. WalkDir relies on this: it
+// never visits a path under an ignored directory.
+func TestMatch_CheckParentsFlag(t *testing.T) {
+	m := New()
+	m.AddPatterns("", []byte("build/\n!build/keep.txt\n"))
+	if got := m.match("build/keep.txt", false, true); !got.Ignored || got.Rule != "build/" {
+		t.Errorf("match(checkParents=true) = %+v, want ignored by build/", got)
+	}
+	if got := m.match("build/keep.txt", false, false); got.Ignored || got.Rule != "!build/keep.txt" {
+		t.Errorf("match(checkParents=false) = %+v, want re-included by !build/keep.txt", got)
+	}
+}

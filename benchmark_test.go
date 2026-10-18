@@ -151,6 +151,19 @@ func BenchmarkMatch_DeepPath32(b *testing.B) {
 	}
 }
 
+// BenchmarkMatch_DeepPathNoNegation measures a 100-segment path that no rule
+// matches and no negation re-includes.
+func BenchmarkMatch_DeepPathNoNegation(b *testing.B) {
+	b.ReportAllocs()
+	m := New()
+	m.AddPatterns("", []byte("*.log\nbuild/\nnode_modules/\n.idea/\n*.tmp\n/dist\n"))
+	path := strings.Repeat("d/", 99) + "main.go"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Match(path, false)
+	}
+}
+
 // BenchmarkMatch_DoubleStar measures ** pattern performance
 func BenchmarkMatch_DoubleStar(b *testing.B) {
 	b.ReportAllocs()

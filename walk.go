@@ -123,7 +123,7 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 		if d.IsDir() {
 
 			// Prune ignored directories. The root is always kept.
-			if rel != "." && child.Match(rel, true) {
+			if rel != "." && child.match(rel, true, false).Ignored {
 				return fs.SkipDir
 			}
 
@@ -150,7 +150,7 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 		}
 
 		// File: skip silently if ignored, otherwise hand to caller.
-		if child.Match(rel, false) {
+		if child.match(rel, false, false).Ignored {
 			return nil
 		}
 		return fn(path, d, nil)

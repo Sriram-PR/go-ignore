@@ -362,6 +362,13 @@ func (m *Matcher) Match(path string, isDir bool) bool {
 //   - Matched == true, Ignored == true: Path is ignored by Rule
 //   - Matched == true, Ignored == false: Path was ignored but re-included by negation Rule
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
+	return m.match(path, isDir, true)
+}
+
+// match implements MatchWithReason. The walker passes checkParents=false: it
+// prunes every directory match reports as ignored, so no path it visits has
+// an ignored parent.
+func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 	path = normalizePath(path)
 	if path == "" {
 		return MatchResult{Ignored: false, Matched: false}
@@ -411,7 +418,7 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	// and O(N²) overall; a 100k-segment path with a matching negation took
 	// tens of seconds before this fix (observed via FuzzMatch timeout in CI).
 	// Slicing is O(N) total and zero-alloc on the hot path.
-	if result.Matched && !result.Ignored && len(pathSegments) > 1 {
+	if checkParents && result.Matched && !result.Ignored && len(pathSegments) > 1 {
 		// Skip any leading slash so ancestor[:j] is a name, not "/" prefix.
 		start := 0
 		if len(path) > 0 && path[0] == '/' {

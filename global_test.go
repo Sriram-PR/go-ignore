@@ -762,3 +762,21 @@ func TestLoadRepo_RealGitWorktree(t *testing.T) {
 		t.Error("key.secret not ignored in a real linked worktree")
 	}
 }
+
+// An unreadable .git file is a real read failure, not a missing source.
+func TestLoadRepo_UnreadableGitFileErrors(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions and a non-root user")
+	}
+	repo := t.TempDir()
+	writeTree(t, repo, map[string]string{".git": "gitdir: elsewhere\n"})
+	gitFile := filepath.Join(repo, ".git")
+	if err := os.Chmod(gitFile, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(gitFile, 0o644) })
+
+	if _, err := LoadRepo(repo, MatcherOptions{}); err == nil {
+		t.Error("LoadRepo succeeded; want an error for an unreadable .git file")
+	}
+}

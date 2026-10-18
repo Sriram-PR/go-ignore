@@ -226,9 +226,9 @@ func resolveExcludeDir(gitPath string) (dir string, ok bool, err error) {
 
 	gitDir := gitPath
 	if !fi.IsDir() {
-		content, err := os.ReadFile(gitPath)
-		if err != nil {
-			return "", false, fmt.Errorf("reading %s: %w", gitPath, err)
+		content, readErr := os.ReadFile(gitPath)
+		if readErr != nil {
+			return "", false, fmt.Errorf("reading %s: %w", gitPath, readErr)
 		}
 		target, found := strings.CutPrefix(strings.TrimSpace(string(content)), "gitdir:")
 		if !found {

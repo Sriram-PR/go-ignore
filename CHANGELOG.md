@@ -23,6 +23,10 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 - **Walks past `MaxPatterns`.** The walker kept every discovered `.gitignore`'s rules until the walk ended, so in a large tree the total passed `MaxPatterns` (100,000 by default), later rules were dropped with only a warning, and the walk yielded files git ignores. Rules now apply only while the walk is inside their directory, so the cap counts the rules of the current entry's ancestors.
 - **`WalkRepo` and `RepoFiles` loaded the root `.gitignore` twice**, once through `LoadRepo` and again in the walker, so its parse warnings were reported twice.
 
+**Performance**
+
+- **Walks with many nested `.gitignore` files are linear.** Every discovered rule stayed live for the rest of the walk, so each entry was matched against the rules of every directory visited so far. `BenchmarkWalkDir_NestedGitignores`: 14.9 µs per entry at 500 directories and 49.1 µs at 2,000 before, 2.4 µs and 2.2 µs after. A tree with 3,000 nested `.gitignore` files and 66,000 files walks in 0.11 s instead of 9.2 s.
+
 ### v1.1.0
 
 `Match` now agrees with git for paths under directories, which removes 863 of the 932 known divergences the new parity harness found. Both fixes change results only where go-ignore disagreed with `git check-ignore`, as the Stability Guarantees allow. The exported API is unchanged. The minimum Go version is now 1.26.

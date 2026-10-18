@@ -15,6 +15,7 @@ Bug fixes from an audit that diffed matching and walking against `git check-igno
 - **`CaseInsensitive` with nested `.gitignore` files.** Rules from a `.gitignore` in a directory whose name had uppercase letters never applied, because the path was lowercased and the base path wasn't. `MatchResult.BasePath` still reports the caller's spelling.
 - **Dir-only `**` patterns.** `**/`, `/**/` and `a/**/` matched files at their own level (`x.log` for `**/`, `a/x.log` for `a/**/`). They now only match inside a directory, as in git.
 - **`.gitignore` text handling now matches git.** Trailing tabs are pattern text (git trims spaces only). A CR is dropped only before LF or at the end of the file, so a lone CR no longer splits a line. Only one leading BOM is stripped.
+- **Deep paths with many wildcard rules.** A floating pattern without `**` was tried at every position in the path, and the negation ancestor walk repeats that for each parent, so cost grew with depth squared. 1000 `x*y` rules against a 1000-deep path took 4.3s and now take 20ms. Results are unchanged.
 - **`git config` timeout.** The 5s timeout didn't hold when `git` left a child process holding stdout, and `LoadRepo` could hang for as long as that child lived. The wait is now bounded.
 
 **Documentation**

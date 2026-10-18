@@ -676,3 +676,31 @@ func TestEdgeCases_DirOnlyGlobstar(t *testing.T) {
 		}
 	}
 }
+
+// A floating pattern without ** can only match the path's last segments, so
+// trying every start position made the parent-excluded ancestor walk
+// O(R·N²) for R such rules. At N=1000 and R=1000 that took ~4.5s.
+func TestEdgeCases_DeepPath_ManyFloatingRules(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping deep-path perf guard in -short mode")
+	}
+	var rules strings.Builder
+	for range 1000 {
+		rules.WriteString("x*y\n")
+	}
+	rules.WriteString("*.log\n!a.log\n")
+	m := New()
+	m.AddPatterns("", []byte(rules.String()))
+
+	path := buildDeepPath(1000, "a.log")
+	start := time.Now()
+	got := m.Match(path, false)
+	elapsed := time.Since(start)
+
+	if got {
+		t.Error("a.log is negated and its parents are not excluded; want not ignored")
+	}
+	if elapsed > time.Second {
+		t.Errorf("Match took %v on a 1000-deep path with 1000 floating rules, want < 1s", elapsed)
+	}
+}

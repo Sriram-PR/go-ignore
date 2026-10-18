@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"slices"
 	"strings"
 )
 
@@ -138,7 +139,13 @@ func matchFloating(r *rule, matchSegments []string, prefixMatch bool, ctx *match
 	if prefixMatch {
 		maxStart = len(matchSegments) - 1
 	}
-	for i := 0; i <= maxStart; i++ {
+	// Without **, an exact match consumes one path segment per pattern
+	// segment, so it can only start at maxStart.
+	start := 0
+	if !prefixMatch && !slices.ContainsFunc(r.segments, isDoubleStar) {
+		start = max(maxStart, 0)
+	}
+	for i := start; i <= maxStart; i++ {
 		if ctx.exhausted() {
 			return false
 		}
@@ -163,6 +170,8 @@ func matchFloating(r *rule, matchSegments []string, prefixMatch bool, ctx *match
 
 	return false
 }
+
+func isDoubleStar(s segment) bool { return s.doubleStar }
 
 // matchSegmentsExact recursively matches pattern segments against path segments.
 // This is the core matching algorithm with ** support.

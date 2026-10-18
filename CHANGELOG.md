@@ -4,7 +4,34 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.0.1
+
+Bug fixes from an audit that diffed matching and walking against `git check-ignore` 2.56. Each one changes results only where go-ignore disagreed with git, which the Stability Guarantees allow in a patch release. The exported API is unchanged.
+
+**Fixed**
+
+- **Linked worktrees and submodules.** In these `.git` is a file, not a directory, and `LoadRepo`, `WalkRepo` and `RepoFiles` failed with "not a directory". `AddExcludePatterns` now follows the `gitdir:` pointer and then `commondir`, so a worktree reads the main repo's `info/exclude` like git. A `.git` file without a pointer just has no exclude file.
+- **Walks skip `.git` files.** Only `.git` directories were pruned, so a submodule's `.git` file showed up in `WalkDir` and `Files` output.
+- **`CaseInsensitive` with nested `.gitignore` files.** Rules from a `.gitignore` in a directory whose name had uppercase letters never applied, because the path was lowercased and the base path wasn't. `MatchResult.BasePath` still reports the caller's spelling.
+- **Dir-only `**` patterns.** `**/`, `/**/` and `a/**/` matched files at their own level (`x.log` for `**/`, `a/x.log` for `a/**/`). They now only match inside a directory, as in git.
+- **`.gitignore` text handling now matches git.** Trailing tabs are pattern text (git trims spaces only). A CR is dropped only before LF or at the end of the file, so a lone CR no longer splits a line. Only one leading BOM is stripped.
+- **`git config` timeout.** The 5s timeout didn't hold when `git` left a child process holding stdout, and `LoadRepo` could hang for as long as that child lived. The wait is now bounded.
+
+**Documentation**
+
+- Restored the README "Stability Guarantees" section, which the CHANGELOG and README pointed to but which had been dropped.
+- `Files` / `FilesFS`: errors are yielded and the walk continues; break to stop. Non-directory entries such as symlinks are yielded too.
+- `WalkDir`: matching is relative to `root`, so walking a subdirectory with a repo matcher doesn't apply rules scoped above it.
+- `MatchResult.Source` is an fs.FS path for `WalkDirFS`, not an absolute path. The `AddPatterns` normalization notes describe the fixed behavior.
+
+**Tests**
+
+- The test binary no longer reads the developer's real git config or home directory. A personal global gitignore used to fail 8 tests.
+- Expectations for the fixed cases were recorded from git 2.56.
+
 ### v1.0.0
+
+**Note:** a few matching cases diverge from git. They are fixed in v1.0.1, so upgrade.
 
 go-ignore is now stable. This release freezes the exported API for the v1.x line — types, functions, methods, fields, and constants are settled, and future releases add to them rather than break them. The README's "Stability Guarantees" section spells out the full contract.
 

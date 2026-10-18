@@ -105,13 +105,18 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 			return fn(path, d, relErr)
 		}
 
-		if d.IsDir() {
-			// Always prune .git (regardless of matcher state) so walks of real
-			// repos don't descend into git internals. The root itself (rel
-			// == ".") is never pruned even if it happens to be named ".git".
-			if rel != "." && d.Name() == ".git" {
+		// Always skip .git (regardless of matcher state): a directory holds git
+		// internals, and a file is the gitdir pointer of a worktree or
+		// submodule, which git never lists. The root itself (rel == ".") is
+		// never skipped even if it happens to be named ".git".
+		if rel != "." && d.Name() == ".git" {
+			if d.IsDir() {
 				return fs.SkipDir
 			}
+			return nil
+		}
+
+		if d.IsDir() {
 
 			// Prune ignored directories. The root is always kept.
 			if rel != "." && child.Match(rel, true) {

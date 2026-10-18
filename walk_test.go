@@ -598,6 +598,23 @@ func TestWalkDirFS_PathsAreForwardSlash(t *testing.T) {
 	}
 }
 
+// In worktrees and submodules .git is a file; git never lists it.
+func TestWalkDir_DotGitFileNotYielded(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"keep.txt":     "x",
+		".git":         "gitdir: ../main/.git/worktrees/wt\n",
+		"sub/.git":     "gitdir: ../.git/modules/sub\n",
+		"sub/file.txt": "x",
+	})
+
+	got := collectWalk(t, New(), root)
+	want := []string{"keep.txt", "sub", "sub/file.txt"}
+	if !equalStrings(got, want) {
+		t.Errorf("WalkDir = %v, want %v", got, want)
+	}
+}
+
 func TestWalkDirFS_DotGitPruned(t *testing.T) {
 	fsys := fstest.MapFS{
 		"keep.txt":          {Data: []byte("x")},

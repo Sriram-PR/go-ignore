@@ -234,9 +234,14 @@ func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bo
 	seg := pattern[0]
 
 	if seg.doubleStar {
-		// ** can match zero or more path segments
+		// As in matchSegmentsExact, a trailing ** must consume a segment:
+		// "**/" names a directory, so a root-level file is not inside one.
+		minI := 0
+		if len(pattern) == 1 {
+			minI = 1
+		}
 		ctx.depth++
-		for i := 0; i <= len(path); i++ {
+		for i := minI; i <= len(path); i++ {
 			if matchSegmentsPrefix(pattern[1:], path[i:], ctx) {
 				ctx.depth--
 				return true

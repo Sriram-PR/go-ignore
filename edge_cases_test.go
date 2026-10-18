@@ -648,3 +648,31 @@ func TestEdgeCases_BasePathNormalization(t *testing.T) {
 		})
 	}
 }
+
+// A dir-only globstar pattern ignores directories at any depth, so a file
+// is covered only when it sits inside one. Expectations recorded from git 2.56.
+func TestEdgeCases_DirOnlyGlobstar(t *testing.T) {
+	type check struct {
+		path  string
+		isDir bool
+		want  bool
+	}
+	tests := []struct {
+		pattern string
+		checks  []check
+	}{
+		{"**/", []check{{"x.log", false, false}, {"d/x.log", false, true}, {"d", true, true}, {"a/sub/x.log", false, true}}},
+		{"/**/", []check{{"x.log", false, false}, {"d/x.log", false, true}, {"d", true, true}}},
+		{"a/**/", []check{{"x.log", false, false}, {"a/x.log", false, false}, {"a", true, false}, {"a/sub", true, true}, {"a/sub/x.log", false, true}}},
+		{"**/**/", []check{{"x.log", false, false}, {"d/x.log", false, true}, {"d", true, true}}},
+	}
+	for _, tt := range tests {
+		m := New()
+		m.AddPatterns("", []byte(tt.pattern+"\n"))
+		for _, c := range tt.checks {
+			if got := m.Match(c.path, c.isDir); got != c.want {
+				t.Errorf("pattern %q: Match(%q, %v) = %v, want %v", tt.pattern, c.path, c.isDir, got, c.want)
+			}
+		}
+	}
+}

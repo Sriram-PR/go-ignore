@@ -1018,6 +1018,10 @@ func TestMatchRule_DirectoryContents(t *testing.T) {
 		{"vendor anywhere file inside", "vendor/", "vendor/lib/file.go", false, false, true},
 		{"vendor nested file inside", "vendor/", "lib/vendor/file.go", false, false, true},
 
+		{"build file inside", "build/", "build/output.js", false, false, true},
+		{"build deep file inside", "build/", "build/a/b/c.js", false, false, true},
+		{"build nested file inside", "build/", "src/build/output.js", false, false, true},
+
 		// Anchored directory patterns
 		{"/build dir", "/build/", "build", true, true, true},
 		{"/build file inside", "/build/", "build/output.js", false, false, true},

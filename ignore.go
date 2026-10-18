@@ -441,14 +441,14 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 			segCount++
 			ancestor := path[start:j]
 			ancRes := evaluateRules(m.rules, ancestor, pathSegments[:segCount], true, &ctx)
+			// An exhausted budget skipped some of this parent's rules, so its
+			// verdict is partial; keep the path's own result.
+			if ctx.exhausted() {
+				break
+			}
 			if ancRes.Matched && ancRes.Ignored {
 				m.mu.RUnlock()
 				return ancRes
-			}
-			// Budget exhaustion can happen mid-walk on deep paths; bail
-			// rather than spin doing no-op matchRule calls for the rest.
-			if ctx.exhausted() {
-				break
 			}
 		}
 	}

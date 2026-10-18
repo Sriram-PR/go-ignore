@@ -1086,3 +1086,14 @@ func TestMatch_DirOnlyNegationReincludesDirOnly(t *testing.T) {
 		}
 	}
 }
+
+// If the budget runs out while checking parents, a parent's partial verdict
+// must not override the path's own complete one: later rules such as !*/ were
+// skipped, so the parent may look ignored when it is not.
+func TestMatch_BudgetExhaustedInParentCheckKeepsOwnResult(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{MaxBacktrackIterations: 20})
+	m.AddPatterns("", []byte("*\n**/q/**/q/**/q/**/z\n!*/\n!*.go\n"))
+	if got := m.MatchWithReason("a/b/c/d/e/f/x.go", false); got.Ignored || got.Rule != "!*.go" {
+		t.Errorf("MatchWithReason = %+v, want the path's own result, re-included by !*.go", got)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -28,6 +29,10 @@ var (
 // See CONTRIBUTING.md "Parity harness".
 func TestParity(t *testing.T) {
 	requireParity(t)
+	if env := os.Getenv("GOIGNORE_PARITY_SEEDS"); env != "" {
+		exploreParity(t, env)
+		return
+	}
 
 	var plain, icase []scenario
 	for _, s := range parityCurated() {
@@ -53,6 +58,24 @@ func TestParity(t *testing.T) {
 		recs = append(recs, r.String())
 	}
 	checkBaseline(t, parityBaselineFile, recs, os.Getenv("GOIGNORE_PARITY_UPDATE") == "1")
+}
+
+// exploreParity runs match and walk on the given comma-separated seeds and
+// logs every divergence without comparing against the baseline.
+func exploreParity(t *testing.T, env string) {
+	var n int
+	for field := range strings.SplitSeq(env, ",") {
+		seed, err := strconv.ParseInt(strings.TrimSpace(field), 10, 64)
+		if err != nil {
+			t.Fatalf("GOIGNORE_PARITY_SEEDS: %v", err)
+		}
+		scens := paritySeeded(seed, parityPerSeed, false)
+		for _, r := range append(runMatchMode(t, "match", scens), runWalkMode(t, scens)...) {
+			t.Logf("%s %s", r.scenario, r)
+			n++
+		}
+	}
+	t.Logf("explore seeds=%s divergences=%d", env, n)
 }
 
 // parityRecord is one path where git and the library disagree.

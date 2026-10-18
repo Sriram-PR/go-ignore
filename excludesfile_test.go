@@ -285,3 +285,63 @@ func TestLoadRepo_BrokenGitFileUsesUserConfig(t *testing.T) {
 			m.Match("a.glob", false), m.Match("a.xdg", false))
 	}
 }
+
+// AddGlobalPatterns follows an include in the global config.
+func TestAddGlobalPatterns_FollowsInclude(t *testing.T) {
+	home := isolateGitConfig(t)
+	writeTree(t, home, map[string]string{
+		"inc.ign":    "*.inc\n",
+		"global.cfg": "[include]\n\tpath = " + gitPath(filepath.Join(home, "inc.cfg")) + "\n",
+	})
+	setExcludes(t, filepath.Join(home, "inc.cfg"), filepath.Join(home, "inc.ign"))
+	m := New()
+	if err := m.AddGlobalPatterns(); err != nil {
+		t.Fatalf("AddGlobalPatterns: %v", err)
+	}
+	if !m.Match("a.inc", false) {
+		t.Error("a.inc not ignored; want the included core.excludesFile loaded")
+	}
+}
+
+// A global core.excludesFile that is set, to a missing file or to the empty
+// string, replaces the XDG default, as in git. (The missing-file case already
+// held before includes were followed; it guards the rule.)
+func TestAddGlobalPatterns_SetValueSkipsXDG(t *testing.T) {
+	for _, name := range []string{"missing file", "empty"} {
+		t.Run(name, func(t *testing.T) {
+			home := isolateGitConfig(t)
+			value := ""
+			if name == "missing file" {
+				value = gitPath(filepath.Join(home, "missing.ign"))
+			}
+			writeTree(t, home, map[string]string{
+				".config/git/ignore": "*.xdg\n",
+				"global.cfg":         "[core]\n\texcludesFile = " + value + "\n",
+			})
+			m := New()
+			if err := m.AddGlobalPatterns(); err != nil {
+				t.Fatalf("AddGlobalPatterns: %v", err)
+			}
+			if m.Match("a.xdg", false) {
+				t.Error("a.xdg ignored; the XDG default must not load when the global value is set")
+			}
+		})
+	}
+}
+
+// AddSystemPatterns follows an include in the system config.
+func TestAddSystemPatterns_FollowsInclude(t *testing.T) {
+	home := isolateGitConfig(t)
+	writeTree(t, home, map[string]string{
+		"inc.ign":    "*.inc\n",
+		"system.cfg": "[include]\n\tpath = " + gitPath(filepath.Join(home, "inc.cfg")) + "\n",
+	})
+	setExcludes(t, filepath.Join(home, "inc.cfg"), filepath.Join(home, "inc.ign"))
+	m := New()
+	if err := m.AddSystemPatterns(); err != nil {
+		t.Fatalf("AddSystemPatterns: %v", err)
+	}
+	if !m.Match("a.inc", false) {
+		t.Error("a.inc not ignored; want the included core.excludesFile loaded")
+	}
+}

@@ -96,11 +96,14 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 }
 
 // AddGlobalPatterns loads the user's global gitignore file and adds its
-// patterns to the matcher. The global gitignore path is resolved in order:
+// patterns to the matcher. The path is core.excludesFile from the global git
+// config (git config --global, with include and includeIf followed). If git
+// is unavailable or the global config does not set it, the path is
+// $XDG_CONFIG_HOME/git/ignore, or ~/.config/git/ignore when XDG_CONFIG_HOME
+// is unset. A global value set to the empty string loads nothing.
 //
-//  1. git config --global core.excludesFile (if git is available)
-//  2. $XDG_CONFIG_HOME/git/ignore (if XDG_CONFIG_HOME is set)
-//  3. ~/.config/git/ignore (default fallback)
+// This reads the global scope only; LoadRepo resolves core.excludesFile
+// across every scope, as git does.
 //
 // If the resolved file does not exist, AddGlobalPatterns returns nil (no error).
 // Only real read failures are returned as errors. A symlink is followed; a
@@ -120,11 +123,11 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddGlobalPatterns() error {
-	path, _, err := gitConfigGet("", "--global", "--get", "core.excludesFile")
+	path, found, err := gitConfigGet("", "--global", "--includes", "--get", "core.excludesFile")
 	if err != nil && !isExitError(err) {
 		return fmt.Errorf("resolving global gitignore path: %w", err)
 	}
-	if path == "" {
+	if !found {
 		if path, err = xdgGlobalIgnorePath(); err != nil {
 			return fmt.Errorf("resolving global gitignore path: %w", err)
 		}
@@ -134,7 +137,8 @@ func (m *Matcher) AddGlobalPatterns() error {
 
 // AddSystemPatterns loads patterns from the system-scope gitignore file
 // (referenced by `git config --system core.excludesFile`, typically
-// configured via /etc/gitconfig) and adds them to the matcher.
+// configured via /etc/gitconfig, with include and includeIf followed) and
+// adds them to the matcher.
 //
 // If git is unavailable, the system config does not set core.excludesFile, or
 // the referenced file does not exist, AddSystemPatterns returns nil (no error).
@@ -152,7 +156,7 @@ func (m *Matcher) AddGlobalPatterns() error {
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddSystemPatterns() error {
-	path, _, err := gitConfigGet("", "--system", "--get", "core.excludesFile")
+	path, _, err := gitConfigGet("", "--system", "--includes", "--get", "core.excludesFile")
 	if err != nil && !isExitError(err) {
 		return fmt.Errorf("resolving system gitignore path: %w", err)
 	}

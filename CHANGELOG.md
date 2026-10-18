@@ -10,6 +10,7 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 - **`LoadRepo`, `WalkRepo` and `RepoFiles` load the `core.excludesFile` git uses.** They loaded both the system and the global file, read only those two scopes, skipped includes, and loaded `~/.config/git/ignore` even when `core.excludesFile` was set. Now one `git config` call in the repository gives the value: the last one across every scope (system, global, the repository's own config, `-c` and `GIT_CONFIG_*`), with `include` and `includeIf` followed. The XDG default applies only when nothing sets it, and a value set to the empty string loads nothing. `GIT_DIR` and `GIT_WORK_TREE` in the environment are ignored, so `repoRoot` picks the repository.
 - **A malformed gitconfig is an error.** git refuses to run with one. `LoadRepo` returns the error, `WalkRepo` returns it before walking, and `RepoFiles` yields it. It used to be ignored, and the XDG default loaded. A `.git` that git rejects (a malformed `.git` file, a `gitdir:` pointing at something that isn't a repository) is still tolerated: the value then comes from every scope except the repository's own config.
+- **`AddGlobalPatterns` and `AddSystemPatterns` follow `include` and `includeIf`.** `AddGlobalPatterns` also no longer falls back to `~/.config/git/ignore` when the global value is set to the empty string, as git does.
 
 ### v1.2.0
 

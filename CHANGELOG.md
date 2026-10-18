@@ -4,7 +4,9 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
-### Unreleased
+### v1.1.0
+
+`Match` now agrees with git for paths under directories, which removes 863 of the 932 known divergences the new parity harness found. Both fixes change results only where go-ignore disagreed with `git check-ignore`, as the Stability Guarantees allow. The exported API is unchanged. The minimum Go version is now 1.26.
 
 **Behavior changes**
 

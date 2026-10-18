@@ -2,6 +2,7 @@ package ignore
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -827,5 +828,48 @@ func TestWalkDirFS_AllowlistIdiom(t *testing.T) {
 	want := []string{".gitignore", "pkg/main.go", "pkg/sub/c.go"}
 	if !equalStrings(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+// Rules from a sibling directory's .gitignore stop counting toward
+// MaxPatterns once the walk leaves that directory, so every directory's own
+// rules apply even when the tree's total exceeds the cap. Each directory's
+// rules stay scoped to it.
+func TestWalkDirFS_RuleStackScopesMaxPatterns(t *testing.T) {
+	fsys := fstest.MapFS{}
+	var want []string
+	for i := range 20 {
+		dir := fmt.Sprintf("d%02d", i)
+		rules := fmt.Sprintf("r%d-1\nr%d-2\nr%d-3\nr%d-4\n*.tmp\n", i, i, i, i)
+		if i == 0 {
+			rules = "r0-1\nr0-2\nr0-3\ny.txt\n*.tmp\n"
+		}
+		fsys[dir+"/.gitignore"] = &fstest.MapFile{Data: []byte(rules)}
+		fsys[dir+"/x.tmp"] = &fstest.MapFile{}
+		fsys[dir+"/y.txt"] = &fstest.MapFile{}
+		want = append(want, dir+"/.gitignore")
+		if i != 0 {
+			want = append(want, dir+"/y.txt")
+		}
+	}
+	var warnings []ParseWarning
+	m := NewWithOptions(MatcherOptions{
+		MaxPatterns:    30,
+		WarningHandler: func(w ParseWarning) { warnings = append(warnings, w) },
+	})
+	var got []string
+	for p, err := range m.FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("FilesFS: %v", err)
+		}
+		got = append(got, p)
+	}
+	sort.Strings(got)
+	sort.Strings(want)
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+	if len(warnings) != 0 {
+		t.Errorf("warnings = %v, want none", warnings)
 	}
 }

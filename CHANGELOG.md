@@ -4,6 +4,12 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### Unreleased
+
+**Fixed**
+
+- **Walks past `MaxPatterns`.** The walker kept every discovered `.gitignore`'s rules until the walk ended, so in a large tree the total passed `MaxPatterns` (100,000 by default), later rules were dropped with only a warning, and the walk yielded files git ignores. Rules now apply only while the walk is inside their directory, so the cap counts the rules of the current entry's ancestors.
+
 ### v1.1.0
 
 `Match` now agrees with git for paths under directories, which removes 863 of the 932 known divergences the new parity harness found. Both fixes change results only where go-ignore disagreed with `git check-ignore`, as the Stability Guarantees allow. The exported API is unchanged. The minimum Go version is now 1.26.

@@ -2,6 +2,9 @@ package ignore
 
 import (
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -413,4 +416,45 @@ func BenchmarkMatchGlob_CharClass(b *testing.B) {
 			matchGlob("*.[ch]", "main.c", testCtx(0))
 		}
 	})
+}
+
+// BenchmarkWalkDir_NestedGitignores walks sibling directories that each have
+// a .gitignore. ns/entry should not grow with the directory count. It uses
+// the OS filesystem: fstest.MapFS scans its whole map on every Open, so its
+// own cost per entry grows with the tree.
+func BenchmarkWalkDir_NestedGitignores(b *testing.B) {
+	for _, dirs := range []int{500, 2000} {
+		b.Run(fmt.Sprintf("dirs=%d", dirs), func(b *testing.B) {
+			root := b.TempDir()
+			var rules strings.Builder
+			for r := range 10 {
+				fmt.Fprintf(&rules, "*.tmp%d\n", r)
+			}
+			for d := range dirs {
+				dir := filepath.Join(root, fmt.Sprintf("d%04d", d))
+				if err := os.Mkdir(dir, 0o755); err != nil {
+					b.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(rules.String()), 0o644); err != nil {
+					b.Fatal(err)
+				}
+				for f := range 5 {
+					if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%d.go", f)), nil, 0o644); err != nil {
+						b.Fatal(err)
+					}
+				}
+			}
+			m := New()
+			entries := 0
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				entries = 0
+				_ = m.WalkDir(root, func(string, fs.DirEntry, error) error {
+					entries++
+					return nil
+				})
+			}
+			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*entries), "ns/entry")
+		})
+	}
 }

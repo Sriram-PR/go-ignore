@@ -44,6 +44,10 @@ type walkBackend struct {
 //     behavior. To walk .git anyway, use filepath.WalkDir directly with Match
 //     for filtering.
 //   - Symlinks are not followed (filepath.WalkDir Lstat semantics).
+//   - Rules from a discovered .gitignore apply only inside its directory and
+//     are dropped when the walk leaves it, so MaxPatterns counts the
+//     receiver's rules plus those of the current entry's ancestors, not the
+//     whole tree.
 //
 // Paths supplied to user fn are OS-native (the same as filepath.WalkDir).
 // Internally the matcher receives the slash-normalised path relative to root,
@@ -98,6 +102,16 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 	}
 	m.mu.RUnlock()
 
+	// One frame per directory whose .gitignore was loaded, holding the rule
+	// count from before it. Leaving the directory truncates back, so only the
+	// ancestor chain's rules are live: matching cost stays flat across
+	// siblings, and MaxPatterns counts the chain, not the whole tree.
+	type frame struct {
+		dir   string // rel of the directory, "" for the root
+		rules int
+	}
+	var frames []frame
+
 	return b.walkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fn(path, d, err)
@@ -107,6 +121,17 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 		rel, relErr := b.relPath(root, path)
 		if relErr != nil {
 			return fn(path, d, relErr)
+		}
+
+		// The walk is depth-first, so a directory that is not an ancestor of
+		// this entry has been left for good.
+		for len(frames) > 0 {
+			top := frames[len(frames)-1]
+			if top.dir == "" || strings.HasPrefix(rel, top.dir+"/") {
+				break
+			}
+			child.rules = child.rules[:top.rules]
+			frames = frames[:len(frames)-1]
 		}
 
 		// Always skip .git (regardless of matcher state): a directory holds git
@@ -139,6 +164,7 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 				if basePath == "." {
 					basePath = ""
 				}
+				frames = append(frames, frame{dir: basePath, rules: len(child.rules)})
 				child.addPatternsFromSource(basePath, content, gitignorePath)
 			case !errors.Is(readErr, fs.ErrNotExist):
 				if cbErr := fn(path, d, fmt.Errorf("reading %s: %w", gitignorePath, readErr)); cbErr != nil {

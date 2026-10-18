@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestExpandTilde(t *testing.T) {
@@ -619,5 +620,35 @@ func TestAddGlobalPatterns_ReadPermissionError(t *testing.T) {
 	err := m.AddGlobalPatterns()
 	if err == nil {
 		t.Fatal("expected error for unreadable file, got nil")
+	}
+}
+
+// A git that hangs while a child keeps stdout open must not stall LoadRepo
+// past the timeout: CommandContext kills git, but Output would otherwise
+// wait for the orphaned child to close the pipe.
+func TestGitConfigExcludesFile_TimeoutBoundsHungChild(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake git is a shell script")
+	}
+	bin := t.TempDir()
+	script := "#!/bin/sh\nsleep 5\necho /never\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	old := gitConfigTimeout
+	gitConfigTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { gitConfigTimeout = old })
+
+	start := time.Now()
+	path, err := gitConfigExcludesFileScoped("--global")
+	elapsed := time.Since(start)
+
+	if err != nil || path != "" {
+		t.Errorf("got (%q, %v), want (\"\", nil) on timeout", path, err)
+	}
+	if elapsed > 3*time.Second {
+		t.Errorf("returned after %v; the 100ms timeout did not bound the call", elapsed)
 	}
 }

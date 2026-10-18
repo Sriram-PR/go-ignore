@@ -14,8 +14,8 @@ import (
 
 // gitConfigTimeout bounds the `git config` subprocess used to resolve the
 // global excludesFile, so a hung or unresponsive git binary cannot stall
-// AddGlobalPatterns indefinitely.
-const gitConfigTimeout = 5 * time.Second
+// AddGlobalPatterns indefinitely. A var so tests can shorten it.
+var gitConfigTimeout = 5 * time.Second
 
 // LoadRepo creates a Matcher pre-loaded with the four standard gitignore
 // sources for a working tree, in git's precedence order (lowest first, so the
@@ -231,6 +231,9 @@ func gitConfigExcludesFileScoped(scope string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", "config", scope, "core.excludesFile")
+	// Killing git does not close stdout if a child of it still holds the pipe;
+	// without WaitDelay, Output would block until that child exits.
+	cmd.WaitDelay = time.Second
 	out, err := cmd.Output()
 	if err != nil {
 		// Timeout — treat as "git unavailable" and fall through to XDG.

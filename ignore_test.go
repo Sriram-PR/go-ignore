@@ -1061,3 +1061,28 @@ func TestMatch_IgnoredParentCoversContents(t *testing.T) {
 		}
 	}
 }
+
+// A dir-only negation re-includes the directory, not the files inside it, as
+// in git. With the allowlist idiom only the re-included files are kept.
+func TestMatch_DirOnlyNegationReincludesDirOnly(t *testing.T) {
+	tests := []struct {
+		patterns string
+		path     string
+		isDir    bool
+		want     bool
+	}{
+		{"*\n!*/\n!*.go\n", "a", true, false},
+		{"*\n!*/\n!*.go\n", "a/x", false, true},
+		{"*\n!*/\n!*.go\n", "a/y.go", false, false},
+		{"*\n!*/\n!*.go\n", "a/b/x", false, true},
+		{"*.txt\n!sub/\n", "sub", true, false},
+		{"*.txt\n!sub/\n", "sub/a.txt", false, true},
+	}
+	for _, tt := range tests {
+		m := New()
+		m.AddPatterns("", []byte(tt.patterns))
+		if got := m.Match(tt.path, tt.isDir); got != tt.want {
+			t.Errorf("patterns %q: Match(%q, %v) = %v, want %v", tt.patterns, tt.path, tt.isDir, got, tt.want)
+		}
+	}
+}

@@ -700,80 +700,6 @@ func TestMatchSegments_DoubleStar(t *testing.T) {
 	}
 }
 
-func TestMatchSegmentsPrefix(t *testing.T) {
-	tests := []struct {
-		name    string
-		pattern []segment
-		path    []string
-		want    bool
-	}{
-		{
-			"empty pattern empty path",
-			[]segment{},
-			[]string{},
-			false, // prefix requires extra segments after pattern
-		},
-		{
-			"empty pattern with path",
-			[]segment{},
-			[]string{"foo"},
-			true, // file inside "empty" prefix dir
-		},
-		{
-			"literal prefix match",
-			[]segment{{value: "foo"}},
-			[]string{"foo", "bar"},
-			true, // bar is inside foo/
-		},
-		{
-			"literal exact (not prefix)",
-			[]segment{{value: "foo"}},
-			[]string{"foo"},
-			false, // no extra segments = not "inside"
-		},
-		{
-			"literal no match",
-			[]segment{{value: "foo"}},
-			[]string{"bar", "baz"},
-			false,
-		},
-		{
-			"two literals prefix",
-			[]segment{{value: "foo"}, {value: "bar"}},
-			[]string{"foo", "bar", "file.txt"},
-			true,
-		},
-		{
-			"doublestar prefix",
-			[]segment{{value: "a"}, {doubleStar: true}, {value: "b"}},
-			[]string{"a", "x", "b", "file.txt"},
-			true,
-		},
-		{
-			"doublestar exact (not prefix)",
-			[]segment{{value: "a"}, {doubleStar: true}, {value: "b"}},
-			[]string{"a", "x", "b"},
-			false,
-		},
-		{
-			"wildcard prefix",
-			[]segment{{value: "*.d", wildcard: true, starCount: 1}},
-			[]string{"test.d", "file.txt"},
-			true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := testCtx(0)
-			got := matchSegmentsPrefix(tt.pattern, tt.path, ctx)
-			if got != tt.want {
-				t.Errorf("matchSegmentsPrefix() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestMatchSegmentsExact_RecursionDepthLimit(t *testing.T) {
 	// Build a pattern with 250 ** segments (exceeds maxRecursionDepth of 200)
 	// followed by a literal target segment.
@@ -793,28 +719,6 @@ func TestMatchSegmentsExact_RecursionDepthLimit(t *testing.T) {
 	// Use a high tick budget so depth is the limiting factor
 	ctx := testCtx(1_000_000)
 	got := matchSegmentsExact(pattern, path, ctx)
-	if got {
-		t.Error("expected false when recursion depth exceeds maxRecursionDepth")
-	}
-}
-
-func TestMatchSegmentsPrefix_RecursionDepthLimit(t *testing.T) {
-	// Same setup but for prefix matching
-	pattern := make([]segment, 251)
-	for i := 0; i < 250; i++ {
-		pattern[i] = segment{doubleStar: true}
-	}
-	pattern[250] = segment{value: "target"}
-
-	path := make([]string, 251)
-	for i := 0; i < 249; i++ {
-		path[i] = "a"
-	}
-	path[249] = "target"
-	path[250] = "file.txt" // extra segment for prefix match
-
-	ctx := testCtx(1_000_000)
-	got := matchSegmentsPrefix(pattern, path, ctx)
 	if got {
 		t.Error("expected false when recursion depth exceeds maxRecursionDepth")
 	}
@@ -843,10 +747,11 @@ func TestMatchRule_Basic(t *testing.T) {
 		{"dir pattern on dir", "build/", "build", true, true},
 		{"dir pattern on file", "build/", "build", false, false},
 		{"dir pattern nested", "build/", "src/build", true, true},
-		// Files INSIDE directories should also be ignored
-		{"dir pattern file inside", "build/", "build/output.js", false, true},
-		{"dir pattern file deep inside", "build/", "build/a/b/c.js", false, true},
-		{"dir pattern nested file inside", "build/", "src/build/output.js", false, true},
+		// A dir-only rule names the directory, not the files inside it;
+		// Match covers those (TestMatchRule_DirectoryContents).
+		{"dir pattern file inside", "build/", "build/output.js", false, false},
+		{"dir pattern file deep inside", "build/", "build/a/b/c.js", false, false},
+		{"dir pattern nested file inside", "build/", "src/build/output.js", false, false},
 
 		// Anchored patterns (contain /)
 		{"anchored match", "src/temp", "src/temp", false, true},
@@ -1089,45 +994,48 @@ func TestSplitPath(t *testing.T) {
 	}
 }
 
-// TestMatchRule_DirectoryContents tests that files inside ignored directories are also ignored
+// TestMatchRule_DirectoryContents checks that a dir-only rule names the
+// directory, not the files inside it, and that Match still ignores those files
+// through its parent-directory check.
 func TestMatchRule_DirectoryContents(t *testing.T) {
 	tests := []struct {
-		name    string
-		pattern string
-		path    string
-		isDir   bool
-		want    bool
+		name      string
+		pattern   string
+		path      string
+		isDir     bool
+		wantRule  bool
+		wantMatch bool
 	}{
 		// Basic directory patterns
-		{"node_modules dir", "node_modules/", "node_modules", true, true},
-		{"node_modules file inside", "node_modules/", "node_modules/lodash/index.js", false, true},
-		{"node_modules deep file", "node_modules/", "node_modules/a/b/c/d.js", false, true},
-		{"node_modules file not inside", "node_modules/", "node_modules.json", false, false},
+		{"node_modules dir", "node_modules/", "node_modules", true, true, true},
+		{"node_modules file inside", "node_modules/", "node_modules/lodash/index.js", false, false, true},
+		{"node_modules deep file", "node_modules/", "node_modules/a/b/c/d.js", false, false, true},
+		{"node_modules file not inside", "node_modules/", "node_modules.json", false, false, false},
 
 		// Floating directory patterns
-		{"vendor anywhere dir", "vendor/", "vendor", true, true},
-		{"vendor anywhere nested dir", "vendor/", "lib/vendor", true, true},
-		{"vendor anywhere file inside", "vendor/", "vendor/lib/file.go", false, true},
-		{"vendor nested file inside", "vendor/", "lib/vendor/file.go", false, true},
+		{"vendor anywhere dir", "vendor/", "vendor", true, true, true},
+		{"vendor anywhere nested dir", "vendor/", "lib/vendor", true, true, true},
+		{"vendor anywhere file inside", "vendor/", "vendor/lib/file.go", false, false, true},
+		{"vendor nested file inside", "vendor/", "lib/vendor/file.go", false, false, true},
 
 		// Anchored directory patterns
-		{"/build dir", "/build/", "build", true, true},
-		{"/build file inside", "/build/", "build/output.js", false, true},
-		{"/build nested not match", "/build/", "src/build/output.js", false, false},
+		{"/build dir", "/build/", "build", true, true, true},
+		{"/build file inside", "/build/", "build/output.js", false, false, true},
+		{"/build nested not match", "/build/", "src/build/output.js", false, false, false},
 
 		// Directory patterns with wildcards
-		{"*.d/ dir", "*.d/", "test.d", true, true},
-		{"*.d/ file inside", "*.d/", "test.d/file.txt", false, true},
+		{"*.d/ dir", "*.d/", "test.d", true, true, true},
+		{"*.d/ file inside", "*.d/", "test.d/file.txt", false, false, true},
 
 		// Hidden directories
-		{".idea dir", ".idea/", ".idea", true, true},
-		{".idea file inside", ".idea/", ".idea/workspace.xml", false, true},
-		{".vscode nested file", ".vscode/", ".vscode/settings.json", false, true},
+		{".idea dir", ".idea/", ".idea", true, true, true},
+		{".idea file inside", ".idea/", ".idea/workspace.xml", false, false, true},
+		{".vscode nested file", ".vscode/", ".vscode/settings.json", false, false, true},
 
 		// Nested directory patterns
-		{"src/build/ dir", "src/build/", "src/build", true, true},
-		{"src/build/ file inside", "src/build/", "src/build/output.js", false, true},
-		{"src/build/ deep file", "src/build/", "src/build/a/b/c.js", false, true},
+		{"src/build/ dir", "src/build/", "src/build", true, true, true},
+		{"src/build/ file inside", "src/build/", "src/build/output.js", false, false, true},
+		{"src/build/ deep file", "src/build/", "src/build/a/b/c.js", false, false, true},
 	}
 
 	for _, tt := range tests {
@@ -1138,10 +1046,15 @@ func TestMatchRule_DirectoryContents(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, testCtx(0))
-			if got != tt.want {
+			if got := matchRule(r, path, pathSegs, tt.isDir, testCtx(0)); got != tt.wantRule {
 				t.Errorf("matchRule(%q, %q, isDir=%v) = %v, want %v",
-					tt.pattern, tt.path, tt.isDir, got, tt.want)
+					tt.pattern, tt.path, tt.isDir, got, tt.wantRule)
+			}
+			m := New()
+			m.AddPatterns("", []byte(tt.pattern+"\n"))
+			if got := m.Match(tt.path, tt.isDir); got != tt.wantMatch {
+				t.Errorf("Match(%q, %v) with %q = %v, want %v",
+					tt.path, tt.isDir, tt.pattern, got, tt.wantMatch)
 			}
 		})
 	}

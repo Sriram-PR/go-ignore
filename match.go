@@ -22,10 +22,10 @@ const DefaultMaxBacktrackIterations = 10000
 const HardMaxBacktrackIterations = 10_000_000
 
 // maxRecursionDepth bounds recursion in segment-matching functions to prevent
-// stack overflow. It applies to every recursive call in matchSegmentsExact and
-// matchSegmentsPrefix, including the linear tail-recursive segment walk (not
-// just ** branches). Patterns or paths with more than 200 segments are treated
-// as non-matching once the limit is reached.
+// stack overflow. It applies to every recursive call in matchSegmentsExact,
+// including the linear tail-recursive segment walk (not just ** branches).
+// Patterns or paths with more than 200 segments are treated as non-matching
+// once the limit is reached.
 const maxRecursionDepth = 200
 
 // MaxPathDepth is the hard upper bound on the segment count of a path
@@ -99,20 +99,17 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, ctx *mat
 		return len(r.segments) == 0
 	}
 
-	// Directory-only patterns:
-	// - Match directories directly (isDir == true)
-	// - Match files INSIDE matching directories (isDir == false, path is inside dir)
-	// For the "inside dir" case, we use prefix matching
-	prefixMatch := r.dirOnly && !isDir
+	// A dir-only rule names directories only. Files inside a matching
+	// directory are covered by Match's parent-directory check, as in git.
+	if r.dirOnly && !isDir {
+		return false
+	}
 
 	if r.anchored {
-		if prefixMatch {
-			return matchSegmentsPrefix(r.segments, matchSegments, ctx)
-		}
 		return matchSegmentsExact(r.segments, matchSegments, ctx)
 	}
 
-	return matchFloating(r, matchSegments, prefixMatch, ctx)
+	return matchFloating(r, matchSegments, ctx)
 }
 
 // resolveMatchSegments applies basePath scoping and returns the segments to match against.
@@ -134,37 +131,25 @@ func resolveMatchSegments(r *rule, path string, pathSegments []string) []string 
 }
 
 // matchFloating tries to match a floating (unanchored) pattern at any position in the path.
-func matchFloating(r *rule, matchSegments []string, prefixMatch bool, ctx *matchContext) bool {
+func matchFloating(r *rule, matchSegments []string, ctx *matchContext) bool {
 	maxStart := len(matchSegments) - len(r.segments)
-	if prefixMatch {
-		maxStart = len(matchSegments) - 1
-	}
-	// Without **, an exact match consumes one path segment per pattern
-	// segment, so it can only start at maxStart.
+	// Without **, a match consumes one path segment per pattern segment, so
+	// it can only start at maxStart.
 	start := 0
-	if !prefixMatch && !slices.ContainsFunc(r.segments, isDoubleStar) {
+	if !slices.ContainsFunc(r.segments, isDoubleStar) {
 		start = max(maxStart, 0)
 	}
 	for i := start; i <= maxStart; i++ {
 		if ctx.exhausted() {
 			return false
 		}
-		if prefixMatch {
-			if matchSegmentsPrefix(r.segments, matchSegments[i:], ctx) {
-				return true
-			}
-		} else {
-			if matchSegmentsExact(r.segments, matchSegments[i:], ctx) {
-				return true
-			}
+		if matchSegmentsExact(r.segments, matchSegments[i:], ctx) {
+			return true
 		}
 	}
 
 	// Special case: pattern with ** can match even if more segments than path
 	if len(r.segments) > 0 && r.segments[0].doubleStar {
-		if prefixMatch {
-			return matchSegmentsPrefix(r.segments, matchSegments, ctx)
-		}
 		return matchSegmentsExact(r.segments, matchSegments, ctx)
 	}
 
@@ -224,67 +209,13 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) boo
 	return result
 }
 
-// matchSegmentsPrefix matches pattern as a PREFIX of path.
-// Unlike matchSegmentsExact, this allows the path to have additional segments
-// after the pattern is fully matched. Used for directory patterns matching
-// files inside the directory.
-func matchSegmentsPrefix(pattern []segment, path []string, ctx *matchContext) bool {
-	// Bound recursion depth; budget is only consumed inside backtrack loops.
-	if ctx.exhausted() || ctx.depth >= maxRecursionDepth {
-		return false
-	}
-
-	if len(pattern) == 0 {
-		// For prefix matching, we need at least one more path segment
-		// (the file must be INSIDE the directory, not the directory itself)
-		return len(path) > 0
-	}
-
-	seg := pattern[0]
-
-	if seg.doubleStar {
-		// As in matchSegmentsExact, a trailing ** must consume a segment:
-		// "**/" names a directory, so a root-level file is not inside one.
-		minI := 0
-		if len(pattern) == 1 {
-			minI = 1
-		}
-		ctx.depth++
-		for i := minI; i <= len(path); i++ {
-			if matchSegmentsPrefix(pattern[1:], path[i:], ctx) {
-				ctx.depth--
-				return true
-			}
-			if !ctx.tick() {
-				ctx.depth--
-				return false
-			}
-		}
-		ctx.depth--
-		return false
-	}
-
-	if len(path) == 0 {
-		return false
-	}
-
-	if !matchSingleSegment(seg, path[0], ctx) {
-		return false
-	}
-
-	ctx.depth++
-	result := matchSegmentsPrefix(pattern[1:], path[1:], ctx)
-	ctx.depth--
-	return result
-}
-
 // matchSingleSegment matches a single pattern segment against a path segment.
 // Handles literal strings, * wildcards, ? wildcards, \ escapes, and [ character classes.
 // The matchContext is shared with the caller so glob-level backtracking
 // counts against the same budget as segment-level matching.
 func matchSingleSegment(seg segment, pathSeg string, ctx *matchContext) bool {
 	if seg.doubleStar {
-		// ** must be handled by matchSegmentsExact/matchSegmentsPrefix;
+		// ** must be handled by matchSegmentsExact;
 		// if it ever leaks here, fail closed rather than report a spurious match.
 		return false
 	}

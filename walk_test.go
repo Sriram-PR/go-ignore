@@ -804,3 +804,28 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+// With the allowlist idiom, re-included directories are walked but only the
+// files a rule re-includes are yielded, as git ls-files does.
+func TestWalkDirFS_AllowlistIdiom(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore":    {Data: []byte("*\n!.gitignore\n!*/\n!*.go\n")},
+		"root.txt":      {Data: []byte("x")},
+		"pkg/a.txt":     {Data: []byte("x")},
+		"pkg/main.go":   {Data: []byte("x")},
+		"pkg/sub/b.bin": {Data: []byte("x")},
+		"pkg/sub/c.go":  {Data: []byte("x")},
+	}
+	var got []string
+	for p, err := range New().FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("FilesFS: %v", err)
+		}
+		got = append(got, p)
+	}
+	sort.Strings(got)
+	want := []string{".gitignore", "pkg/main.go", "pkg/sub/c.go"}
+	if !equalStrings(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path"
 	"slices"
 	"strings"
 	"testing"
@@ -143,5 +144,24 @@ func TestCheckBaselineDiff(t *testing.T) {
 	}
 	if !slices.Equal(resolved, []string{"walk d"}) {
 		t.Errorf("resolved = %q, want [walk d]", resolved)
+	}
+}
+
+func TestParityScenarios_DirsExist(t *testing.T) {
+	scens := append(parityCurated(), paritySeeded(1, 50, false)...)
+	for _, s := range scens {
+		for p := range s.paths {
+			parts := strings.Split(p, "/")
+			for k := 1; k < len(parts); k++ {
+				if prefix := strings.Join(parts[:k], "/"); !s.paths[prefix] {
+					t.Errorf("%s: prefix %q of %q is not a directory", s.name, prefix, p)
+				}
+			}
+		}
+		for f := range s.files {
+			if d := path.Dir(f); d != "." && !s.paths[d] {
+				t.Errorf("%s: %q holds a .gitignore but is not a directory", s.name, d)
+			}
+		}
 	}
 }

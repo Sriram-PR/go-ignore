@@ -350,6 +350,34 @@ func TestMatch_EmptyPath(t *testing.T) {
 	}
 }
 
+// A nested .gitignore in a mixed-case directory must still apply under
+// CaseInsensitive: the path is lowercased before matching, so the rule's
+// base path has to be compared case-insensitively too.
+func TestMatch_CaseInsensitive_MixedCaseBasePath(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{CaseInsensitive: true})
+	m.AddPatterns("", []byte("*.LOG\n"))
+	m.AddPatterns("Sub", []byte("!x.log\n"))
+
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"Sub/x.log", false},
+		{"SUB/X.LOG", false},
+		{"Sub/y.log", true},
+		{"other/x.log", true},
+	}
+	for _, tt := range tests {
+		if got := m.Match(tt.path, false); got != tt.want {
+			t.Errorf("Match(%q) = %v, want %v", tt.path, got, tt.want)
+		}
+	}
+
+	if r := m.MatchWithReason("Sub/x.log", false); r.BasePath != "Sub" {
+		t.Errorf("BasePath = %q, want %q (as written by the caller)", r.BasePath, "Sub")
+	}
+}
+
 func TestMatch_CaseInsensitive(t *testing.T) {
 	m := NewWithOptions(MatcherOptions{CaseInsensitive: true})
 	m.AddPatterns("", []byte("BUILD/\n*.LOG\n"))

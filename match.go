@@ -120,11 +120,13 @@ func resolveMatchSegments(r *rule, path string, pathSegments []string) []string 
 	if r.basePath == "" {
 		return pathSegments
 	}
-	if !strings.HasPrefix(path, r.basePathSlash) && path != r.basePath {
-		return nil
-	}
-	if path == r.basePath {
+	// Compare against basePathSlash, not basePath: under CaseInsensitive only
+	// basePathSlash is lowercased to match the lowercased path.
+	if path == r.basePathSlash[:len(r.basePathSlash)-1] {
 		return []string{}
+	}
+	if !strings.HasPrefix(path, r.basePathSlash) {
+		return nil
 	}
 	// Sub-slice the already-split path segments instead of re-splitting
 	return pathSegments[r.baseSegCount:]

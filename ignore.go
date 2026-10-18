@@ -240,6 +240,9 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	// This avoids calling strings.ToLower on every match call.
 	if m.opts.CaseInsensitive {
 		for i := range newRules {
+			// Only the scoping key is lowered; basePath keeps the caller's
+			// spelling for MatchResult.BasePath.
+			newRules[i].basePathSlash = strings.ToLower(newRules[i].basePathSlash)
 			for j := range newRules[i].segments {
 				seg := &newRules[i].segments[j]
 				if !seg.doubleStar {

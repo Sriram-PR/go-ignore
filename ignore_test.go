@@ -1035,3 +1035,29 @@ func TestMatch_CheckParentsFlag(t *testing.T) {
 		t.Errorf("match(checkParents=false) = %+v, want re-included by !build/keep.txt", got)
 	}
 }
+
+// A path under an ignored directory is ignored with or without a negation,
+// and the parent's rule is reported, as git check-ignore -v does.
+func TestMatch_IgnoredParentCoversContents(t *testing.T) {
+	tests := []struct {
+		patterns string
+		path     string
+		isDir    bool
+		wantRule string
+	}{
+		{"build\n", "build/app.js", false, "build"},
+		{"build\n", "src/build/a/b.js", false, "build"},
+		{"/out\n", "out/x/y", true, "/out"},
+		{"build/\n*.js\n", "build/app.js", false, "build/"},
+		{"*.d\n!a.d/keep\n", "a.d/keep", false, "*.d"},
+	}
+	for _, tt := range tests {
+		m := New()
+		m.AddPatterns("", []byte(tt.patterns))
+		got := m.MatchWithReason(tt.path, tt.isDir)
+		if !got.Ignored || got.Rule != tt.wantRule {
+			t.Errorf("patterns %q: MatchWithReason(%q, %v) = %+v, want ignored by %q",
+				tt.patterns, tt.path, tt.isDir, got, tt.wantRule)
+		}
+	}
+}

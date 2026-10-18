@@ -148,14 +148,12 @@ func runWalkMode(t *testing.T, scens []scenario) []parityRecord {
 	return recs
 }
 
-// libMatch loads the scenario's .gitignore files shallowest first, as the
-// walker does, and reports MatchResult.Ignored for each path.
-func libMatch(s scenario, isDir map[string]bool, paths []string) map[string]bool {
-	m := ignore.NewWithOptions(ignore.MatcherOptions{
-		CaseInsensitive: s.icase,
-		MaxPatterns:     -1,
-		WarningHandler:  func(ignore.ParseWarning) {},
-	})
+// parityMatcher loads the scenario's .gitignore files shallowest first, as
+// the walker does. Any order that loads a directory's file before its
+// descendants' is equivalent: sibling directories' rules never apply to the
+// same path.
+func parityMatcher(s scenario) *ignore.Matcher {
+	m := ignore.NewWithOptions(parityOptions(s))
 	files := slices.SortedFunc(maps.Keys(s.files), func(a, b string) int {
 		if c := cmp.Compare(strings.Count(a, "/"), strings.Count(b, "/")); c != 0 {
 			return c
@@ -169,6 +167,20 @@ func libMatch(s scenario, isDir map[string]bool, paths []string) map[string]bool
 		}
 		m.AddPatterns(base, []byte(s.files[f]))
 	}
+	return m
+}
+
+func parityOptions(s scenario) ignore.MatcherOptions {
+	return ignore.MatcherOptions{
+		CaseInsensitive: s.icase,
+		MaxPatterns:     -1,
+		WarningHandler:  func(ignore.ParseWarning) {},
+	}
+}
+
+// libMatch reports MatchResult.Ignored for each path.
+func libMatch(s scenario, isDir map[string]bool, paths []string) map[string]bool {
+	m := parityMatcher(s)
 	res := make(map[string]bool, len(paths))
 	for _, p := range paths {
 		res[p] = m.MatchWithReason(p, isDir[p]).Ignored

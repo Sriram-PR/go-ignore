@@ -346,6 +346,11 @@ func (m *Matcher) Warnings() []ParseWarning {
 // directory-only patterns (those ending in "/") match a directory only when
 // isDir is true. Passing false for a path that is really a directory can make
 // that directory be reported as not ignored (git needs the same information).
+//
+// As in git, a path inside an ignored directory is ignored, and no negation
+// can re-include it: Match checks each parent directory, shallowest first,
+// before taking the path's own verdict. Cost therefore grows with path depth,
+// one pass over the rules per parent directory.
 // Thread-safe: can be called concurrently.
 func (m *Matcher) Match(path string, isDir bool) bool {
 	result := m.MatchWithReason(path, isDir)
@@ -361,6 +366,9 @@ func (m *Matcher) Match(path string, isDir bool) bool {
 //   - Matched == false: No rules matched; path is not ignored (default)
 //   - Matched == true, Ignored == true: Path is ignored by Rule
 //   - Matched == true, Ignored == false: Path was ignored but re-included by negation Rule
+//
+// When a parent directory is ignored, the result describes the rule that
+// ignored the outermost such parent, as git check-ignore -v reports it.
 func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	return m.match(path, isDir, true)
 }
@@ -381,9 +389,9 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 	var segBuf [32]string
 	pathSegments := splitPathBuf(path, segBuf[:0])
 
-	// Defensive: paths past MaxPathDepth short-circuit. The parent-excluded
-	// negation walk is inherently O(M·N²), so without this cap a fuzzer or
-	// malicious caller can construct a path that pegs CPU for minutes.
+	// Defensive: paths past MaxPathDepth short-circuit. The parent check
+	// runs every rule once per parent directory, so without this cap a fuzzer
+	// or malicious caller could make a single call pathologically slow.
 	// Realistic paths are nowhere near this limit; see MaxPathDepth's docs.
 	if len(pathSegments) > MaxPathDepth {
 		return MatchResult{Ignored: false, Matched: false}
@@ -409,16 +417,17 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 
 	result := evaluateRules(m.rules, path, pathSegments, isDir, &ctx)
 
-	// Spec: a file cannot be re-included if a parent directory is excluded.
-	// Only walk ancestors when negation tried to re-include the path —
-	// otherwise the result is already correct and we'd waste budget.
+	// As in git, an ignored parent directory decides: the path is ignored by
+	// that parent's rule and no negation can re-include it. Shallowest first,
+	// so the outermost ignored parent is reported. The path's own result is
+	// computed first so that it stands if the budget runs out mid-walk.
 	//
 	// We slice the original `path` at internal slash positions rather than
 	// strings.Join'ing slices of pathSegments. Joining was O(i) per ancestor
-	// and O(N²) overall; a 100k-segment path with a matching negation took
-	// tens of seconds before this fix (observed via FuzzMatch timeout in CI).
-	// Slicing is O(N) total and zero-alloc on the hot path.
-	if checkParents && result.Matched && !result.Ignored && len(pathSegments) > 1 {
+	// and O(N²) overall; a 100k-segment path took tens of seconds that way
+	// (observed via FuzzMatch timeout in CI). Slicing is O(N) total and
+	// zero-alloc on the hot path.
+	if checkParents && len(pathSegments) > 1 {
 		// Skip any leading slash so ancestor[:j] is a name, not "/" prefix.
 		start := 0
 		if len(path) > 0 && path[0] == '/' {

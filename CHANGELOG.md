@@ -6,6 +6,10 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ### Unreleased
 
+**Behavior changes**
+
+- **`Match` ignores paths inside an ignored directory.** Parent directories were checked only when a negation re-included the path, so with the rule `build`, `Match("build/app.js", false)` returned false where git ignores it. `Match` and `MatchWithReason` now check every parent directory, shallowest first, and report the outermost ignored parent's rule, as `git check-ignore -v` does. `WalkDir` and `Files` already pruned ignored directories, so their output is unchanged.
+
 **Requirements**
 
 - Minimum Go version is now 1.26 (1.25 is out of support). CI tests 1.26 and 1.27.

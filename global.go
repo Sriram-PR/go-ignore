@@ -23,7 +23,8 @@ var gitConfigTimeout = 5 * time.Second
 //
 //  1. The system gitignore (git config --system core.excludesFile; see AddSystemPatterns)
 //  2. The user's global gitignore (resolved via git config / XDG; see AddGlobalPatterns)
-//  3. <repoRoot>/.git/info/exclude (see AddExcludePatterns)
+//  3. <repoRoot>/.git/info/exclude, following a .git file in linked worktrees
+//     and submodules (see AddExcludePatterns)
 //  4. <repoRoot>/.gitignore (root scope)
 //
 // repoRoot is used only to locate the two on-disk files above; it is NOT
@@ -171,7 +172,11 @@ func (m *Matcher) AddPatternsFromFile(basePath, path string) error {
 
 // AddExcludePatterns loads patterns from the repository's .git/info/exclude
 // file and adds them to the matcher. The gitDir parameter is the path to the
-// .git directory (e.g., ".git" or an absolute path).
+// .git directory (e.g., ".git" or an absolute path). It may also be a .git
+// file, as in linked worktrees and submodules: its "gitdir:" pointer is
+// followed, and then the git directory's commondir if present, so a linked
+// worktree reads the main repository's info/exclude like git does. A .git
+// file without a "gitdir:" line has no exclude file.
 //
 // If the exclude file does not exist, AddExcludePatterns returns nil (no error).
 // Only real read failures are returned as errors.
@@ -189,7 +194,11 @@ func (m *Matcher) AddPatternsFromFile(basePath, path string) error {
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddExcludePatterns(gitDir string) error {
-	path := filepath.Join(gitDir, "info", "exclude")
+	dir, ok, err := resolveExcludeDir(gitDir)
+	if err != nil || !ok {
+		return err
+	}
+	path := filepath.Join(dir, "info", "exclude")
 
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -201,6 +210,51 @@ func (m *Matcher) AddExcludePatterns(gitDir string) error {
 
 	m.addPatternsFromSource("", content, path)
 	return nil
+}
+
+// resolveExcludeDir returns the directory whose info/exclude applies to the
+// git path gitPath (a .git directory or a .git file). ok is false when gitPath
+// does not exist or is a .git file without a gitdir pointer.
+func resolveExcludeDir(gitPath string) (dir string, ok bool, err error) {
+	fi, err := os.Stat(gitPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("reading %s: %w", gitPath, err)
+	}
+
+	gitDir := gitPath
+	if !fi.IsDir() {
+		content, err := os.ReadFile(gitPath)
+		if err != nil {
+			return "", false, fmt.Errorf("reading %s: %w", gitPath, err)
+		}
+		target, found := strings.CutPrefix(strings.TrimSpace(string(content)), "gitdir:")
+		if !found {
+			return "", false, nil
+		}
+		gitDir = resolveRelative(filepath.Dir(gitPath), strings.TrimSpace(target))
+	}
+
+	common, err := os.ReadFile(filepath.Join(gitDir, "commondir"))
+	switch {
+	case err == nil:
+		return resolveRelative(gitDir, strings.TrimSpace(string(common))), true, nil
+	case errors.Is(err, os.ErrNotExist):
+		return gitDir, true, nil
+	default:
+		return "", false, fmt.Errorf("reading %s: %w", filepath.Join(gitDir, "commondir"), err)
+	}
+}
+
+// resolveRelative resolves p against base unless p is already absolute.
+func resolveRelative(base, p string) string {
+	p = filepath.FromSlash(p)
+	if filepath.IsAbs(p) {
+		return p
+	}
+	return filepath.Join(base, p)
 }
 
 // resolveGlobalIgnorePath determines the path to the global gitignore file.

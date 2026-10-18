@@ -2,6 +2,7 @@ package ignore
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -650,5 +651,114 @@ func TestGitConfigExcludesFile_TimeoutBoundsHungChild(t *testing.T) {
 	}
 	if elapsed > 3*time.Second {
 		t.Errorf("returned after %v; the 100ms timeout did not bound the call", elapsed)
+	}
+}
+
+// In a linked worktree .git is a file pointing at .git/worktrees/<name>, whose
+// commondir leads back to the main .git; info/exclude lives there.
+func TestLoadRepo_LinkedWorktreeGitFile(t *testing.T) {
+	base := t.TempDir()
+	writeTree(t, base, map[string]string{
+		"main/.git/info/exclude":           "*.secret\n",
+		"main/.git/worktrees/wt/commondir": "../..\n",
+		"wt/.git":                          "gitdir: ../main/.git/worktrees/wt\n",
+		"wt/.gitignore":                    "*.log\n",
+	})
+
+	m, err := LoadRepo(filepath.Join(base, "wt"), MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if !m.Match("key.secret", false) {
+		t.Error("key.secret not ignored; common info/exclude was not loaded")
+	}
+	if !m.Match("x.log", false) {
+		t.Error("x.log not ignored; root .gitignore was not loaded")
+	}
+}
+
+// A submodule's .git file points at .git/modules/<name>, which has no
+// commondir; its own info/exclude applies.
+func TestLoadRepo_SubmoduleGitFile(t *testing.T) {
+	base := t.TempDir()
+	writeTree(t, base, map[string]string{
+		"sup/.git/modules/sub/info/exclude": "*.tmp\n",
+		"sup/sub/.git":                      "gitdir: ../.git/modules/sub\n",
+	})
+
+	m, err := LoadRepo(filepath.Join(base, "sup", "sub"), MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if !m.Match("a.tmp", false) {
+		t.Error("a.tmp not ignored; submodule info/exclude was not loaded")
+	}
+}
+
+func TestLoadRepo_AbsoluteGitdirPointer(t *testing.T) {
+	base := t.TempDir()
+	gitDir := filepath.Join(base, "elsewhere")
+	writeTree(t, base, map[string]string{
+		"elsewhere/info/exclude": "*.bak\n",
+		"wt/.git":                "gitdir: " + gitDir + "\n",
+	})
+
+	m, err := LoadRepo(filepath.Join(base, "wt"), MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if !m.Match("a.bak", false) {
+		t.Error("a.bak not ignored via absolute gitdir pointer")
+	}
+}
+
+// A .git file that is not a gitdir pointer has no exclude file to load; it
+// must not fail the whole LoadRepo.
+func TestLoadRepo_MalformedGitFileSkipsExclude(t *testing.T) {
+	repo := t.TempDir()
+	writeTree(t, repo, map[string]string{
+		".git":       "not a pointer\n",
+		".gitignore": "*.log\n",
+	})
+
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if !m.Match("x.log", false) {
+		t.Error("root .gitignore not loaded")
+	}
+}
+
+// Confirms the hand-built layouts above match what git actually creates.
+func TestLoadRepo_RealGitWorktree(t *testing.T) {
+	if !gitAvailable() {
+		t.Skip("git not available")
+	}
+	base := t.TempDir()
+	mainRepo := filepath.Join(base, "main")
+	wt := filepath.Join(base, "wt")
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if err := os.MkdirAll(mainRepo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run(mainRepo, "init", "-q")
+	run(mainRepo, "commit", "-q", "--allow-empty", "-m", "init")
+	run(mainRepo, "worktree", "add", "-q", wt)
+	writeTree(t, mainRepo, map[string]string{".git/info/exclude": "*.secret\n"})
+
+	m, err := LoadRepo(wt, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if !m.Match("key.secret", false) {
+		t.Error("key.secret not ignored in a real linked worktree")
 	}
 }

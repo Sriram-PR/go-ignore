@@ -11,6 +11,10 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 - **`Match` ignores paths inside an ignored directory.** Parent directories were checked only when a negation re-included the path, so with the rule `build`, `Match("build/app.js", false)` returned false where git ignores it. `Match` and `MatchWithReason` now check every parent directory, shallowest first, and report the outermost ignored parent's rule, as `git check-ignore -v` does. `WalkDir` and `Files` already pruned ignored directories, so their output is unchanged.
 - **`!dir/` re-includes the directory, not the files in it.** A dir-only rule also matched every file inside a matching directory. With the allowlist idiom (`*`, `!*/`, `!*.go`), every file under a re-included directory came back, and `WalkDir` and `Files` yielded files git omits. Dir-only rules now match directories only, and the files inside follow from the parent check, as in git.
 
+**Performance**
+
+- `Match` now runs the rules once per parent directory, so its cost grows with path depth. Short paths cost about the same (`BenchmarkMatch_Miss`: 94 ns before, 111 ns after). Deep or `**`-heavy ones cost more (`BenchmarkMatch_DeepPath`, 15 segments: 1.1 µs to 4.9 µs; `BenchmarkMatch_DoubleStarDeep`, `**/target` on 21 segments: 356 ns to 11.8 µs). `WalkDir` and `Files` skip the check, since they never enter an ignored directory.
+
 **Requirements**
 
 - Minimum Go version is now 1.26 (1.25 is out of support). CI tests 1.26 and 1.27.

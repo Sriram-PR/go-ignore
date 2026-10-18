@@ -3,6 +3,7 @@ package ignore_test
 import (
 	"io/fs"
 	"maps"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -18,7 +19,8 @@ import (
 //
 // Case-insensitive scenarios are left out: there, sibling directories that
 // differ only in case get each other's rules in load order, a state that
-// cannot exist on a case-insensitive filesystem.
+// cannot exist on a case-insensitive filesystem. On Windows, paths with a
+// backslash in a name are left out too: there it is a path separator.
 func TestWalkAgreesWithMatch(t *testing.T) {
 	var scens []scenario
 	for _, s := range parityCurated() {
@@ -32,6 +34,9 @@ func TestWalkAgreesWithMatch(t *testing.T) {
 	for _, s := range scens {
 		fsys := fstest.MapFS{}
 		for p, dir := range s.paths {
+			if runtime.GOOS == "windows" && strings.Contains(p, `\`) {
+				continue
+			}
 			if dir {
 				fsys[p] = &fstest.MapFile{Mode: fs.ModeDir | 0o755}
 			} else {

@@ -18,7 +18,6 @@ type scenario struct {
 }
 
 type curatedCase struct {
-	name  string
 	files map[string]string
 	paths []string // trailing "/" = dir
 	icase bool
@@ -237,8 +236,9 @@ func genScenario(r *rand.Rand, icase bool) *scenario {
 		if i == 0 && r.Intn(2) == 0 {
 			d = ""
 		}
-		var lines []string
-		for j, np := 0, 1+r.Intn(4); j < np; j++ {
+		np := 1 + r.Intn(4)
+		lines := make([]string, 0, np)
+		for range np {
 			lines = append(lines, genPattern(r))
 		}
 		eol := "\n"
@@ -254,7 +254,7 @@ func genScenario(r *rand.Rand, icase bool) *scenario {
 	}
 	for i, np := 0, 3+r.Intn(10); i < np; i++ {
 		depth := 1 + r.Intn(4)
-		var segs []string
+		segs := make([]string, 0, depth)
 		for k := 0; k < depth; k++ {
 			nm := names[r.Intn(len(names))]
 			if icase && (nm == "FOO" || nm == "Foo") {
@@ -291,8 +291,9 @@ func genScenario(r *rand.Rand, icase bool) *scenario {
 // or ".." segment are dropped: they cannot exist on disk inside the repo, and
 // git check-ignore rejects them.
 func parityCurated() []scenario {
-	var out []scenario
-	for i, c := range curatedCases() {
+	cases := curatedCases()
+	out := make([]scenario, 0, len(cases))
+	for i, c := range cases {
 		s := scenario{name: fmt.Sprintf("curated-%d", i), icase: c.icase, files: c.files, paths: map[string]bool{}}
 		for _, p := range c.paths {
 			if strings.HasPrefix(p, "/") || strings.Contains(p, "//") || hasDotSegment(p) {

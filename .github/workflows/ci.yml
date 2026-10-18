@@ -19,6 +19,8 @@ on:
           - fuzz
           - fuzz-long
           - benchmark
+          - parity
+          - parity-explore
 
 permissions:
   contents: read
@@ -110,6 +112,50 @@ jobs:
           go test -fuzz=FuzzNormalizeContent -fuzztime=30s
           go test -fuzz=FuzzSegmentMatching -fuzztime=30s
           go test -fuzz=FuzzConcurrentAccess -fuzztime=30s
+
+  parity:
+    name: Git Parity
+    if: ${{ github.event_name != 'workflow_dispatch' || contains(fromJson('["all","parity"]'), github.event.inputs.job) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Show git version
+        run: git --version
+
+      - name: Run parity harness
+        env:
+          GOIGNORE_PARITY: "1"
+        run: go test -run '^TestParity$' -count=1 .
+
+  # Report-only exploration on a fresh seed; never compared with the baseline.
+  parity-explore:
+    name: Git Parity (explore)
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'parity-explore' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Show git version
+        run: git --version
+
+      - name: Explore a new seed
+        env:
+          GOIGNORE_PARITY: "1"
+          GOIGNORE_PARITY_SEEDS: ${{ github.run_id }}
+        run: go test -run '^TestParity$' -count=1 -v .
 
   # Long-form fuzz: 30 minutes per fuzzer, ~4 hours total. Runs only when
   # explicitly dispatched (never on push/PR) — burns hours of CI compute and

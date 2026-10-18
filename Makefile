@@ -1,4 +1,4 @@
-.PHONY: all test test-race test-cover bench fuzz fuzz-long lint fmt vet clean help
+.PHONY: all test test-race test-cover bench fuzz fuzz-long lint fmt vet clean help parity parity-update test-git fixtures
 
 # Default target
 all: fmt vet test
@@ -49,6 +49,14 @@ fuzz-long:
 test-git:
 	go test -v -run TestGitParity ./...
 
+# Run the git parity harness against testdata/parity/baseline.txt
+parity:
+	GOIGNORE_PARITY=1 go test -run '^TestParity$$' -count=1 .
+
+# Regenerate the parity baseline (commit it with the change that caused it)
+parity-update:
+	GOIGNORE_PARITY=1 GOIGNORE_PARITY_UPDATE=1 go test -run '^TestParity$$' -count=1 -v .
+
 # Run linter (requires golangci-lint)
 lint:
 	golangci-lint run
@@ -82,6 +90,8 @@ help:
 	@echo "  test-race  - Run tests with race detector"
 	@echo "  test-cover - Run tests with coverage report"
 	@echo "  test-git   - Run git parity tests"
+	@echo "  parity     - Run git parity harness vs baseline"
+	@echo "  parity-update - Regenerate the parity baseline"
 	@echo "  bench      - Run benchmarks"
 	@echo "  fuzz       - Run fuzz tests (30s each, smoke)"
 	@echo "  fuzz-long  - Run fuzz tests (30m each, pre-release)"

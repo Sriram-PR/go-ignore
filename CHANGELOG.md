@@ -4,6 +4,12 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### Unreleased
+
+**Tests**
+
+- Git parity harness (`make parity`): compares `Match`, case-insensitive `Match` and `WalkDir` with git on curated and seeded scenarios, against a checked-in baseline of known divergences. Runs in CI.
+
 ### v1.0.1
 
 Bug fixes from an audit that diffed matching and walking against `git check-ignore` 2.56. Each one changes results only where go-ignore disagreed with git, which the Stability Guarantees allow in a patch release. The exported API is unchanged.

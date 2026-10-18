@@ -68,6 +68,15 @@ go test -v -run TestGitParity
 
 If you find a discrepancy with Git, add a test case to `git_parity_test.go`.
 
+### Parity harness
+
+`make parity` writes curated and seeded scenarios to temporary git repos and compares `Match`, case-insensitive `Match`, and `WalkDir` with `git check-ignore` and `git ls-files`. Divergences git and go-ignore already disagree on are listed in `testdata/parity/baseline.txt`.
+
+- **Regressions (new divergences):** your change made go-ignore disagree with git somewhere new. Fix it.
+- **Resolved:** your change fixed a known divergence. Run `make parity-update` and commit the smaller baseline in the same commit as the fix.
+
+CI runs the harness on every push. To look for new divergence classes, dispatch the workflow with `parity-explore`, which runs a fresh seed and only reports.
+
 ### Fuzz Testing
 
 Run fuzz tests to catch edge cases. Each can only run one at a time per

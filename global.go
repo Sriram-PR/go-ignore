@@ -42,17 +42,8 @@ var gitConfigTimeout = 5 * time.Second
 //
 // Pass a zero-value MatcherOptions{} to accept all defaults.
 func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
-	m := NewWithOptions(opts)
-
-	if err := m.AddSystemPatterns(); err != nil {
-		return nil, err
-	}
-
-	if err := m.AddGlobalPatterns(); err != nil {
-		return nil, err
-	}
-
-	if err := m.AddExcludePatterns(filepath.Join(repoRoot, ".git")); err != nil {
+	m, err := loadRepoConfig(repoRoot, opts)
+	if err != nil {
 		return nil, err
 	}
 
@@ -65,6 +56,23 @@ func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 		return nil, fmt.Errorf("reading %s: %w", rootIgnore, err)
 	}
 	m.addPatternsFromSource("", content, rootIgnore)
+	return m, nil
+}
+
+// loadRepoConfig loads LoadRepo's sources except the root .gitignore: the
+// system, global and info/exclude files. WalkRepo and RepoFiles leave the
+// root .gitignore to the walker, which reports a bad one through fn.
+func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
+	m := NewWithOptions(opts)
+	if err := m.AddSystemPatterns(); err != nil {
+		return nil, err
+	}
+	if err := m.AddGlobalPatterns(); err != nil {
+		return nil, err
+	}
+	if err := m.AddExcludePatterns(filepath.Join(repoRoot, ".git")); err != nil {
+		return nil, err
+	}
 	return m, nil
 }
 

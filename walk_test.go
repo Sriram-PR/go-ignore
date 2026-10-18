@@ -467,33 +467,39 @@ func TestFiles_NestedDiscoveryStillApplies(t *testing.T) {
 	}
 }
 
-func TestRepoFiles_LoadRepoErrorYielded(t *testing.T) {
-	// If LoadRepo cannot read a corrupt source, RepoFiles must yield that
-	// error once and stop. We force an error by making .gitignore unreadable.
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod 0o000 unreliable on Windows")
+func TestRepoFiles_UnreadableRootGitignoreYieldedOnce(t *testing.T) {
+	// An unreadable root .gitignore is reported once and the walk goes on
+	// without its rules, as git does.
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions and a non-root user")
 	}
 	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		".gitignore": "*.log\n",
+		"a.log":      "x",
+	})
 	gitignore := filepath.Join(root, ".gitignore")
-	if err := os.WriteFile(gitignore, []byte("*.log\n"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
 	if err := os.Chmod(gitignore, 0o000); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(gitignore, 0o644) })
 
-	yields := 0
-	var firstErr error
+	var errs []error
+	sawLog := false
 	for path, err := range RepoFiles(root, MatcherOptions{}) {
-		yields++
-		if err != nil && firstErr == nil {
-			firstErr = err
+		if err != nil {
+			errs = append(errs, err)
+			continue
 		}
-		_ = path
+		if filepath.Base(path) == "a.log" {
+			sawLog = true
+		}
 	}
-	if yields != 1 || firstErr == nil {
-		t.Errorf("yields=%d firstErr=%v; want exactly one yield carrying a LoadRepo error", yields, firstErr)
+	if len(errs) != 1 || !errors.Is(errs[0], fs.ErrPermission) {
+		t.Errorf("errors = %v; want exactly one wrapping fs.ErrPermission", errs)
+	}
+	if !sawLog {
+		t.Error("a.log not yielded; want the walk to continue without the unreadable rules")
 	}
 }
 
@@ -970,5 +976,61 @@ func TestWalkDir_UnreadableGitignoreOneCallback(t *testing.T) {
 	}
 	if !sawLog {
 		t.Error("sub/a.log not visited; want the walk to continue without the unreadable rules")
+	}
+}
+
+// WalkRepo reads the root .gitignore once: LoadRepo's copy and the walker's
+// used to both load it.
+func TestWalkRepo_RootGitignoreLoadedOnce(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{".gitignore": "!\n*.log\n"})
+	warnings := 0
+	opts := MatcherOptions{WarningHandler: func(ParseWarning) { warnings++ }}
+	if err := WalkRepo(root, opts, func(string, fs.DirEntry, error) error { return nil }); err != nil {
+		t.Fatalf("WalkRepo: %v", err)
+	}
+	if warnings != 1 {
+		t.Errorf("got %d warnings for the root .gitignore's \"!\" line, want 1", warnings)
+	}
+}
+
+// WalkRepo with an unreadable root .gitignore reports it once through fn and
+// walks the tree.
+func TestWalkRepo_UnreadableRootGitignoreContinues(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions and a non-root user")
+	}
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		".gitignore": "*.log\n",
+		"a.log":      "x",
+	})
+	gitignore := filepath.Join(root, ".gitignore")
+	if err := os.Chmod(gitignore, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(gitignore, 0o644) })
+
+	rootCalls := 0
+	var rootErr error
+	sawLog := false
+	err := WalkRepo(root, MatcherOptions{}, func(p string, d fs.DirEntry, err error) error {
+		if p == root {
+			rootCalls++
+			rootErr = err
+		}
+		if filepath.Base(p) == "a.log" {
+			sawLog = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkRepo: %v", err)
+	}
+	if rootCalls != 1 || !errors.Is(rootErr, fs.ErrPermission) {
+		t.Errorf("root got %d callbacks, err %v; want 1 with fs.ErrPermission", rootCalls, rootErr)
+	}
+	if !sawLog {
+		t.Error("a.log not visited; want the walk to continue")
 	}
 }

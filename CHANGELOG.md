@@ -14,12 +14,14 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 - **A `.gitignore` the walker can't use gets one callback.** An unreadable nested `.gitignore` made `WalkDir` call `fn` twice for its directory, with the error and then with nil. Now `fn(dir, d, err)` is the only call, and its return decides: nil walks the directory without that file's rules, as git does, and `fs.SkipDir` skips it. `Files` and `FilesFS` yield the error and keep going.
 - **Symlinked `.gitignore` files are not followed by the walker or by `LoadRepo`.** git refuses them too. The walker reports one callback for the directory, and `LoadRepo` returns an error; both wrap `ErrPatternFileSkipped`. `info/exclude`, the global and system files and `AddPatternsFromFile` still follow symlinks, as git does.
+- **`WalkRepo` and `RepoFiles` keep walking past a bad root `.gitignore`.** An unreadable one made them fail before walking anything. The walker now reads the root `.gitignore` itself and reports a bad one through `fn`, or as a yielded error, like a nested one. `LoadRepo` still returns the error.
 
 **Fixed**
 
 - **Walks no longer hang or exhaust memory on a hostile `.gitignore`.** A FIFO named `.gitignore` blocked `WalkDir` forever, and one symlinked to `/dev/zero` grew memory until the process was killed. Only regular files are read, at most 100 MB, git's limit.
 - **Loaders are bounded the same way.** `LoadRepo`, `AddExcludePatterns`, `AddGlobalPatterns`, `AddSystemPatterns` and `AddPatternsFromFile` refuse anything but a regular file of at most 100 MB, so a FIFO named `.git` no longer hangs `LoadRepo` and `AddPatternsFromFile("", "/dev/zero")` returns an error. `AddPatternsReader` stops reading after 100 MB.
 - **Walks past `MaxPatterns`.** The walker kept every discovered `.gitignore`'s rules until the walk ended, so in a large tree the total passed `MaxPatterns` (100,000 by default), later rules were dropped with only a warning, and the walk yielded files git ignores. Rules now apply only while the walk is inside their directory, so the cap counts the rules of the current entry's ancestors.
+- **`WalkRepo` and `RepoFiles` loaded the root `.gitignore` twice**, once through `LoadRepo` and again in the walker, so its parse warnings were reported twice.
 
 ### v1.1.0
 

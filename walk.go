@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"iter"
-	"os"
 	pathpkg "path"
 	"path/filepath"
 	"slices"
@@ -19,7 +18,7 @@ import (
 // at call time.
 type walkBackend struct {
 	walkDir  func(root string, fn fs.WalkDirFunc) error
-	readFile func(path string) ([]byte, error)
+	src      patternSource
 	joinPath func(elem ...string) string
 	relPath  func(root, p string) (string, error)
 }
@@ -43,7 +42,13 @@ type walkBackend struct {
 //     Match itself does NOT treat .git as special — this is a WalkDir-specific
 //     behavior. To walk .git anyway, use filepath.WalkDir directly with Match
 //     for filtering.
-//   - Symlinks are not followed (filepath.WalkDir Lstat semantics).
+//   - Symlinks are not followed (filepath.WalkDir Lstat semantics), and a
+//     .gitignore that is a symlink is not read, as in git.
+//   - A .gitignore that cannot be read (unreadable, a symlink, not a regular
+//     file, or larger than 100 MB) gets exactly one call for its directory,
+//     fn(dir, d, err), with err wrapping ErrPatternFileSkipped or the read
+//     error. Returning nil walks the directory without that file's rules, as
+//     git does; returning fs.SkipDir skips the directory instead.
 //   - Rules from a discovered .gitignore apply only inside its directory and
 //     are dropped when the walk leaves it, so MaxPatterns counts the
 //     receiver's rules plus those of the current entry's ancestors, not the
@@ -79,9 +84,9 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 // without OS path semantics.
 //
 // Like WalkDir, the receiver matcher is NOT mutated; discovered rules live
-// only for the duration of the call. The .gitignore lookup uses fs.ReadFile
-// — symlink handling is whatever fsys provides (most fs.FS implementations,
-// including fstest.MapFS and embed.FS, have no concept of symlinks).
+// only for the duration of the call. A .gitignore that fsys reports as a
+// symlink (through fs.ReadLinkFS, as fstest.MapFS does) is not read; other
+// fs.FS implementations have no symlinks to report.
 //
 // As with WalkDir, parse warnings from discovered nested .gitignore files
 // reach only a configured WarningHandler, not the receiver's Warnings().
@@ -153,11 +158,9 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 			}
 
 			// Discover a .gitignore in this directory and load it into the
-			// per-walk child matcher. ReadFile returns a not-exist error for
-			// directories without a .gitignore — that's the common case and
-			// silently ignored. Other read errors flow through fn.
+			// per-walk child matcher. Most directories have none.
 			gitignorePath := b.joinPath(path, ".gitignore")
-			content, readErr := b.readFile(gitignorePath)
+			content, readErr := readPatternFile(b.src, gitignorePath, false, maxPatternFileSize)
 			switch {
 			case readErr == nil:
 				basePath := rel
@@ -167,9 +170,9 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 				frames = append(frames, frame{dir: basePath, rules: len(child.rules)})
 				child.addPatternsFromSource(basePath, content, gitignorePath)
 			case !errors.Is(readErr, fs.ErrNotExist):
-				if cbErr := fn(path, d, fmt.Errorf("reading %s: %w", gitignorePath, readErr)); cbErr != nil {
-					return cbErr
-				}
+				// The only callback for this directory: nil walks it without
+				// these rules, as git does, and SkipDir prunes it.
+				return fn(path, d, fmt.Errorf("reading %s: %w", gitignorePath, readErr))
 			}
 
 			return fn(path, d, nil)
@@ -186,7 +189,7 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 // osBackend is the walkBackend backed by the OS filesystem.
 var osBackend = walkBackend{
 	walkDir:  filepath.WalkDir,
-	readFile: os.ReadFile,
+	src:      osSource{},
 	joinPath: filepath.Join,
 	relPath: func(root, p string) (string, error) {
 		rel, err := filepath.Rel(root, p)
@@ -202,7 +205,7 @@ var osBackend = walkBackend{
 func fsBackend(fsys fs.FS) walkBackend {
 	return walkBackend{
 		walkDir:  func(root string, fn fs.WalkDirFunc) error { return fs.WalkDir(fsys, root, fn) },
-		readFile: func(p string) ([]byte, error) { return fs.ReadFile(fsys, p) },
+		src:      fsSource{fsys},
 		joinPath: pathpkg.Join,
 		relPath: func(root, p string) (string, error) {
 			if p == root {

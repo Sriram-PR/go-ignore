@@ -6,8 +6,18 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ### Unreleased
 
+**Added**
+
+- `ErrPatternFileSkipped`, wrapped by the error for a pattern file that is deliberately not read: a symlinked `.gitignore` in the working tree, anything that is not a regular file, or a file over 100 MB.
+
+**Behavior changes**
+
+- **A `.gitignore` the walker can't use gets one callback.** An unreadable nested `.gitignore` made `WalkDir` call `fn` twice for its directory, with the error and then with nil. Now `fn(dir, d, err)` is the only call, and its return decides: nil walks the directory without that file's rules, as git does, and `fs.SkipDir` skips it. `Files` and `FilesFS` yield the error and keep going.
+- **Symlinked `.gitignore` files are not followed by the walker.** git refuses them too. The directory gets one callback with an error wrapping `ErrPatternFileSkipped`.
+
 **Fixed**
 
+- **Walks no longer hang or exhaust memory on a hostile `.gitignore`.** A FIFO named `.gitignore` blocked `WalkDir` forever, and one symlinked to `/dev/zero` grew memory until the process was killed. Only regular files are read, at most 100 MB, git's limit.
 - **Walks past `MaxPatterns`.** The walker kept every discovered `.gitignore`'s rules until the walk ended, so in a large tree the total passed `MaxPatterns` (100,000 by default), later rules were dropped with only a warning, and the walk yielded files git ignores. Rules now apply only while the walk is inside their directory, so the cap counts the rules of the current entry's ancestors.
 
 ### v1.1.0

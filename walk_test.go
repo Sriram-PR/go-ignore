@@ -873,3 +873,102 @@ func TestWalkDirFS_RuleStackScopesMaxPatterns(t *testing.T) {
 		t.Errorf("warnings = %v, want none", warnings)
 	}
 }
+
+// A .gitignore the walker refuses to read gets exactly one callback for its
+// directory, carrying ErrPatternFileSkipped. fn's return decides what
+// happens next: nil walks the directory without that file's rules (git's
+// choice), SkipDir prunes it.
+func TestWalkDirFS_RefusedGitignoreOneCallback(t *testing.T) {
+	kinds := map[string]*fstest.MapFile{
+		"symlink": {Mode: fs.ModeSymlink, Data: []byte("../rules")},
+		"pipe":    {Mode: fs.ModeNamedPipe},
+		"dir":     {Mode: fs.ModeDir | 0o755},
+	}
+	for name, gitignore := range kinds {
+		for _, ret := range []error{nil, fs.SkipDir} {
+			fsys := fstest.MapFS{
+				"rules":          {Data: []byte("*.log\n")},
+				"sub/.gitignore": gitignore,
+				"sub/a.log":      {},
+				"sub/b.txt":      {},
+			}
+			subCalls := 0
+			var subErr error
+			var files []string
+			err := New().WalkDirFS(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+				if p == "sub" {
+					subCalls++
+					subErr = err
+					if err != nil {
+						return ret
+					}
+				}
+				if err == nil && !d.IsDir() {
+					files = append(files, p)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatalf("%s: WalkDirFS: %v", name, err)
+			}
+			if subCalls != 1 || !errors.Is(subErr, ErrPatternFileSkipped) {
+				t.Errorf("%s: sub got %d callbacks, err %v; want 1 with ErrPatternFileSkipped", name, subCalls, subErr)
+			}
+			sort.Strings(files)
+			// A symlink or pipe named .gitignore is itself a file the walk
+			// yields, as git lists it.
+			want := []string{"rules", "sub/a.log", "sub/b.txt"}
+			if !gitignore.Mode.IsDir() {
+				want = append(want, "sub/.gitignore")
+			}
+			if ret == fs.SkipDir {
+				want = []string{"rules"}
+			}
+			sort.Strings(want)
+			if !equalStrings(files, want) {
+				t.Errorf("%s, fn returns %v: files %v, want %v", name, ret, files, want)
+			}
+		}
+	}
+}
+
+// An unreadable nested .gitignore gets one callback, with the permission
+// error, and the walk continues into the directory, as git does.
+func TestWalkDir_UnreadableGitignoreOneCallback(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions and a non-root user")
+	}
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"sub/.gitignore": "*.log\n",
+		"sub/a.log":      "x",
+	})
+	gitignore := filepath.Join(root, "sub", ".gitignore")
+	if err := os.Chmod(gitignore, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(gitignore, 0o644) })
+
+	subCalls := 0
+	var subErr error
+	sawLog := false
+	err := New().WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		switch filepath.Base(p) {
+		case "sub":
+			subCalls++
+			subErr = err
+		case "a.log":
+			sawLog = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDir: %v", err)
+	}
+	if subCalls != 1 || !errors.Is(subErr, fs.ErrPermission) {
+		t.Errorf("sub got %d callbacks, err %v; want 1 with fs.ErrPermission", subCalls, subErr)
+	}
+	if !sawLog {
+		t.Error("sub/a.log not visited; want the walk to continue without the unreadable rules")
+	}
+}

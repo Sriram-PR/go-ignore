@@ -25,7 +25,7 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 **Performance**
 
-- **Walks with many nested `.gitignore` files are linear.** Every discovered rule stayed live for the rest of the walk, so each entry was matched against the rules of every directory visited so far. `BenchmarkWalkDir_NestedGitignores`: 14.9 µs per entry at 500 directories and 49.1 µs at 2,000 before, 2.4 µs and 2.2 µs after. A tree with 3,000 nested `.gitignore` files and 66,000 files walks in 0.11 s instead of 9.2 s.
+- **Walks with many nested `.gitignore` files are linear.** Every discovered rule stayed live for the rest of the walk, so each entry was matched against the rules of every directory visited so far. `BenchmarkWalkDir_NestedGitignores`: 14.9 µs per entry at 500 directories and 49.1 µs at 2,000 before, 2.4 µs and 2.2 µs after. A tree with 3,000 nested `.gitignore` files and 63,000 other files walks in 0.11 s instead of 9.2 s.
 
 ### v1.1.0
 

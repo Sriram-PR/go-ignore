@@ -36,7 +36,9 @@ var gitConfigTimeout = 5 * time.Second
 // Missing files are silently skipped; only real read failures are returned.
 // Every file must be a regular file of at most 100 MB, and the root
 // .gitignore must not be a symlink (git does not follow one); otherwise the
-// error wraps ErrPatternFileSkipped. Nested .gitignore files under subdirectories are NOT walked — use WalkDir or
+// error wraps ErrPatternFileSkipped.
+//
+// Nested .gitignore files under subdirectories are NOT walked — use WalkDir or
 // WalkRepo for that (they auto-discover per-directory .gitignore files), or call
 // AddPatterns with the appropriate basePath yourself if you need finer control.
 //

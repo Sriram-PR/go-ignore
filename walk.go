@@ -75,8 +75,9 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 }
 
 // WalkDirFS is the fs.FS-backed counterpart to WalkDir. It walks the tree at
-// root inside fsys, applying the same nested .gitignore discovery and
-// .git/-pruning behavior. Paths supplied to fn use forward slashes (fs.WalkDir
+// root inside fsys, applying the same nested .gitignore discovery, rule
+// scoping, handling of a .gitignore it cannot read (one call, 100 MB limit)
+// and .git/-pruning behavior. Paths supplied to fn use forward slashes (fs.WalkDir
 // convention), regardless of host OS.
 //
 // Use cases: in-memory tests via fstest.MapFS, embedded filesystems via
@@ -158,7 +159,8 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 			}
 
 			// Discover a .gitignore in this directory and load it into the
-			// per-walk child matcher. Most directories have none.
+			// per-walk child matcher. Most directories have none, which is not an
+			// error.
 			gitignorePath := b.joinPath(path, ".gitignore")
 			content, readErr := readPatternFile(b.src, gitignorePath, false, maxPatternFileSize)
 			switch {

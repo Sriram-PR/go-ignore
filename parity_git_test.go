@@ -109,3 +109,16 @@ func gitCheckIgnore(t *testing.T, s scenario, dir string, paths []string) map[st
 	}
 	return res
 }
+
+// gitLsFiles returns the untracked, non-ignored files git lists.
+func gitLsFiles(t *testing.T, s scenario, dir string) map[string]bool {
+	t.Helper()
+	out := runGit(t, s, dir, nil, "ls-files", "-o", "--exclude-standard", "-z")
+	res := map[string]bool{}
+	for p := range strings.SplitSeq(string(out), "\x00") {
+		if p != "" {
+			res[p] = true
+		}
+	}
+	return res
+}

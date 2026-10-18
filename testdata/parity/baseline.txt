@@ -678,3 +678,260 @@ match files={".gitignore":"é\r\n" "b/a/.gitignore":"a\\ b/*.b/[%--]  \n![[:digi
 match files={".gitignore":"é\r\n" "b/a/.gitignore":"a\\ b/*.b/[%--]  \n![[:digit:]]  \n"} path="é/a b/!a/b" dir=true git=true lib=false
 match files={"b/a/.gitignore":"/[a-]/[!-a]\n/é \n" "foo/.gitignore":"a*/?/\n/[[:punct:]]  \na*/**a\n[a-c-e]/.x\n"} path="foo/a.b/!a/]" dir=false git=true lib=false
 match files={"foo/.gitignore":"[ab] \n/[^a]/[[:space:]]/[]a]\n"} path="foo/a/x" dir=false git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="a b/-" dir=true git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="a b/-/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="a.b/b" dir=true git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="ab/!a" dir=true git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="ab/!a/.x" dir=true git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="ab/!a/.x/a" dir=false git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="ab/a.b" dir=true git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="ab/a.b/-" dir=true git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="ab/a.b/-/a" dir=true git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="x/a]/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"!/[[:foo:]]/[--a]\n!\\* \n/?/\\a\n/a**\n[a-[:alpha:]]\n" "a/.gitignore":"!*b/[a-[:alpha:]]/\n/[--a]/??/*\n[\\\\]/[[:punct:]]/[[:punct:]]  \n[]a]/[a-c-e]/[ab]\n"} path="x/a]/#a/x" dir=false git=true lib=false
+match-icase files={".gitignore":"!/a b\n/[ab]/\\?/ \n/[[:alpha:]-z]\n" "a/b/.gitignore":"![[:space:]]/[a[:]]\na\\ /[[:punct:]]/[a-]\n[a-b]/  \n"} path="a/b" dir=true git=true lib=false
+match-icase files={".gitignore":"!/a b\n/[ab]/\\?/ \n/[[:alpha:]-z]\n" "a/b/.gitignore":"![[:space:]]/[a[:]]\na\\ /[[:punct:]]/[a-]\n[a-b]/  \n"} path="b/ab" dir=true git=true lib=false
+match-icase files={".gitignore":"!/a b\n/[ab]/\\?/ \n/[[:alpha:]-z]\n" "a/b/.gitignore":"![[:space:]]/[a[:]]\na\\ /[[:punct:]]/[a-]\n[a-b]/  \n"} path="b/ab/a*" dir=false git=true lib=false
+match-icase files={".gitignore":"!?\n\\a\n*.b\n/[!-a]/ \n"} path="b/[a]" dir=true git=true lib=false
+match-icase files={".gitignore":"![\\\\]/?/\n![^a]\n/a**\na**/[[:alpha:]]/a\\ b/  \n" "foo/.gitignore":"\ufeff[!]a]\n![a-c-e]/[a-]/[]a]\n"} path="ab/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"![\\\\]/?/\n![^a]\n/a**\na**/[[:alpha:]]/a\\ b/  \n" "foo/.gitignore":"\ufeff[!]a]\n![a-c-e]/[a-]/[]a]\n"} path="ab/foo/a]" dir=true git=true lib=false
+match-icase files={".gitignore":"![\\\\]/?/\n![^a]\n/a**\na**/[[:alpha:]]/a\\ b/  \n" "foo/.gitignore":"\ufeff[!]a]\n![a-c-e]/[a-]/[]a]\n"} path="ab/foo/a]/a" dir=false git=true lib=false
+match-icase files={".gitignore":"![a\\-c]/foo\n![[:alpha:][:digit:]]/[]a]/  \n[[:alpha:][:digit:]]\n" "a/.gitignore":"a*/a\n**a/foo\n/[[:alpha:]]/b\nb\n"} path="bar/x/#a" dir=false git=true lib=false
+match-icase files={".gitignore":"![a\\-c]/foo\n![[:alpha:][:digit:]]/[]a]/  \n[[:alpha:][:digit:]]\n" "a/.gitignore":"a*/a\n**a/foo\n/[[:alpha:]]/b\nb\n"} path="x/a.b" dir=true git=true lib=false
+match-icase files={".gitignore":"![a\\-c]/foo\n![[:alpha:][:digit:]]/[]a]/  \n[[:alpha:][:digit:]]\n" "a/.gitignore":"a*/a\n**a/foo\n/[[:alpha:]]/b\nb\n"} path="x/b/é" dir=true git=true lib=false
+match-icase files={".gitignore":"!\\#a/  \n[\\]]/ \n[\\]]/[\\]]\n/*a*\n"} path="#a/[a]" dir=true git=true lib=false
+match-icase files={".gitignore":"!a\\ b\n/b/?/a b\nbar/\n\\!a\n" "a/.gitignore":"\ufeff[\\a]/Foo\n[[:upper:]]/ \n??/\n" "foo/.gitignore":"\ufeff[[:space:]]\n"} path="!a/b" dir=true git=true lib=false
+match-icase files={".gitignore":"!a\\ b\n/b/?/a b\nbar/\n\\!a\n" "a/.gitignore":"\ufeff[\\a]/Foo\n[[:upper:]]/ \n??/\n" "foo/.gitignore":"\ufeff[[:space:]]\n"} path="!a/b/b" dir=false git=true lib=false
+match-icase files={".gitignore":"!a\\/.x/ \nFoo/foo/[a-]\n"} path="foo/foo/-/a" dir=true git=true lib=false
+match-icase files={".gitignore":"!a\n!a\\ /a**b/b/\n[-a] \n"} path="-/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"!a\n!a\\ /a**b/b/\n[-a] \n"} path="-/foo/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"!ab/a\\ \n[[:upper:]]\n??/a?/**\n/[]a]/[[:digit:]]/[^a]\n"} path="a" dir=true git=true lib=false
+match-icase files={".gitignore":"*.LOG\n" "Sub/.gitignore":"!x.log\n"} path="SUB/x.log" dir=false git=true lib=false
+match-icase files={".gitignore":"*a*\na**/[a-c-e]\na\\ b\n" "b/a/.gitignore":"\ufeff*\\*/a\\ b\n!a**b/é/[[:lower:]]/\n[a\\-c]/  \n\\[a]/\\#a\n" "foo/bar/.gitignore":"!/[[:upper:]]/[[:space:]]/[]a]\n[a-[:alpha:]]\n"} path="[a]/b" dir=true git=true lib=false
+match-icase files={".gitignore":"*a*\na**/[a-c-e]\na\\ b\n" "b/a/.gitignore":"\ufeff*\\*/a\\ b\n!a**b/é/[[:lower:]]/\n[a\\-c]/  \n\\[a]/\\#a\n" "foo/bar/.gitignore":"!/[[:upper:]]/[[:space:]]/[]a]\n[a-[:alpha:]]\n"} path="[a]/b/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"*a*\na**/[a-c-e]\na\\ b\n" "b/a/.gitignore":"\ufeff*\\*/a\\ b\n!a**b/é/[[:lower:]]/\n[a\\-c]/  \n\\[a]/\\#a\n" "foo/bar/.gitignore":"!/[[:upper:]]/[[:space:]]/[]a]\n[a-[:alpha:]]\n"} path="a*/#a/]" dir=false git=true lib=false
+match-icase files={".gitignore":"*a*\na**/[a-c-e]\na\\ b\n" "b/a/.gitignore":"\ufeff*\\*/a\\ b\n!a**b/é/[[:lower:]]/\n[a\\-c]/  \n\\[a]/\\#a\n" "foo/bar/.gitignore":"!/[[:upper:]]/[[:space:]]/[]a]\n[a-[:alpha:]]\n"} path="bar/-" dir=false git=true lib=false
+match-icase files={".gitignore":".x \n/[a-[:alpha:]]\n![[:space:]]/ab\n/?/\n" "a/b/.gitignore":"/? \n"} path="a/[a]" dir=true git=true lib=false
+match-icase files={".gitignore":".x \n/[a-[:alpha:]]\n![[:space:]]/ab\n/?/\n" "a/b/.gitignore":"/? \n"} path="a/b" dir=true git=true lib=false
+match-icase files={".gitignore":".x \n/[a-[:alpha:]]\n![[:space:]]/ab\n/?/\n" "a/b/.gitignore":"/? \n"} path="a]/!a" dir=true git=true lib=false
+match-icase files={".gitignore":".x \n/[a-[:alpha:]]\n![[:space:]]/ab\n/?/\n" "a/b/.gitignore":"/? \n"} path="a]/!a/-" dir=false git=true lib=false
+match-icase files={".gitignore":"/*.b/[a-b]/\n[a-[:alpha:]]\n/[\\]]/foo \n/[^a]/\n" "foo/bar/.gitignore":"[[:foo:]]\n[--a]/\\[a]/a** \n\\[a]/[\\\\]/[[:punct:]]\n"} path="a]/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"/*.b/[a-b]/\n[a-[:alpha:]]\n/[\\]]/foo \n/[^a]/\n" "foo/bar/.gitignore":"[[:foo:]]\n[--a]/\\[a]/a** \n\\[a]/[\\\\]/[[:punct:]]\n"} path="a]/#a/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"/*.b/[a-b]/\n[a-[:alpha:]]\n/[\\]]/foo \n/[^a]/\n" "foo/bar/.gitignore":"[[:foo:]]\n[--a]/\\[a]/a** \n\\[a]/[\\\\]/[[:punct:]]\n"} path="a]/#a/foo/ab" dir=false git=true lib=false
+match-icase files={".gitignore":"/.x/[[:alpha:]]/a\\\nFoo/[[:foo:]]/\na/a/**a \n? \n/**/[]a]/\n[ab]/\n"} path="a]/a.b/x/a.b" dir=false git=true lib=false
+match-icase files={".gitignore":"/.x/\n[!]a]/\n!foo/??\n[a[:]]/\\*/a\\ b \n"} path="foo/b/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"/?/a?\n" "a/.gitignore":"[[:alpha:][:digit:]]/[[:lower:]]/ \n/a**/a?\n*a*/a b/[-a]\n/[^a] \n" "foo/.gitignore":"!\\!a  \n"} path="-/ab/.x" dir=true git=true lib=false
+match-icase files={".gitignore":"/?/a?\n" "a/.gitignore":"[[:alpha:][:digit:]]/[[:lower:]]/ \n/a**/a?\n*a*/a b/[-a]\n/[^a] \n" "foo/.gitignore":"!\\!a  \n"} path="-/ab/.x/-" dir=false git=true lib=false
+match-icase files={".gitignore":"/Foo\n/[]a]\na/a**/[\\a]\nfoo/ab/foo\n"} path="]/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="-/ab" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="b/-" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="b/-/a*" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="b/-/a*/a*" dir=false git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="b/a" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="b/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="b/bar/ab" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="b/bar/ab/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="x/a*" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="x/a*/-" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!]a]\r\n" "b/a/.gitignore":"[a-]/[[:upper:]]/\n[ab]/[a[:]]/[!a]\n/a**b/[a\\-c]\n"} path="x/a*/-/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!a]/[\\]]/\\[a]\n[!]a]\n" "a/b/.gitignore":"a**b/b/[^a]\n[a\\-c]/\n![\\\\]/[[:lower:]]/[a-]  \n" "foo/.gitignore":"/a\\ \r\n"} path="-/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!a]/[\\]]/\\[a]\n[!]a]\n" "a/b/.gitignore":"a**b/b/[^a]\n[a\\-c]/\n![\\\\]/[[:lower:]]/[a-]  \n" "foo/.gitignore":"/a\\ \r\n"} path="-/foo/[a]" dir=true git=true lib=false
+match-icase files={".gitignore":"/[!a]/[\\]]/\\[a]\n[!]a]\n" "a/b/.gitignore":"a**b/b/[^a]\n[a\\-c]/\n![\\\\]/[[:lower:]]/[a-]  \n" "foo/.gitignore":"/a\\ \r\n"} path="-/foo/[a]/.x" dir=false git=true lib=false
+match-icase files={".gitignore":"/[--a]\n"} path="]/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"/[--a]\n"} path="b" dir=false git=true lib=false
+match-icase files={".gitignore":"/[--a]\n"} path="x" dir=true git=true lib=false
+match-icase files={".gitignore":"/[--a]\n"} path="x/-" dir=true git=true lib=false
+match-icase files={".gitignore":"/[--a]\n"} path="x/-/#a" dir=false git=true lib=false
+match-icase files={".gitignore":"/[[:digit:]]/Foo\r\n[!]a]\r\n!\\!a/é\r\n/*.b/\r\n"} path="b/a b" dir=true git=true lib=false
+match-icase files={".gitignore":"/[[:digit:]]/Foo\r\n[!]a]\r\n!\\!a/é\r\n/*.b/\r\n"} path="b/a b/a" dir=false git=true lib=false
+match-icase files={".gitignore":"/[[:digit:]]/Foo\r\n[!]a]\r\n!\\!a/é\r\n/*.b/\r\n"} path="x/ab" dir=true git=true lib=false
+match-icase files={".gitignore":"/[[:digit:]]/Foo\r\n[!]a]\r\n!\\!a/é\r\n/*.b/\r\n"} path="x/ab/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"/[[:digit:]]/Foo\r\n[!]a]\r\n!\\!a/é\r\n/*.b/\r\n"} path="x/ab/bar/a" dir=false git=true lib=false
+match-icase files={".gitignore":"/[[:digit:]]/Foo\r\n[!]a]\r\n!\\!a/é\r\n/*.b/\r\n"} path="x/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"/[[:digit:]]/Foo\r\n[!]a]\r\n!\\!a/é\r\n/*.b/\r\n"} path="x/bar/ab" dir=true git=true lib=false
+match-icase files={".gitignore":"/[[:digit:]]/Foo\r\n[!]a]\r\n!\\!a/é\r\n/*.b/\r\n"} path="x/bar/ab/[a]" dir=false git=true lib=false
+match-icase files={".gitignore":"/[[:foo:]]/[a[:]]/bar\na\n!/[[:alpha:][:digit:]] \né/a\\ \n" "foo/bar/.gitignore":"x**\n[ab]\n"} path="a.b/a/ab" dir=false git=true lib=false
+match-icase files={".gitignore":"/[[:foo:]]\n\\#a/*b/[a\\-c]/\n[a-[:alpha:]] \n/bar\n" "foo/bar/.gitignore":"[!a]/[\\]]\nFoo/[[:digit:]]/*.b/\n[!]a]/[^a]/\n![[:lower:]]/[--a]/[-a] \n"} path="a]/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"/[\\]]\n/[[:digit:]]/a.*/ \n[[:digit:]]/[[:digit:]]/[--a]\n" "a/.gitignore":"a\\/[%--]/\r\n/??/*\\*\r\n/\\#a\r\n*a*/\\[a]/Foo  \r\n" "b/a/.gitignore":"[[:lower:]]\n![%--]/a b/\n"} path="]/]" dir=true git=true lib=false
+match-icase files={".gitignore":"/[\\]]\n/[[:digit:]]/a.*/ \n[[:digit:]]/[[:digit:]]/[--a]\n" "a/.gitignore":"a\\/[%--]/\r\n/??/*\\*\r\n/\\#a\r\n*a*/\\[a]/Foo  \r\n" "b/a/.gitignore":"[[:lower:]]\n![%--]/a b/\n"} path="]/]/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"/[\\]]\n/[[:digit:]]/a.*/ \n[[:digit:]]/[[:digit:]]/[--a]\n" "a/.gitignore":"a\\/[%--]/\r\n/??/*\\*\r\n/\\#a\r\n*a*/\\[a]/Foo  \r\n" "b/a/.gitignore":"[[:lower:]]\n![%--]/a b/\n"} path="]/]/bar/b" dir=true git=true lib=false
+match-icase files={".gitignore":"/[^a]\n\\*/[\\a]\n[ab]/\n" "b/a/.gitignore":"?\r\n[^a]/?/[[:digit:]]/\r\n"} path="x/a]" dir=true git=true lib=false
+match-icase files={".gitignore":"/[^a]\n\\*/[\\a]\n[ab]/\n" "b/a/.gitignore":"?\r\n[^a]/?/[[:digit:]]/\r\n"} path="x/a]/é" dir=true git=true lib=false
+match-icase files={".gitignore":"/[^a]\n\\*/[\\a]\n[ab]/\n" "b/a/.gitignore":"?\r\n[^a]/?/[[:digit:]]/\r\n"} path="x/a]/é/a*" dir=false git=true lib=false
+match-icase files={".gitignore":"/[a\\-c]/[\\]]/??  \n!a\\ /\n[[:punct:]] \na\\\n" "a/.gitignore":"\ufeffbar\n" "foo/bar/.gitignore":"[\\a]/a?/a**\n[a-[:alpha:]]/\\?/ \n![a\\-c]/[[:alpha:][:digit:]]/\n[-a] \n"} path="a/a b/bar/ab" dir=false git=true lib=false
+match-icase files={".gitignore":"/x** \n[a\\-c]/**/[!-a]\n/\\a/**/[a-[:alpha:]]/\n" "a/b/.gitignore":"[a\\-c]\n"} path="a/]/!a" dir=false git=true lib=false
+match-icase files={".gitignore":"/é/a b\n/b\n/[!-a]/\n[!a]  \n/*b\nbar/\n[^a]/\\#a/**a  \nab\n"} path="foo/ab/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"/é/a b\n/b\n/[!-a]/\n[!a]  \n/*b\nbar/\n[^a]/\\#a/**a  \nab\n"} path="foo/b/#a" dir=false git=true lib=false
+match-icase files={".gitignore":"?/.x\n/a?/*a*/[\\a]/\n"} path="-/.x/ab" dir=false git=true lib=false
+match-icase files={".gitignore":"?/a**\n![!a]/?/a**b\n/[!a]\n[a-]/*b\n"} path="-/ab/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"?/a**\n![!a]/?/a**b\n/[!a]\n[a-]/*b\n"} path="-/ab/foo/a b" dir=true git=true lib=false
+match-icase files={".gitignore":"??/??\nFoo/a*\n/[[:digit:]]/?/[a-c-e]/  \n" "foo/.gitignore":"/x**/*.b\r\n[[:alpha:][:digit:]]/bar\r\n[ab]/[a-b]/\r\n[ab]/[!a]/[!-a] \r\n"} path="#a/.x/ab" dir=true git=true lib=false
+match-icase files={".gitignore":"??/??\nFoo/a*\n/[[:digit:]]/?/[a-c-e]/  \n" "foo/.gitignore":"/x**/*.b\r\n[[:alpha:][:digit:]]/bar\r\n[ab]/[a-b]/\r\n[ab]/[!a]/[!-a] \r\n"} path="ab/!a/a*" dir=true git=true lib=false
+match-icase files={".gitignore":"??/??\nFoo/a*\n/[[:digit:]]/?/[a-c-e]/  \n" "foo/.gitignore":"/x**/*.b\r\n[[:alpha:][:digit:]]/bar\r\n[ab]/[a-b]/\r\n[ab]/[!a]/[!-a] \r\n"} path="ab/!a/a*/a*" dir=false git=true lib=false
+match-icase files={".gitignore":"?\n[-a]/.x/[a-[:alpha:]]\n"} path="-/é" dir=true git=true lib=false
+match-icase files={".gitignore":"?\n[-a]/.x/[a-[:alpha:]]\n"} path="-/é/[a]" dir=false git=true lib=false
+match-icase files={".gitignore":"?\n[-a]/.x/[a-[:alpha:]]\n"} path="[a]/a/a b" dir=false git=true lib=false
+match-icase files={".gitignore":"?\n[-a]/.x/[a-[:alpha:]]\n"} path="a.b/a/a b" dir=true git=true lib=false
+match-icase files={".gitignore":"Foo/[ab]/.x \na\\/[^a]\n" "a/.gitignore":"\ufeff/é  \r\n[a-[:alpha:]]/[a-]/ \r\n[[:alpha:][:digit:]]\r\n[[:alpha:]-z]\r\n" "foo/.gitignore":"[ab]/[--a]/a?/\n"} path="a/a.b/a/]" dir=false git=true lib=false
+match-icase files={".gitignore":"K\n"} path="K" dir=false git=false lib=true
+match-icase files={".gitignore":"[!A]x\n"} path="Ax" dir=false git=true lib=false
+match-icase files={".gitignore":"[!A]x\n"} path="ax" dir=false git=true lib=false
+match-icase files={".gitignore":"[!a]\n\\[a]/[a-[:alpha:]]\na\\ \n"} path="[a]/a]/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"[!a]\n\\[a]/[a-[:alpha:]]\na\\ \n"} path="[a]/a]/bar/!a" dir=false git=true lib=false
+match-icase files={".gitignore":"[!a]\n\\[a]/[a-[:alpha:]]\na\\ \n"} path="b/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"[!a]\n\\[a]/[a-[:alpha:]]\na\\ \n"} path="foo/a/b/é" dir=false git=true lib=false
+match-icase files={".gitignore":"[%--]/[[:upper:]]/\\#a/ \n[a[:]]/a\\ b\n[--a]\n"} path="]/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"[%--]/[[:upper:]]/\\#a/ \n[a[:]]/a\\ b\n[--a]\n"} path="foo/a/b" dir=true git=true lib=false
+match-icase files={".gitignore":"[%--]/[[:upper:]]/\\#a/ \n[a[:]]/a\\ b\n[--a]\n"} path="foo/a/b/[a]" dir=true git=true lib=false
+match-icase files={".gitignore":"[%--]/[[:upper:]]/\\#a/ \n[a[:]]/a\\ b\n[--a]\n"} path="é/a/x" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="!a/!a" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="!a/!a/.x" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="!a/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="#a/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="#a/foo/a.b" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="#a/x/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="a b/é" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="a b/é/a b" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="a*/a.b" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="a*/a.b/[a]" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="a.b/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"[-a]\n!b/ \n[[:alpha:]]\n/*a*/ \n[]a]/[[:alpha:][:digit:]]/ab\n"} path="a.b/bar/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:]-z]/\\!a\n/[[:digit:]]/[^a]\n[\\\\]/ \n" "a/b/.gitignore":"b/\\!a/\na\\  \n"} path="-/!a/b" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"/ab\n[!a]/[[:foo:]]/[--a] \n[a-c-e]/foo/ \n" "foo/.gitignore":"x** \n!*b\n/foo/a\\/[[:alpha:]-z]\nx**/**a\n"} path="#a/x/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"/ab\n[!a]/[[:foo:]]/[--a] \n[a-c-e]/foo/ \n" "foo/.gitignore":"x** \n!*b\n/foo/a\\/[[:alpha:]-z]\nx**/**a\n"} path="a/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"/ab\n[!a]/[[:foo:]]/[--a] \n[a-c-e]/foo/ \n" "foo/.gitignore":"x** \n!*b\n/foo/a\\/[[:alpha:]-z]\nx**/**a\n"} path="a/bar/#a" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"/ab\n[!a]/[[:foo:]]/[--a] \n[a-c-e]/foo/ \n" "foo/.gitignore":"x** \n!*b\n/foo/a\\/[[:alpha:]-z]\nx**/**a\n"} path="b/[a]" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"/ab\n[!a]/[[:foo:]]/[--a] \n[a-c-e]/foo/ \n" "foo/.gitignore":"x** \n!*b\n/foo/a\\/[[:alpha:]-z]\nx**/**a\n"} path="b/[a]/-" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"/ab\n[!a]/[[:foo:]]/[--a] \n[a-c-e]/foo/ \n" "foo/.gitignore":"x** \n!*b\n/foo/a\\/[[:alpha:]-z]\nx**/**a\n"} path="b/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"/ab\n[!a]/[[:foo:]]/[--a] \n[a-c-e]/foo/ \n" "foo/.gitignore":"x** \n!*b\n/foo/a\\/[[:alpha:]-z]\nx**/**a\n"} path="b/foo/]" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"a**b/\\a/[[:lower:]]  \n![[:foo:]]/a?\n.x/*b/a* \né  \n"} path="a/x/!a" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"a**b/\\a/[[:lower:]]  \n![[:foo:]]/a?\n.x/*b/a* \né  \n"} path="a/x/!a/ab" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"a**b/\\a/[[:lower:]]  \n![[:foo:]]/a?\n.x/*b/a* \né  \n"} path="b/é" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"a**b/\\a/[[:lower:]]  \n![[:foo:]]/a?\n.x/*b/a* \né  \n"} path="é/b/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n" "b/a/.gitignore":"a**b/\\a/[[:lower:]]  \n![[:foo:]]/a?\n.x/*b/a* \né  \n"} path="é/b/bar/]" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n.x/bar\nb/  \n[a-[:alpha:]]/*a* \n" "a/.gitignore":"/[[:upper:]]/ab/\\*\r\na/a*/[[:punct:]]/\r\n/[ab]/**/[ab]/\r\nbar\r\n[a[:]]/\n/a\\/?/\n/?/[[:lower:]]  \n"} path="x/-" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n.x/bar\nb/  \n[a-[:alpha:]]/*a* \n" "a/.gitignore":"/[[:upper:]]/ab/\\*\r\na/a*/[[:punct:]]/\r\n/[ab]/**/[ab]/\r\nbar\r\n[a[:]]/\n/a\\/?/\n/?/[[:lower:]]  \n"} path="x/-/ab" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n.x/bar\nb/  \n[a-[:alpha:]]/*a* \n" "a/.gitignore":"/[[:upper:]]/ab/\\*\r\na/a*/[[:punct:]]/\r\n/[ab]/**/[ab]/\r\nbar\r\n[a[:]]/\n/a\\/?/\n/?/[[:lower:]]  \n"} path="x/-/ab/[a]" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n[a\\-c]/**a/[]a]\n" "b/a/.gitignore":"![-a]/a\\ b/\n.x/[[:upper:]]\n"} path="ab/x/a]" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n[a\\-c]/**a/[]a]\n" "b/a/.gitignore":"![-a]/a\\ b/\n.x/[[:upper:]]\n"} path="ab/x/a]/a]" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n[a\\-c]/**a/[]a]\n" "b/a/.gitignore":"![-a]/a\\ b/\n.x/[[:upper:]]\n"} path="x/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n[a\\-c]/**a/[]a]\n" "b/a/.gitignore":"![-a]/a\\ b/\n.x/[[:upper:]]\n"} path="x/foo/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:alpha:][:digit:]]\n[a\\-c]/**a/[]a]\n" "b/a/.gitignore":"![-a]/a\\ b/\n.x/[[:upper:]]\n"} path="x/foo/foo/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:foo:]]/\r\nfoo\r\n" "foo/.gitignore":"\ufeff/[[:alpha:][:digit:]]/\n![^a]/\n"} path="foo/-" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:lower:]]\n[[:alpha:][:digit:]]/[!-a]\na\\/[[:lower:]]/*/\n" "a/b/.gitignore":"b/**a/[[:foo:]]/ \na\\/[!]a]/*a*\na\\/ \n[[:upper:]]/[\\a]  \n" "foo/.gitignore":"[a\\-c]/x**/[ab]\n/a**b/a?/[[:upper:]]/\n"} path="a/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:lower:]]\n[[:alpha:][:digit:]]/[!-a]\na\\/[[:lower:]]/*/\n" "a/b/.gitignore":"b/**a/[[:foo:]]/ \na\\/[!]a]/*a*\na\\/ \n[[:upper:]]/[\\a]  \n" "foo/.gitignore":"[a\\-c]/x**/[ab]\n/a**b/a?/[[:upper:]]/\n"} path="b/a]" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:lower:]]\n[[:alpha:][:digit:]]/[!-a]\na\\/[[:lower:]]/*/\n" "a/b/.gitignore":"b/**a/[[:foo:]]/ \na\\/[!]a]/*a*\na\\/ \n[[:upper:]]/[\\a]  \n" "foo/.gitignore":"[a\\-c]/x**/[ab]\n/a**b/a?/[[:upper:]]/\n"} path="b/a]/b/a]" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:punct:]]/*a*/\n" "b/a/.gitignore":"[!]a]/a**b/\n" "foo/bar/.gitignore":"a*\na*/a\\\n**/a b/[!a]\n*\\*/a.*/\n"} path="-/a/]" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:punct:]]\n[[:alpha:]-z]/bar/[[:lower:]]/  \n/\\?/[a-[:alpha:]]/a**b\n/ab\n**a\n[a-[:alpha:]]/b\na.*/a\\/Foo\n[-a]/[[:digit:]]  \n" "a/b/.gitignore":"[!-a]/[^a]\nFoo/[\\a]\n"} path="!a/ab" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:punct:]]\n[[:alpha:]-z]/bar/[[:lower:]]/  \n/\\?/[a-[:alpha:]]/a**b\n/ab\n**a\n[a-[:alpha:]]/b\na.*/a\\/Foo\n[-a]/[[:digit:]]  \n" "a/b/.gitignore":"[!-a]/[^a]\nFoo/[\\a]\n"} path="a b/-/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:punct:]]\n[[:alpha:]-z]/bar/[[:lower:]]/  \n/\\?/[a-[:alpha:]]/a**b\n/ab\n**a\n[a-[:alpha:]]/b\na.*/a\\/Foo\n[-a]/[[:digit:]]  \n" "a/b/.gitignore":"[!-a]/[^a]\nFoo/[\\a]\n"} path="a b/-/foo/a*" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:punct:]]\n[[:alpha:]-z]/bar/[[:lower:]]/  \n/\\?/[a-[:alpha:]]/a**b\n/ab\n**a\n[a-[:alpha:]]/b\na.*/a\\/Foo\n[-a]/[[:digit:]]  \n" "a/b/.gitignore":"[!-a]/[^a]\nFoo/[\\a]\n"} path="a*/foo/-/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:punct:]]\n[[:alpha:]-z]/bar/[[:lower:]]/  \n/\\?/[a-[:alpha:]]/a**b\n/ab\n**a\n[a-[:alpha:]]/b\na.*/a\\/Foo\n[-a]/[[:digit:]]  \n" "a/b/.gitignore":"[!-a]/[^a]\nFoo/[\\a]\n"} path="a/b" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:punct:]]\n[[:alpha:]-z]/bar/[[:lower:]]/  \n/\\?/[a-[:alpha:]]/a**b\n/ab\n**a\n[a-[:alpha:]]/b\na.*/a\\/Foo\n[-a]/[[:digit:]]  \n" "a/b/.gitignore":"[!-a]/[^a]\nFoo/[\\a]\n"} path="foo/-/a*" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:punct:]]\n[[:alpha:]-z]/bar/[[:lower:]]/  \n/\\?/[a-[:alpha:]]/a**b\n/ab\n**a\n[a-[:alpha:]]/b\na.*/a\\/Foo\n[-a]/[[:digit:]]  \n" "a/b/.gitignore":"[!-a]/[^a]\nFoo/[\\a]\n"} path="foo/-/a*/[a]" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]/?/a?/ \n[!a]\n"} path="]/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]/?/a?/ \n[!a]\n"} path="]/#a/a]" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]/?/a?/ \n[!a]\n"} path="]/#a/a]/#a" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]/?/a?/ \n[!a]\n"} path="x/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]\n"} path=".x/b" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]\n"} path="bar/b" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]\n"} path="bar/b/a.b" dir=true git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]\n"} path="bar/b/a.b/x" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]x\n"} path="Ax" dir=false git=true lib=false
+match-icase files={".gitignore":"[[:upper:]]x\n"} path="ax" dir=false git=true lib=false
+match-icase files={".gitignore":"[\\\\]/[[:foo:]]/\n? \n"} path="#a/bar/]/#a" dir=false git=true lib=false
+match-icase files={".gitignore":"[\\]]/[a-c-e]/[a-b]\n/[a[:]]/[[:alpha:]]\n[[:alpha:][:digit:]]/[a[:]]/[[:digit:]]\n[!]a]\n" "a/.gitignore":"[!a] \n" "foo/.gitignore":"/[%--]/[[:lower:]]\n"} path="foo/b/a b" dir=true git=true lib=false
+match-icase files={".gitignore":"[\\a]  \n" "a/b/.gitignore":"[\\a]/\\#a/[[:digit:]]/  \n/[%--]/a/[[:lower:]]  \n"} path="a/b" dir=true git=true lib=false
+match-icase files={".gitignore":"[\\a]  \n" "a/b/.gitignore":"[\\a]/\\#a/[[:digit:]]/  \n/[%--]/a/[[:lower:]]  \n"} path="a/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"[\\a]  \n" "a/b/.gitignore":"[\\a]/\\#a/[[:digit:]]/  \n/[%--]/a/[[:lower:]]  \n"} path="a/bar/a*" dir=true git=true lib=false
+match-icase files={".gitignore":"[\\a]  \n" "a/b/.gitignore":"[\\a]/\\#a/[[:digit:]]/  \n/[%--]/a/[[:lower:]]  \n"} path="a/bar/a*/-" dir=false git=true lib=false
+match-icase files={".gitignore":"[]a]/\n/a b/\\a\n[a-[:alpha:]]\n[a-c-e]\n" "foo/.gitignore":"a*/a**b  \n**\n" "foo/bar/.gitignore":"/[]a]/[a-b]\n**a/[a-c-e] \n/[[:lower:]]/[\\a]\n"} path="b/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"[a-]\n[!]a]/[a[:]]/[ab]/\na/a\\ \n"} path="a/.x" dir=true git=true lib=false
+match-icase files={".gitignore":"[a-]\n[!]a]/[a[:]]/[ab]/\na/a\\ \n"} path="a/.x/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"[a-b]\n"} path="a/a*" dir=true git=true lib=false
+match-icase files={".gitignore":"[a-b]\n"} path="a/a*/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"[a-b]\n"} path="b/a b" dir=true git=true lib=false
+match-icase files={".gitignore":"\\!a/\n*/**a/[a-[:alpha:]]\n??\n*a*/*\n" "b/a/.gitignore":"\ufeff[a-[:alpha:]] \n![ab]/[ab]/*a*  \n*a*/a.*\n"} path=".x/]" dir=true git=true lib=false
+match-icase files={".gitignore":"\\!a/\n*/**a/[a-[:alpha:]]\n??\n*a*/*\n" "b/a/.gitignore":"\ufeff[a-[:alpha:]] \n![ab]/[ab]/*a*  \n*a*/a.*\n"} path=".x/]/a" dir=true git=true lib=false
+match-icase files={".gitignore":"\\!a/\n*/**a/[a-[:alpha:]]\n??\n*a*/*\n" "b/a/.gitignore":"\ufeff[a-[:alpha:]] \n![ab]/[ab]/*a*  \n*a*/a.*\n"} path="a*/.x/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"\\!a/\n*/**a/[a-[:alpha:]]\n??\n*a*/*\n" "b/a/.gitignore":"\ufeff[a-[:alpha:]] \n![ab]/[ab]/*a*  \n*a*/a.*\n"} path="a*/foo/a]/]" dir=false git=true lib=false
+match-icase files={".gitignore":"\\?/a.*/?\n[--a]\n/*a*/\n/[^a]\n"} path="ab/x" dir=true git=true lib=false
+match-icase files={".gitignore":"\\?/a.*/?\n[--a]\n/*a*/\n/[^a]\n"} path="b/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"\\Fo*\n"} path="FOO" dir=false git=false lib=true
+match-icase files={".gitignore":"\\Fo*\n"} path="foo" dir=false git=false lib=true
+match-icase files={".gitignore":"\ufeff/*\\*/[!a]/*a* \n[!]a]  \n[!-a]/[[:digit:]]/\n" "a/b/.gitignore":"/[a\\-c]/a?/ \n" "foo/.gitignore":"[^a]/[[:alpha:]]\n[\\a]\nfoo\n[--a]/[a\\-c]/b\n"} path="bar/-/!a" dir=false git=true lib=false
+match-icase files={".gitignore":"\ufeff/*\\*/\\!a\n\ufeff/\\?/**a/**a\n?\n"} path="foo/-/[a]" dir=false git=true lib=false
+match-icase files={".gitignore":"\ufeff/[[:punct:]]/\n!/x**\n"} path="-/[a]" dir=true git=true lib=false
+match-icase files={".gitignore":"\ufeff/[[:punct:]]/\n!/x**\n"} path="-/a" dir=true git=true lib=false
+match-icase files={".gitignore":"\ufeff[[:alpha:][:digit:]]/x**/\\!a\n!a b/[a-[:alpha:]]/[a-]/  \na**\n" "b/a/.gitignore":"/??/a*\n*b/[[:upper:]]/[[:foo:]]/ \n" "foo/.gitignore":"!/\\?/[-a]/a\\ \n"} path="ab/a b/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"\ufeff[[:alpha:][:digit:]]/x**/\\!a\n!a b/[a-[:alpha:]]/[a-]/  \na**\n" "b/a/.gitignore":"/??/a*\n*b/[[:upper:]]/[[:foo:]]/ \n" "foo/.gitignore":"!/\\?/[-a]/a\\ \n"} path="ab/é" dir=true git=true lib=false
+match-icase files={".gitignore":"\ufeff[[:alpha:][:digit:]]/x**/\\!a\n!a b/[a-[:alpha:]]/[a-]/  \na**\n" "b/a/.gitignore":"/??/a*\n*b/[[:upper:]]/[[:foo:]]/ \n" "foo/.gitignore":"!/\\?/[-a]/a\\ \n"} path="foo/a.b/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"\ufeff[[:alpha:][:digit:]]/x**/\\!a\n!a b/[a-[:alpha:]]/[a-]/  \na**\n" "b/a/.gitignore":"/??/a*\n*b/[[:upper:]]/[[:foo:]]/ \n" "foo/.gitignore":"!/\\?/[-a]/a\\ \n"} path="foo/a.b/foo/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"\ufeff[[:alpha:][:digit:]]/x**/\\!a\n!a b/[a-[:alpha:]]/[a-]/  \na**\n" "b/a/.gitignore":"/??/a*\n*b/[[:upper:]]/[[:foo:]]/ \n" "foo/.gitignore":"!/\\?/[-a]/a\\ \n"} path="foo/ab/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"\ufeff[[:alpha:][:digit:]]/x**/\\!a\n!a b/[a-[:alpha:]]/[a-]/  \na**\n" "b/a/.gitignore":"/??/a*\n*b/[[:upper:]]/[[:foo:]]/ \n" "foo/.gitignore":"!/\\?/[-a]/a\\ \n"} path="foo/ab/bar/x" dir=false git=true lib=false
+match-icase files={".gitignore":"\xff\n"} path="\xfe" dir=false git=false lib=true
+match-icase files={".gitignore":"a b\n/[a-]/[ab]/[[:punct:]] \n[[:alpha:]]/a\\/a\\ \n/?/a.*\n" "a/.gitignore":"[a-[:alpha:]]/[]a]/\n?/  \n!bar\n" "foo/bar/.gitignore":"??/\\#a/?\n"} path="a b/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"a b\n/[a-]/[ab]/[[:punct:]] \n[[:alpha:]]/a\\/a\\ \n/?/a.*\n" "a/.gitignore":"[a-[:alpha:]]/[]a]/\n?/  \n!bar\n" "foo/bar/.gitignore":"??/\\#a/?\n"} path="a b/foo/!a" dir=true git=true lib=false
+match-icase files={".gitignore":"a**b/\\[a]/[[:lower:]] \n/[\\]]/[[:alpha:]-z]/a\n!/[a-c-e]\n[a-]\n" "a/b/.gitignore":"[a[:]]/[[:foo:]]/\\a  \n\\a/[[:digit:]]/[!-a]\n"} path="-/a]" dir=true git=true lib=false
+match-icase files={".gitignore":"a**b/\\[a]/[[:lower:]] \n/[\\]]/[[:alpha:]-z]/a\n!/[a-c-e]\n[a-]\n" "a/b/.gitignore":"[a[:]]/[[:foo:]]/\\a  \n\\a/[[:digit:]]/[!-a]\n"} path="a/b" dir=true git=true lib=false
+match-icase files={".gitignore":"a**b/\\[a]/[[:lower:]] \n/[\\]]/[[:alpha:]-z]/a\n!/[a-c-e]\n[a-]\n" "a/b/.gitignore":"[a[:]]/[[:foo:]]/\\a  \n\\a/[[:digit:]]/[!-a]\n"} path="foo/-/a*" dir=false git=true lib=false
+match-icase files={".gitignore":"a**b\nFoo/*\n/ab\n\\*  \n"} path="]/a.b/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"a**b\nFoo/*\n/ab\n\\*  \n"} path="foo/-/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"a**b\nFoo/*\n/ab\n\\*  \n"} path="foo/bar/é" dir=true git=true lib=false
+match-icase files={".gitignore":"a.*/?/\\!a/\n?/a?/[[:punct:]] \n/[-a]\n" "b/a/.gitignore":"![--a]/[]a]\n/[\\\\]/[a\\-c]/[a\\-c]\n!/?/*\\* \n[[:alpha:][:digit:]]/**\n" "foo/.gitignore":"*b  \n/foo\n/**/x**/a.*  \n"} path="a/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"a/\\!a/*a*\n[a-b]\n\\?\n" "foo/.gitignore":"/a**\na\\/\\a/[[:upper:]]\n!a\\/[[:alpha:][:digit:]]\n[^a]/[ab]/[^a]\n"} path="b/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"a?/\n/a?\n[!-a]/??\n" "b/a/.gitignore":"[[:upper:]]\n"} path="#a/a]/x" dir=true git=true lib=false
+match-icase files={".gitignore":"a?/\n/a?\n[!-a]/??\n" "b/a/.gitignore":"[[:upper:]]\n"} path="a.b/a*/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"a?/\n/a?\n[!-a]/??\n" "b/a/.gitignore":"[[:upper:]]\n"} path="bar/a]/é" dir=true git=true lib=false
+match-icase files={".gitignore":"a?\n"} path="A\xff" dir=false git=true lib=false
+match-icase files={".gitignore":"a?\n"} path="a\xff" dir=false git=true lib=false
+match-icase files={".gitignore":"a\\ /[[:punct:]]/ \nfoo/*\\*/??\n!??/?/a.*\n[^a]/x**/**\n" "a/.gitignore":"[ab]\n" "b/a/.gitignore":"/a*\n[--a]/[a-c-e]\n[[:digit:]]\n"} path="a/a/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"a\\ b \r\n[a-[:alpha:]]/*.b\n[[:punct:]]/\n" "foo/bar/.gitignore":"[-a]/\n[[:space:]]\n**/a.*\n"} path="a b/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"a\\/x**\n/\\a\n*\\*\n"} path="a/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"a\\/x**\n/\\a\n*\\*\n"} path="a/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"a\xff\n"} path="A\xfe" dir=false git=false lib=true
+match-icase files={".gitignore":"a\xff\n"} path="a\xfe" dir=false git=false lib=true
+match-icase files={".gitignore":"b/*\\*/[a-]/\r\n??/[[:space:]]/[[:alpha:]-z]\r\n/[!-a]\r\n" "foo/bar/.gitignore":"/??/bar/?/ \na**/[[:alpha:]]\n[[:foo:]]/bar\n"} path="x/foo" dir=false git=true lib=false
+match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="-/a*/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="]/a]/a/.x" dir=true git=true lib=false
+match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="a*/bar" dir=true git=true lib=false
+match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="a.b/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="a.b/#a/a/x" dir=true git=true lib=false
+match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="a.b/bar" dir=false git=true lib=false
+match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="x" dir=true git=true lib=false
+match-icase files={".gitignore":"bar/\r\n? \r\n" "b/a/.gitignore":"!/*a*/\n"} path="-/a b" dir=true git=true lib=false
+match-icase files={".gitignore":"bar/\r\n? \r\n" "b/a/.gitignore":"!/*a*/\n"} path="a*/a/.x" dir=true git=true lib=false
+match-icase files={".gitignore":"bar/\r\n? \r\n" "b/a/.gitignore":"!/*a*/\n"} path="a*/a/.x/#a" dir=true git=true lib=false
+match-icase files={".gitignore":"bar/\r\n? \r\n" "b/a/.gitignore":"!/*a*/\n"} path="é/[a]/x/a]" dir=false git=true lib=false
+match-icase files={".gitignore":"k\n"} path="K" dir=false git=false lib=true
+match-icase files={".gitignore":"x** \n/b/[-a]\na* \n" "a/b/.gitignore":"/*.b \n"} path="a/b" dir=true git=true lib=false
+match-icase files={".gitignore":"x** \n/b/[-a]\na* \n" "a/b/.gitignore":"/*.b \n"} path="ab/foo" dir=true git=true lib=false
+match-icase files={".gitignore":"x** \n/b/[-a]\na* \n" "a/b/.gitignore":"/*.b \n"} path="ab/foo/ab/-" dir=false git=true lib=false
+match-icase files={".gitignore":"x**/*\\*\na.*\n![-a]/??\n" "foo/.gitignore":"a/[a-c-e]/a\\ b\n[[:punct:]] \n![-a]/*\\*/ \n??/[!]a]\n"} path="foo/-/]/a]" dir=false git=true lib=false
+match-icase files={".gitignore":"É\n"} path="é" dir=false git=false lib=true
+match-icase files={".gitignore":"é\n"} path="É" dir=false git=false lib=true
+match-icase files={".gitignore":"İ\n"} path="i" dir=false git=false lib=true
+match-icase files={".gitignore":"ǅ\n"} path="Ǆ" dir=false git=false lib=true
+match-icase files={".gitignore":"ǅ\n"} path="ǆ" dir=false git=false lib=true
+match-icase files={"b/a/.gitignore":"/[a-]/[!-a]\n/é \n" "foo/.gitignore":"a*/?/\n/[[:punct:]]  \na*/**a\n[a-c-e]/.x\n"} path="foo/a.b/!a/]" dir=false git=true lib=false
+match-icase files={"foo/.gitignore":"/a** \n/*\\*/[%--]/\\#a\n**a\n!/*\\* \n"} path="foo/a.b/a.b" dir=true git=true lib=false
+walk files={".gitignore":"***/b\n"} path="a/x/b/c" dir=false git=false lib=true
+walk files={".gitignore":"***/b\n"} path="b" dir=false git=false lib=true
+walk files={".gitignore":"**\\/a\n"} path="foo/a/x" dir=false git=false lib=true
+walk files={".gitignore":"*\n!*/\n!*.go\n"} path="a/b/y" dir=false git=false lib=true
+walk files={".gitignore":"*\n!*/\n!*.go\n"} path="a/x" dir=false git=false lib=true
+walk files={".gitignore":"*\n!*/\n"} path="a/b/y" dir=false git=false lib=true
+walk files={".gitignore":"*\n!*/\n"} path="a/x" dir=false git=false lib=true
+walk files={".gitignore":"*\n!.gitignore\n!sub/\n!sub/.gitignore\n" "sub/.gitignore":"!*.go\n"} path="sub/a" dir=false git=false lib=true
+walk files={".gitignore":"*\n!build/\n"} path="build/x" dir=false git=false lib=true
+walk files={".gitignore":"//a\n"} path="a" dir=false git=true lib=false
+walk files={".gitignore":"[[:alpha:]x\n"} path="[:x" dir=false git=true lib=false
+walk files={".gitignore":"[b-a]x\n"} path="bx" dir=false git=false lib=true
+walk files={".gitignore":"[x\n"} path="[x" dir=false git=true lib=false
+walk files={".gitignore":"[z-a]x\n"} path="zx" dir=false git=false lib=true
+walk files={".gitignore":"a/****/b\n"} path="a/b/c/d" dir=false git=false lib=true
+walk files={".gitignore":"a/***/b\n"} path="a/b/c/d" dir=false git=false lib=true
+walk files={".gitignore":"a///b\n"} path="a/b" dir=false git=true lib=false
+walk files={".gitignore":"a//b\n"} path="a/b" dir=false git=true lib=false
+walk files={".gitignore":"a/\n!a\n"} path="a/x" dir=false git=true lib=false
+walk files={".gitignore":"a\\/b\n"} path="a/b" dir=false git=false lib=true

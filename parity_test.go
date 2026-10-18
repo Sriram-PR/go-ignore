@@ -3,9 +3,11 @@ package ignore_test
 import (
 	"cmp"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -27,18 +29,27 @@ var (
 func TestParity(t *testing.T) {
 	requireParity(t)
 
-	var plain []scenario
+	var plain, icase []scenario
 	for _, s := range parityCurated() {
-		if !s.icase {
+		if s.icase {
+			icase = append(icase, s)
+		} else {
 			plain = append(plain, s)
 		}
 	}
 	for _, seed := range paritySeeds {
 		plain = append(plain, paritySeeded(seed, parityPerSeed, false)...)
 	}
+	icase = append(icase, paritySeeded(paritySeeds[0], parityPerSeed, true)...)
 
 	var recs []string
 	for _, r := range runMatchMode(t, "match", plain) {
+		recs = append(recs, r.String())
+	}
+	for _, r := range runMatchMode(t, "match-icase", icase) {
+		recs = append(recs, r.String())
+	}
+	for _, r := range runWalkMode(t, plain) {
 		recs = append(recs, r.String())
 	}
 	checkBaseline(t, parityBaselineFile, recs, os.Getenv("GOIGNORE_PARITY_UPDATE") == "1")
@@ -96,6 +107,24 @@ func runMatchMode(t *testing.T, mode string, scens []scenario) []parityRecord {
 	return recs
 }
 
+func runWalkMode(t *testing.T, scens []scenario) []parityRecord {
+	t.Helper()
+	var recs []parityRecord
+	for _, s := range scens {
+		dir, _ := gitRepo(t, s)
+		g := gitLsFiles(t, s, dir)
+		l := libWalk(t, dir)
+		all := maps.Clone(g)
+		maps.Copy(all, l)
+		for _, p := range slices.Sorted(maps.Keys(all)) {
+			if g[p] != l[p] {
+				recs = append(recs, parityRecord{s.name, "walk", s.files, p, false, g[p], l[p]})
+			}
+		}
+	}
+	return recs
+}
+
 // libMatch loads the scenario's .gitignore files shallowest first, as the
 // walker does, and reports MatchResult.Ignored for each path.
 func libMatch(s scenario, isDir map[string]bool, paths []string) map[string]bool {
@@ -120,6 +149,31 @@ func libMatch(s scenario, isDir map[string]bool, paths []string) map[string]bool
 	res := make(map[string]bool, len(paths))
 	for _, p := range paths {
 		res[p] = m.MatchWithReason(p, isDir[p]).Ignored
+	}
+	return res
+}
+
+// libWalk returns every non-directory entry WalkDir yields, as slash paths
+// relative to dir.
+func libWalk(t *testing.T, dir string) map[string]bool {
+	t.Helper()
+	res := map[string]bool{}
+	err := ignore.New().WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			return err
+		}
+		res[filepath.ToSlash(rel)] = true
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkDir %s: %v", dir, err)
 	}
 	return res
 }

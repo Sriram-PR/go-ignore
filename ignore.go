@@ -184,10 +184,11 @@ func (m *Matcher) effectiveMaxBacktrackIterations() int {
 // AddPatterns parses gitignore content and adds rules.
 // basePath is the directory containing the .gitignore (empty string for root).
 //
-// Input normalization (applied automatically):
-//   - UTF-8 BOM is stripped if present
-//   - CRLF and CR line endings are normalized to LF
-//   - Trailing whitespace on each line is trimmed
+// Input normalization (applied automatically, as git does):
+//   - One leading UTF-8 BOM is stripped
+//   - A CR before LF or at the end of content is dropped; any other CR is
+//     pattern text
+//   - Unescaped trailing spaces on each line are trimmed; tabs are kept
 //
 // Both nil and empty content produce no rules. Nil content returns immediately
 // without acquiring locks; empty content goes through parsing (which yields nothing).

@@ -4,7 +4,9 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
-### Unreleased
+### v1.3.0
+
+`core.excludesFile` parity. `LoadRepo`, `WalkRepo` and `RepoFiles` now load the one excludes file git itself uses for the repository, instead of both the system and global files, and `AddGlobalPatterns` and `AddSystemPatterns` follow includes. No exported identifiers change, and matching is untouched.
 
 **Behavior changes**
 

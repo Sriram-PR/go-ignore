@@ -17,17 +17,28 @@ import (
 // can shorten it.
 var gitConfigTimeout = 5 * time.Second
 
-// LoadRepo creates a Matcher pre-loaded with the four standard gitignore
+// LoadRepo creates a Matcher pre-loaded with the three standard gitignore
 // sources for a working tree, in git's precedence order (lowest first, so the
 // last-loaded rule wins per the matcher's last-match-wins semantics):
 //
-//  1. The system gitignore (git config --system core.excludesFile; see AddSystemPatterns)
-//  2. The user's global gitignore (resolved via git config / XDG; see AddGlobalPatterns)
-//  3. <repoRoot>/.git/info/exclude, following a .git file in linked worktrees
+//  1. The file named by core.excludesFile, resolved as git does for repoRoot:
+//     the last value across every config scope (system, global, the
+//     repository's own config, -c and GIT_CONFIG_*), with include and
+//     includeIf followed. When no scope sets it, $XDG_CONFIG_HOME/git/ignore
+//     (default ~/.config/git/ignore); a value set to the empty string loads
+//     nothing.
+//  2. <repoRoot>/.git/info/exclude, following a .git file in linked worktrees
 //     and submodules (see AddExcludePatterns)
-//  4. <repoRoot>/.gitignore (root scope)
+//  3. <repoRoot>/.gitignore (root scope)
 //
-// repoRoot is used only to locate the two on-disk files above; it is NOT
+// The value comes from running "git config" in repoRoot, with GIT_DIR and
+// GIT_WORK_TREE removed from its environment. If git is not installed or does
+// not answer within 5 seconds, the XDG default is used. If git rejects
+// repoRoot's .git (a malformed .git file, say), the value is read without the
+// repository's own config. Any other git config failure, such as a malformed
+// system or global gitconfig, is returned as an error.
+//
+// repoRoot locates the repository and the two on-disk files above; it is NOT
 // stripped from paths passed to Match. Paths supplied to Match must be
 // relative to repoRoot (e.g., "build/output.js"), matching git's own
 // convention. Passing absolute paths or paths with a different prefix will
@@ -41,6 +52,11 @@ var gitConfigTimeout = 5 * time.Second
 // Nested .gitignore files under subdirectories are NOT walked — use WalkDir or
 // WalkRepo for that (they auto-discover per-directory .gitignore files), or call
 // AddPatterns with the appropriate basePath yourself if you need finer control.
+//
+// Trust model: the repository's own config can choose the excludes file, as
+// in git. git skips that config when the repository is owned by another user
+// (safe.directory); the file is only read as patterns, under the limits
+// above.
 //
 // Pass a zero-value MatcherOptions{} to accept all defaults.
 func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
@@ -61,15 +77,16 @@ func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 	return m, nil
 }
 
-// loadRepoConfig loads LoadRepo's sources except the root .gitignore: the
-// system, global and info/exclude files. WalkRepo and RepoFiles leave the
+// loadRepoConfig loads LoadRepo's sources except the root .gitignore:
+// core.excludesFile and info/exclude. WalkRepo and RepoFiles leave the
 // root .gitignore to the walker, which reports a bad one through fn.
 func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 	m := NewWithOptions(opts)
-	if err := m.AddSystemPatterns(); err != nil {
+	path, err := effectiveExcludesFile(repoRoot)
+	if err != nil {
 		return nil, err
 	}
-	if err := m.AddGlobalPatterns(); err != nil {
+	if err := m.addExcludesFile(path, "core.excludesFile"); err != nil {
 		return nil, err
 	}
 	if err := m.AddExcludePatterns(filepath.Join(repoRoot, ".git")); err != nil {
@@ -275,19 +292,66 @@ func resolveRelative(base, p string) string {
 	return filepath.Join(base, p)
 }
 
+// effectiveExcludesFile returns the core.excludesFile git uses for repoRoot:
+// the last value across every config scope, includes followed, or the XDG
+// default when no scope sets it. "" means a value set to the empty string,
+// which loads nothing.
+func effectiveExcludesFile(repoRoot string) (string, error) {
+	// git cannot run in a directory that does not exist, and LoadRepo
+	// tolerates a missing repoRoot, so ask from its nearest existing ancestor.
+	dir := repoRoot
+	for {
+		if _, err := os.Stat(dir); err == nil {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	path, found, err := gitConfigGet(dir, "--get", "core.excludesFile")
+	if isExitError(err) {
+		// git refuses to run in a repository whose .git it rejects (a
+		// malformed .git file, a gitdir pointer to a non-repository). Ask
+		// again without the repository, so its config alone is skipped; a
+		// malformed system or global config still fails here.
+		path, found, err = gitConfigGetNoRepo("--get", "core.excludesFile")
+	}
+	if err != nil {
+		return "", fmt.Errorf("resolving core.excludesFile: %w", err)
+	}
+	if found {
+		return path, nil
+	}
+	return xdgGlobalIgnorePath()
+}
+
 // gitConfigGet runs `git config --path <args...>` in dir ("" for the current
 // directory). --path makes git expand ~ and ~user. found is false when the
 // key is unset (exit 1), git is not installed, or the call timed out: each
 // means "use the default". Any other exit is an error wrapping
 // *exec.ExitError, with git's message.
 func gitConfigGet(dir string, args ...string) (value string, found bool, err error) {
+	// dir, not an inherited GIT_DIR or GIT_WORK_TREE, decides which
+	// repository's config is read.
+	return runGitConfig(dir, withoutEnv(os.Environ(), "GIT_DIR", "GIT_WORK_TREE"), args)
+}
+
+// gitConfigGetNoRepo is gitConfigGet outside any repository: git config
+// treats a GIT_DIR that is not a git directory as no repository, and reads
+// every other scope.
+func gitConfigGetNoRepo(args ...string) (value string, found bool, err error) {
+	env := append(withoutEnv(os.Environ(), "GIT_DIR", "GIT_WORK_TREE"), "GIT_DIR="+os.DevNull)
+	return runGitConfig("", env, args)
+}
+
+func runGitConfig(dir string, env, args []string) (value string, found bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"config", "--path"}, args...)...)
 	cmd.Dir = dir
-	// dir, not an inherited GIT_DIR or GIT_WORK_TREE, decides which
-	// repository's config is read.
-	cmd.Env = withoutEnv(os.Environ(), "GIT_DIR", "GIT_WORK_TREE")
+	cmd.Env = env
 	// Killing git does not close stdout if a child of it still holds the pipe;
 	// without WaitDelay, Output would block until that child exits.
 	cmd.WaitDelay = time.Second

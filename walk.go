@@ -225,11 +225,11 @@ func fsBackend(fsys fs.FS) walkBackend {
 	}
 }
 
-// WalkRepo is a convenience that combines LoadRepo and WalkDir: it loads the
-// system, global and info/exclude files as LoadRepo does, then walks root.
+// WalkRepo is a convenience that combines LoadRepo and WalkDir: it loads
+// core.excludesFile and info/exclude as LoadRepo does, then walks root.
 // The walker reads root's .gitignore itself, once, so a bad one is reported
 // through fn like any nested .gitignore instead of failing the call. A
-// failure reading the other three sources is returned before the walk.
+// failure loading the other two sources is returned before the walk.
 //
 // Use this when you want the standard "walk a working tree, skipping
 // ignored files" behavior without managing the matcher yourself.
@@ -320,8 +320,8 @@ func filesFromWalker(walker func(fs.WalkDirFunc) error) iter.Seq2[string, error]
 
 // RepoFiles is a convenience that combines LoadRepo and Files, with the root
 // .gitignore handled as in WalkRepo: a bad one is yielded as ("", err) and
-// iteration continues. A failure reading the system, global or info/exclude
-// file is yielded once and ends the iteration.
+// iteration continues. A failure loading core.excludesFile or info/exclude is
+// yielded once and ends the iteration.
 //
 // Use it for the standard one-line "iterate the non-ignored files in this
 // repo" pattern:

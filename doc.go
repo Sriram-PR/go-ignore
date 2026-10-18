@@ -19,12 +19,12 @@
 //
 // # Loading and walking
 //
-// LoadRepo pre-loads the four standard gitignore sources (system, global,
-// .git/info/exclude, and the root .gitignore) for a working tree. WalkDir and
-// WalkRepo walk a tree, auto-discovering nested .gitignore files and pruning
-// ignored (and .git/) directories; Files and RepoFiles are their
-// range-over-func form, and WalkDirFS/FilesFS operate over an fs.FS. See each
-// function's own documentation for details.
+// LoadRepo pre-loads the standard gitignore sources for a working tree:
+// core.excludesFile as git resolves it, .git/info/exclude, and the root
+// .gitignore. WalkDir and WalkRepo walk a tree, auto-discovering nested
+// .gitignore files and pruning ignored (and .git/) directories; Files and
+// RepoFiles are their range-over-func form, and WalkDirFS/FilesFS operate
+// over an fs.FS. See each function's own documentation for details.
 //
 // # Match provenance
 //

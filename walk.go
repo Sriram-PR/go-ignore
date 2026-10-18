@@ -37,15 +37,19 @@ type walkBackend struct {
 //     fs.DirEntry, and a non-nil err if the entry could not be read. Ignored
 //     entries are silently skipped — fn is not called for them.
 //   - Ignored directories are pruned (their contents are not visited).
-//   - Any directory named .git is pruned wherever it is encountered (not just
-//     at the repository root), regardless of matcher rules, to avoid walking
-//     git internals. Match itself does NOT treat .git as special — this prune
-//     is a WalkDir-specific behavior. To walk .git anyway, use filepath.WalkDir
-//     directly with Match for filtering.
+//   - Any entry named .git is skipped wherever it is encountered (not just
+//     at the repository root), regardless of matcher rules: a directory holds
+//     git internals, and a file is a worktree or submodule gitdir pointer.
+//     Match itself does NOT treat .git as special — this is a WalkDir-specific
+//     behavior. To walk .git anyway, use filepath.WalkDir directly with Match
+//     for filtering.
 //   - Symlinks are not followed (filepath.WalkDir Lstat semantics).
 //
 // Paths supplied to user fn are OS-native (the same as filepath.WalkDir).
-// Internally the matcher receives the slash-normalised relative path.
+// Internally the matcher receives the slash-normalised path relative to root,
+// so root should be the directory the matcher's rules are scoped to. Walking
+// a subdirectory of a repository with a LoadRepo matcher matches "sub/x" as
+// "x", and .gitignore files above root are not read.
 //
 // Parse warnings from the nested .gitignore files discovered during the walk
 // are delivered only to a configured WarningHandler (MatcherOptions). Because
@@ -208,13 +212,15 @@ func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error {
 }
 
 // Files returns a range-over-func iterator that yields the OS-native path of
-// every non-ignored regular file under root, in the same lexical order
+// every non-ignored, non-directory entry under root (regular files and
+// symlinks, which are not followed), in the same lexical order
 // filepath.WalkDir uses. Directories are not yielded — use WalkDir if you
 // need to observe them.
 //
-// Errors encountered during traversal are yielded as ("", err); after a
-// non-nil error is yielded, iteration ends. Breaking out of the range loop
-// stops iteration cleanly via fs.SkipAll.
+// Errors encountered during traversal are yielded as ("", err) and the walk
+// continues with the next entry; return or break out of the range loop to
+// stop at the first error. Breaking out stops iteration cleanly via
+// fs.SkipAll.
 //
 // Files inherits WalkDir's behavior: nested .gitignore files are discovered
 // as descent happens, ignored directories are pruned, .git/ is always pruned,

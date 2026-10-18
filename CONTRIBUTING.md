@@ -26,7 +26,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 - Check existing issues to see if your change is already being discussed
 - For significant changes, open an issue first to discuss the approach
-- Ensure your change aligns with the project's scope (see README limitations)
+- Ensure your change aligns with the project's scope: gitignore matching and walking, stdlib only
 
 ### Code Style
 
@@ -138,7 +138,7 @@ When reporting bugs, please include:
 
 Before requesting features, consider:
 
-- Is it within scope? (See README limitations)
+- Is it within scope (gitignore matching and walking)?
 - Does it maintain zero-dependency principle?
 - Would it benefit most users?
 

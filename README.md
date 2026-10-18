@@ -71,7 +71,7 @@ The iterator form is `for path, err := range ignore.RepoFiles(".", ignore.Matche
 
 ```go
 r := m.MatchWithReason("debug.log", false)
-fmt.Println(r.Ignored, r.Rule, r.Line) // true "*.log" 1
+fmt.Println(r.Ignored, r.Rule, r.Line) // true *.log 1
 ```
 
 ## Supported Syntax
@@ -129,9 +129,14 @@ Key entry points:
 - `AddPatterns` / `AddPatternsReader` / `AddPatternsFromFile` (plus `…WithSource` variants) — add rules from bytes, a reader, or a file.
 - `Match` / `MatchWithReason` — test a path, optionally with match provenance.
 
-## Versioning
+## Stability Guarantees
 
-Semantic versioning. Within the v1.x line, the exported API and the documented matching semantics are stable; see the package docs for the full compatibility contract.
+Semantic versioning. Within the v1.x line:
+
+- Exported identifiers keep their names and signatures. New ones may be added.
+- The `Default*` limits keep their values. `HardMaxBacktrackIterations` and `MaxPathDepth` may be raised, never lowered.
+- Documented matching semantics stay the same, except bug fixes where the library disagreed with `git check-ignore`. Those ship in a patch or minor release with a note in [CHANGELOG.md](CHANGELOG.md).
+- Unexported code and the wording of `ParseWarning.Message` are not part of the API.
 
 ## Contributing
 

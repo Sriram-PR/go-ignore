@@ -18,12 +18,13 @@ type MatchResult struct {
 	Rule string
 
 	// Source identifies which file or stream supplied the matching rule. It is
-	// the absolute path of the originating .gitignore when the matcher knows it
-	// (set automatically by AddGlobalPatterns, AddSystemPatterns,
+	// the path of the originating .gitignore when the matcher knows it, set
+	// automatically by AddGlobalPatterns, AddSystemPatterns,
 	// AddExcludePatterns, AddPatternsFromFile, LoadRepo, and the nested
-	// .gitignore discovery done inside WalkDir). For rules added via
-	// AddPatterns or AddPatternsReader — which carry only an in-memory blob
-	// and no source path — Source is "". Empty if Matched == false.
+	// .gitignore discovery inside WalkDir (an OS path, as given) and
+	// WalkDirFS (an fs.FS path). For rules added via AddPatterns or
+	// AddPatternsReader, which carry only an in-memory blob, Source is "".
+	// Empty if Matched == false.
 	Source string
 
 	// BasePath is the directory containing the .gitignore that had the matching rule.

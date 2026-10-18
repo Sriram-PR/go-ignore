@@ -10,64 +10,6 @@ import (
 	"time"
 )
 
-func TestExpandTilde(t *testing.T) {
-	t.Run("non-tilde passthrough", func(t *testing.T) {
-		path, err := expandTilde("/absolute/path")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if path != "/absolute/path" {
-			t.Errorf("got %q, want %q", path, "/absolute/path")
-		}
-	})
-
-	t.Run("relative passthrough", func(t *testing.T) {
-		path, err := expandTilde("relative/path")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if path != "relative/path" {
-			t.Errorf("got %q, want %q", path, "relative/path")
-		}
-	})
-
-	t.Run("tilde alone", func(t *testing.T) {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			t.Skipf("cannot get home dir: %v", err)
-		}
-		path, err := expandTilde("~")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if path != home {
-			t.Errorf("got %q, want %q", path, home)
-		}
-	})
-
-	t.Run("tilde with path", func(t *testing.T) {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			t.Skipf("cannot get home dir: %v", err)
-		}
-		path, err := expandTilde("~/some/path")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		want := home + "/some/path"
-		if path != want {
-			t.Errorf("got %q, want %q", path, want)
-		}
-	})
-
-	t.Run("unknown user error", func(t *testing.T) {
-		_, err := expandTilde("~nonexistentuserxyz123/path")
-		if err == nil {
-			t.Fatal("expected error for unknown user, got nil")
-		}
-	})
-}
-
 func TestXdgGlobalIgnorePath(t *testing.T) {
 	t.Run("with XDG_CONFIG_HOME", func(t *testing.T) {
 		tmp := t.TempDir()
@@ -102,7 +44,7 @@ func TestXdgGlobalIgnorePath(t *testing.T) {
 	})
 }
 
-func TestGitConfigExcludesFile_Success(t *testing.T) {
+func TestGitConfigGet_GlobalValue(t *testing.T) {
 	tmp := t.TempDir()
 
 	// Create a gitignore file
@@ -113,7 +55,7 @@ func TestGitConfigExcludesFile_Success(t *testing.T) {
 
 	// Create a .gitconfig pointing core.excludesFile at it
 	gitconfig := filepath.Join(tmp, ".gitconfig")
-	configContent := "[core]\n\texcludesFile = " + ignoreFile + "\n"
+	configContent := "[core]\n\texcludesFile = " + gitPath(ignoreFile) + "\n"
 	if err := os.WriteFile(gitconfig, []byte(configContent), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -121,18 +63,18 @@ func TestGitConfigExcludesFile_Success(t *testing.T) {
 	// Point GIT_CONFIG_GLOBAL at our fake config
 	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
 
-	// Step 1: Verify gitConfigExcludesFile reads the path correctly
-	path, err := gitConfigExcludesFile()
+	// Step 1: Verify gitConfigGet reads the path correctly
+	path, found, err := gitConfigGet("", "--global", "--get", "core.excludesFile")
 	if err != nil {
-		t.Fatalf("gitConfigExcludesFile: %v", err)
+		t.Fatalf("gitConfigGet: %v", err)
 	}
-	if path == "" {
+	if !found {
 		// Git didn't return a path — likely GIT_CONFIG_GLOBAL isn't
 		// supported by this git version (e.g., older git on Windows).
 		t.Skip("git does not respect GIT_CONFIG_GLOBAL on this platform")
 	}
-	if path != ignoreFile {
-		t.Errorf("gitConfigExcludesFile = %q, want %q", path, ignoreFile)
+	if filepath.Clean(path) != ignoreFile {
+		t.Errorf("gitConfigGet = %q, want %q", path, ignoreFile)
 	}
 
 	// Step 2: Verify the full AddGlobalPatterns flow loads the patterns
@@ -172,7 +114,7 @@ func TestAddSystemPatterns_Success(t *testing.T) {
 
 	gitconfig := filepath.Join(tmp, "system-gitconfig")
 	if err := os.WriteFile(gitconfig,
-		[]byte("[core]\n\texcludesFile = "+ignoreFile+"\n"), 0o644); err != nil {
+		[]byte("[core]\n\texcludesFile = "+gitPath(ignoreFile)+"\n"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	t.Setenv("GIT_CONFIG_SYSTEM", gitconfig)
@@ -192,7 +134,7 @@ func TestAddSystemPatterns_Success(t *testing.T) {
 	if !m.Match("foo.sys", false) {
 		t.Error("expected *.sys to match foo.sys")
 	}
-	if r := m.MatchWithReason("foo.sys", false); r.Source != ignoreFile {
+	if r := m.MatchWithReason("foo.sys", false); filepath.Clean(r.Source) != ignoreFile {
 		t.Errorf("Source = %q, want %q", r.Source, ignoreFile)
 	}
 }
@@ -628,7 +570,7 @@ func TestAddGlobalPatterns_ReadPermissionError(t *testing.T) {
 // A git that hangs while a child keeps stdout open must not stall LoadRepo
 // past the timeout: CommandContext kills git, but Output would otherwise
 // wait for the orphaned child to close the pipe.
-func TestGitConfigExcludesFile_TimeoutBoundsHungChild(t *testing.T) {
+func TestGitConfigGet_TimeoutBoundsHungChild(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fake git is a shell script")
 	}
@@ -644,11 +586,11 @@ func TestGitConfigExcludesFile_TimeoutBoundsHungChild(t *testing.T) {
 	t.Cleanup(func() { gitConfigTimeout = old })
 
 	start := time.Now()
-	path, err := gitConfigExcludesFileScoped("--global")
+	path, found, err := gitConfigGet("", "--global", "--get", "core.excludesFile")
 	elapsed := time.Since(start)
 
-	if err != nil || path != "" {
-		t.Errorf("got (%q, %v), want (\"\", nil) on timeout", path, err)
+	if err != nil || found {
+		t.Errorf("got (%q, %v, %v), want not found on timeout", path, found, err)
 	}
 	if elapsed > 3*time.Second {
 		t.Errorf("returned after %v; the 100ms timeout did not bound the call", elapsed)

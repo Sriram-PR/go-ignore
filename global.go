@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
 
-// gitConfigTimeout bounds the `git config` subprocess used to resolve the
-// global excludesFile, so a hung or unresponsive git binary cannot stall
-// AddGlobalPatterns indefinitely. A var so tests can shorten it.
+// gitConfigTimeout bounds each `git config` subprocess, so a hung or
+// unresponsive git binary cannot stall a loader indefinitely. A var so tests
+// can shorten it.
 var gitConfigTimeout = 5 * time.Second
 
 // LoadRepo creates a Matcher pre-loaded with the four standard gitignore
@@ -103,24 +103,16 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddGlobalPatterns() error {
-	path, err := resolveGlobalIgnorePath()
-	if err != nil {
+	path, _, err := gitConfigGet("", "--global", "--get", "core.excludesFile")
+	if err != nil && !isExitError(err) {
 		return fmt.Errorf("resolving global gitignore path: %w", err)
 	}
 	if path == "" {
-		return nil
-	}
-
-	content, err := readPatternFile(osSource{}, path, true, maxPatternFileSize)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
+		if path, err = xdgGlobalIgnorePath(); err != nil {
+			return fmt.Errorf("resolving global gitignore path: %w", err)
 		}
-		return fmt.Errorf("reading global gitignore %s: %w", path, err)
 	}
-
-	m.addPatternsFromSource("", content, path)
-	return nil
+	return m.addExcludesFile(path, "global gitignore")
 }
 
 // AddSystemPatterns loads patterns from the system-scope gitignore file
@@ -143,22 +135,27 @@ func (m *Matcher) AddGlobalPatterns() error {
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddSystemPatterns() error {
-	path, err := gitConfigExcludesFileScoped("--system")
-	if err != nil {
+	path, _, err := gitConfigGet("", "--system", "--get", "core.excludesFile")
+	if err != nil && !isExitError(err) {
 		return fmt.Errorf("resolving system gitignore path: %w", err)
 	}
+	return m.addExcludesFile(path, "system gitignore")
+}
+
+// addExcludesFile loads the pattern file at path with root scope, labeled
+// with its path. An empty path or a missing file adds nothing; what names the
+// file in a read error.
+func (m *Matcher) addExcludesFile(path, what string) error {
 	if path == "" {
 		return nil
 	}
-
 	content, err := readPatternFile(osSource{}, path, true, maxPatternFileSize)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
-		return fmt.Errorf("reading system gitignore %s: %w", path, err)
+		return fmt.Errorf("reading %s %s: %w", what, path, err)
 	}
-
 	m.addPatternsFromSource("", content, path)
 	return nil
 }
@@ -278,59 +275,59 @@ func resolveRelative(base, p string) string {
 	return filepath.Join(base, p)
 }
 
-// resolveGlobalIgnorePath determines the path to the global gitignore file.
-// It tries git config first, then falls back to XDG conventions.
-// Returns an empty string if no path can be determined.
-func resolveGlobalIgnorePath() (string, error) {
-	path, err := gitConfigExcludesFile()
-	if err != nil {
-		return "", err
-	}
-	if path != "" {
-		return path, nil
-	}
-
-	return xdgGlobalIgnorePath()
-}
-
-// gitConfigExcludesFile reads core.excludesFile from --global git config.
-// Returns empty string if git is not available or the key is not set.
-func gitConfigExcludesFile() (string, error) {
-	return gitConfigExcludesFileScoped("--global")
-}
-
-// gitConfigExcludesFileScoped reads core.excludesFile from the given git config
-// scope. scope is the git config selector ("--global" or "--system"); other
-// values are passed through unchanged.
-func gitConfigExcludesFileScoped(scope string) (string, error) {
+// gitConfigGet runs `git config --path <args...>` in dir ("" for the current
+// directory). --path makes git expand ~ and ~user. found is false when the
+// key is unset (exit 1), git is not installed, or the call timed out: each
+// means "use the default". Any other exit is an error wrapping
+// *exec.ExitError, with git's message.
+func gitConfigGet(dir string, args ...string) (value string, found bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "config", scope, "core.excludesFile")
+	cmd := exec.CommandContext(ctx, "git", append([]string{"config", "--path"}, args...)...)
+	cmd.Dir = dir
+	// dir, not an inherited GIT_DIR or GIT_WORK_TREE, decides which
+	// repository's config is read.
+	cmd.Env = withoutEnv(os.Environ(), "GIT_DIR", "GIT_WORK_TREE")
 	// Killing git does not close stdout if a child of it still holds the pipe;
 	// without WaitDelay, Output would block until that child exits.
 	cmd.WaitDelay = time.Second
 	out, err := cmd.Output()
 	if err != nil {
-		// Timeout — treat as "git unavailable" and fall through to XDG.
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return "", nil
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, exec.ErrNotFound) {
+			return "", false, nil
 		}
-		// git not found, config key not set, or fatal git error (e.g., no
-		// global/system config file on Windows) — expected, fall through.
 		var exitErr *exec.ExitError
-		if errors.Is(err, exec.ErrNotFound) || errors.As(err, &exitErr) {
-			return "", nil
+		if !errors.As(err, &exitErr) {
+			return "", false, fmt.Errorf("running git config: %w", err)
 		}
-		// Non-exec error (e.g., permission denied on the binary itself)
-		return "", fmt.Errorf("running git config: %w", err)
+		if exitErr.ExitCode() == 1 {
+			return "", false, nil
+		}
+		msg, _, _ := strings.Cut(strings.TrimSpace(string(exitErr.Stderr)), "\n")
+		return "", false, fmt.Errorf("git config: %w: %s", err, msg)
 	}
+	return strings.TrimRight(string(out), "\r\n"), true, nil
+}
 
-	path := strings.TrimSpace(string(out))
-	if path == "" {
-		return "", nil
+// isExitError reports whether err comes from git exiting non-zero. The
+// per-scope loaders treat that as "not set": a scoped git config fails on
+// some platforms when the scope's file is missing.
+func isExitError(err error) bool {
+	var exitErr *exec.ExitError
+	return errors.As(err, &exitErr)
+}
+
+// withoutEnv returns env without the named variables.
+func withoutEnv(env []string, names ...string) []string {
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		name, _, _ := strings.Cut(kv, "=")
+		// Windows environment names are case-insensitive.
+		if !slices.ContainsFunc(names, func(n string) bool { return strings.EqualFold(n, name) }) {
+			out = append(out, kv)
+		}
 	}
-
-	return expandTilde(path)
+	return out
 }
 
 // xdgGlobalIgnorePath returns the XDG-based global gitignore path.
@@ -345,38 +342,4 @@ func xdgGlobalIgnorePath() (string, error) {
 		return "", fmt.Errorf("determining home directory: %w", err)
 	}
 	return filepath.Join(home, ".config", "git", "ignore"), nil
-}
-
-// expandTilde expands ~ and ~user prefixes in a path.
-func expandTilde(path string) (string, error) {
-	if !strings.HasPrefix(path, "~") {
-		return path, nil
-	}
-
-	var userPart, rest string
-	if i := strings.IndexByte(path, '/'); i >= 0 {
-		userPart = path[:i]
-		rest = path[i:]
-	} else {
-		userPart = path
-		rest = ""
-	}
-
-	var homeDir string
-	if userPart == "~" {
-		dir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("expanding ~: %w", err)
-		}
-		homeDir = dir
-	} else {
-		username := userPart[1:] // strip the leading "~" from "~user"
-		u, err := user.Lookup(username)
-		if err != nil {
-			return "", fmt.Errorf("expanding %s: %w", userPart, err)
-		}
-		homeDir = u.HomeDir
-	}
-
-	return homeDir + rest, nil
 }

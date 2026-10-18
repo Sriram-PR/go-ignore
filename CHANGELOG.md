@@ -4,7 +4,9 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
-### Unreleased
+### v1.2.0
+
+Walker hardening. Walks with many nested `.gitignore` files are now linear (a 3,000-directory tree went from 9.2 s to 0.11 s), and a bad pattern file can no longer hang a walk or a loader, eat all memory, or pull in rules through a symlinked `.gitignore`. The behavior changes follow what git does. `ErrPatternFileSkipped` is the only new exported identifier.
 
 **Added**
 

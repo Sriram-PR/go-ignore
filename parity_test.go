@@ -1,6 +1,7 @@
 package ignore_test
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"os"
@@ -8,9 +9,40 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	ignore "github.com/Sriram-PR/go-ignore"
 )
 
 const parityBaselineFile = "testdata/parity/baseline.txt"
+
+// Default scenario set. Lower parityPerSeed if a full run exceeds 60s.
+var (
+	paritySeeds   = []int64{1, 2, 3}
+	parityPerSeed = 300
+)
+
+// TestParity compares the library with git on generated and curated
+// scenarios and checks the divergences against a checked-in baseline.
+// See CONTRIBUTING.md "Parity harness".
+func TestParity(t *testing.T) {
+	requireParity(t)
+
+	var plain []scenario
+	for _, s := range parityCurated() {
+		if !s.icase {
+			plain = append(plain, s)
+		}
+	}
+	for _, seed := range paritySeeds {
+		plain = append(plain, paritySeeded(seed, parityPerSeed, false)...)
+	}
+
+	var recs []string
+	for _, r := range runMatchMode(t, "match", plain) {
+		recs = append(recs, r.String())
+	}
+	checkBaseline(t, parityBaselineFile, recs, os.Getenv("GOIGNORE_PARITY_UPDATE") == "1")
+}
 
 // parityRecord is one path where git and the library disagree.
 type parityRecord struct {
@@ -35,6 +67,61 @@ func (r parityRecord) String() string {
 	}
 	b.WriteString("}")
 	return fmt.Sprintf("%s files=%s path=%q dir=%v git=%v lib=%v", r.mode, b.String(), r.path, r.isDir, r.git, r.lib)
+}
+
+func runMatchMode(t *testing.T, mode string, scens []scenario) []parityRecord {
+	t.Helper()
+	var recs []parityRecord
+	for _, s := range scens {
+		dir, isDir := gitRepo(t, s)
+		var paths []string
+		for _, p := range slices.Sorted(maps.Keys(isDir)) {
+			if path.Base(p) != ".gitignore" {
+				paths = append(paths, p)
+			}
+		}
+		g := gitCheckIgnore(t, s, dir, paths)
+		l := libMatch(s, isDir, paths)
+		for _, p := range paths {
+			gv, ok := g[p]
+			if !ok {
+				t.Logf("%s: git did not report %q", s.name, p)
+				continue
+			}
+			if gv != l[p] {
+				recs = append(recs, parityRecord{s.name, mode, s.files, p, isDir[p], gv, l[p]})
+			}
+		}
+	}
+	return recs
+}
+
+// libMatch loads the scenario's .gitignore files shallowest first, as the
+// walker does, and reports MatchResult.Ignored for each path.
+func libMatch(s scenario, isDir map[string]bool, paths []string) map[string]bool {
+	m := ignore.NewWithOptions(ignore.MatcherOptions{
+		CaseInsensitive: s.icase,
+		MaxPatterns:     -1,
+		WarningHandler:  func(ignore.ParseWarning) {},
+	})
+	files := slices.SortedFunc(maps.Keys(s.files), func(a, b string) int {
+		if c := cmp.Compare(strings.Count(a, "/"), strings.Count(b, "/")); c != 0 {
+			return c
+		}
+		return cmp.Compare(a, b)
+	})
+	for _, f := range files {
+		base := path.Dir(f)
+		if base == "." {
+			base = ""
+		}
+		m.AddPatterns(base, []byte(s.files[f]))
+	}
+	res := make(map[string]bool, len(paths))
+	for _, p := range paths {
+		res[p] = m.MatchWithReason(p, isDir[p]).Ignored
+	}
+	return res
 }
 
 // diffBaseline returns records in got but not want (regressions) and in want

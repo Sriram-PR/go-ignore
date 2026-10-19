@@ -97,11 +97,17 @@ type MatcherOptions struct {
 
 	// MaxPatterns limits the total number of rules a Matcher can hold.
 	// Default: DefaultMaxPatterns (100000). Set to -1 for unlimited.
+	//
+	// Together with MaxPatternLength it bounds memory. A rule keeps about
+	// 16 times its length when it has many short segments (a 4 KB a/a/...
+	// pattern keeps about 70 KB), so the defaults allow about 7 GB. Lower
+	// either limit for untrusted input.
 	MaxPatterns int
 
 	// MaxPatternLength limits the length of individual pattern lines.
 	// Lines exceeding this limit are skipped with a parse warning.
 	// Default: DefaultMaxPatternLength (4096). Set to -1 for unlimited.
+	// See MaxPatterns for the memory these two limits allow.
 	MaxPatternLength int
 }
 
@@ -271,7 +277,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	m.rules = append(m.rules, newRules...)
 	handler := m.opts.WarningHandler
 	if handler == nil {
-		m.warnings = append(m.warnings, parseWarnings...)
+		m.retainWarnings(parseWarnings, normalizedBase)
 	}
 	m.mu.Unlock()
 
@@ -282,6 +288,29 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	if handler != nil {
 		for _, w := range parseWarnings {
 			handler(w)
+		}
+	}
+}
+
+// maxRetainedWarnings bounds the warnings a Matcher collects for Warnings.
+const maxRetainedWarnings = 10_000
+
+// retainWarnings appends ws to the collected warnings, up to
+// maxRetainedWarnings and then one marker, and drops the rest. m.mu must be
+// held.
+func (m *Matcher) retainWarnings(ws []ParseWarning, basePath string) {
+	for _, w := range ws {
+		switch {
+		case len(m.warnings) < maxRetainedWarnings:
+			m.warnings = append(m.warnings, w)
+		case len(m.warnings) == maxRetainedWarnings:
+			m.warnings = append(m.warnings, ParseWarning{
+				Message:  "warning limit reached, further warnings dropped",
+				BasePath: basePath,
+			})
+			return
+		default:
+			return
 		}
 	}
 }
@@ -330,8 +359,9 @@ func (m *Matcher) addPatternsReader(basePath, source string, r io.Reader, limit 
 	return nil
 }
 
-// Warnings returns all collected parse warnings.
-// Only populated if no WarningHandler was set.
+// Warnings returns the collected parse warnings: the first 10,000, then one
+// "warning limit reached, further warnings dropped" entry. Only populated if
+// no WarningHandler was set; a handler receives every warning.
 func (m *Matcher) Warnings() []ParseWarning {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

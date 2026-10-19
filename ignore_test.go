@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -1204,5 +1205,28 @@ func TestAddPatterns_ConcurrentRespectsLimit(t *testing.T) {
 	wg.Wait()
 	if n := m.RuleCount(); n != 100 {
 		t.Errorf("RuleCount = %d, want 100", n)
+	}
+}
+
+// Collected warnings stop at maxRetainedWarnings plus one marker, across
+// calls; a WarningHandler still receives every warning.
+func TestWarnings_Capped(t *testing.T) {
+	bad := []byte(strings.Repeat("!\n", maxRetainedWarnings+500))
+	m := New()
+	m.AddPatterns("", bad)
+	m.AddPatterns("sub", bad)
+	w := m.Warnings()
+	if len(w) != maxRetainedWarnings+1 {
+		t.Fatalf("len(Warnings) = %d, want %d", len(w), maxRetainedWarnings+1)
+	}
+	if last := w[len(w)-1]; last.Message != "warning limit reached, further warnings dropped" || last.BasePath != "" {
+		t.Errorf("last warning = %+v, want the drop marker for the first call", last)
+	}
+
+	var n atomic.Int64
+	h := NewWithOptions(MatcherOptions{WarningHandler: func(ParseWarning) { n.Add(1) }})
+	h.AddPatterns("", bad)
+	if got := n.Load(); got != maxRetainedWarnings+500 {
+		t.Errorf("handler saw %d warnings, want %d", got, maxRetainedWarnings+500)
 	}
 }

@@ -10,6 +10,7 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 - **A rule's answer no longer depends on the rules before it.** One backtrack budget was shared by every rule in a `Match` call, and once a pathological rule (`*a*a*a*a*b`, a chain of `**`) spent it, every later rule was skipped, so `.env` or `secret/` after such a rule could stop matching. Matching now backs up only to the last `*` or `**`, as git's wildmatch effectively does, so it costs polynomial time and never gives up.
 - **Patterns longer than 200 segments match.** They used to be silently dead.
+- **`Warnings()` keeps at most 10,000 warnings**, then one "warning limit reached, further warnings dropped" entry. A `WarningHandler` still receives every warning.
 
 **Deprecated**
 

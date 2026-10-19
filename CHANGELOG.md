@@ -4,7 +4,9 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
-### Unreleased
+### v1.5.0
+
+Single-path checks with nested `.gitignore` files. A `Tree` from `OpenTree`, `Matcher.Tree` or `Matcher.TreeFS` checks one path at a time against every `.gitignore` from the root down to it, the way `git check-ignore -v` does, and reads each file once per `Tree`. Also fixes `.` path segments, which were matched as names. Only additions to the exported API; `Match` and the walker are unchanged.
 
 **Added**
 

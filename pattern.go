@@ -43,19 +43,24 @@ type segment struct {
 // parseLines parses gitignore content into rules.
 // It normalizes content (BOM, line endings) and processes each line.
 // maxPatternLength limits individual line length (-1 for unlimited).
+// maxRules limits the rules returned (-1 for unlimited); parsing stops at the
+// first rule past it, and truncated reports that one was found.
 // source is an optional informational label (e.g., the path to the
 // originating .gitignore file) carried on each parsed rule and surfaced via
 // MatchResult.Source. Pass "" if no source label is available.
 // Returns parsed rules and any warnings for malformed patterns.
-func parseLines(basePath string, content []byte, maxPatternLength int, source string) ([]rule, []ParseWarning) {
-	content = normalizeContent(content)
+func parseLines(basePath string, content []byte, maxPatternLength, maxRules int, source string) (rules []rule, warnings []ParseWarning, truncated bool) {
+	text := string(normalizeContent(content))
 
-	lines := strings.Split(string(content), "\n")
-	rules := make([]rule, 0, len(lines))
-	var warnings []ParseWarning
+	n := strings.Count(text, "\n") + 1
+	if maxRules >= 0 {
+		n = min(n, maxRules)
+	}
+	rules = make([]rule, 0, n)
 
-	for i, line := range lines {
-		lineNum := i + 1 // 1-indexed
+	for lineNum := 1; ; lineNum++ {
+		line, rest, more := strings.Cut(text, "\n")
+		text = rest
 
 		if maxPatternLength >= 0 && len(line) > maxPatternLength {
 			warnings = append(warnings, ParseWarning{
@@ -64,20 +69,23 @@ func parseLines(basePath string, content []byte, maxPatternLength int, source st
 				Message:  "pattern exceeds maximum length, skipped",
 				BasePath: basePath,
 			})
-			continue
+		} else {
+			r, warning := parseLine(line, lineNum, basePath, source)
+			if warning != nil {
+				warning.BasePath = basePath
+				warnings = append(warnings, *warning)
+			}
+			if r != nil {
+				if maxRules >= 0 && len(rules) == maxRules {
+					return rules, warnings, true
+				}
+				rules = append(rules, *r)
+			}
 		}
-
-		r, warning := parseLine(line, lineNum, basePath, source)
-		if warning != nil {
-			warning.BasePath = basePath
-			warnings = append(warnings, *warning)
-		}
-		if r != nil {
-			rules = append(rules, *r)
+		if !more {
+			return rules, warnings, false
 		}
 	}
-
-	return rules, warnings
 }
 
 // parseLine parses a single line from a .gitignore file.

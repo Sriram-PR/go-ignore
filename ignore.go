@@ -220,8 +220,16 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	// Normalize basePath once for consistent rule scoping and warning reporting.
 	normalizedBase := normalizePath(basePath)
 
-	// Parse before locking; parsing touches no shared state.
-	newRules, parseWarnings := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), source)
+	// Parse no more rules than the matcher can still hold. Parsing itself
+	// runs unlocked; the capacity is checked again under the lock below,
+	// since a concurrent AddPatterns may have used some of it.
+	maxRules := -1
+	if maxPatterns := m.effectiveMaxPatterns(); maxPatterns >= 0 {
+		m.mu.RLock()
+		maxRules = max(maxPatterns-len(m.rules), 0)
+		m.mu.RUnlock()
+	}
+	newRules, parseWarnings, truncated := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), maxRules, source)
 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
 	// This avoids calling strings.ToLower on every match call.
@@ -250,13 +258,13 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 				BasePath: normalizedBase,
 			})
 			newRules = nil
-		} else if len(newRules) > remaining {
+		} else if truncated || len(newRules) > remaining {
 			parseWarnings = append(parseWarnings, ParseWarning{
 				Pattern:  "",
 				Message:  "maximum pattern count reached, excess patterns truncated",
 				BasePath: normalizedBase,
 			})
-			newRules = newRules[:remaining]
+			newRules = newRules[:min(len(newRules), remaining)]
 		}
 	}
 

@@ -1161,3 +1161,48 @@ func TestMatch_BacktrackOptionIgnored(t *testing.T) {
 		t.Error("x/aaaa/debug.log not ignored; *.log must apply whatever the budget option says")
 	}
 }
+
+// Parsing stops at the pattern limit, so input past it costs nothing: 1 MB
+// of rules with MaxPatterns 10 allocated 140 MB before.
+func TestAddPatterns_StopsParsingAtLimit(t *testing.T) {
+	content := []byte(strings.Repeat("a\n", 500_000))
+	m := NewWithOptions(MatcherOptions{MaxPatterns: 10})
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	m.AddPatterns("", content)
+	runtime.ReadMemStats(&after)
+	if n := m.RuleCount(); n != 10 {
+		t.Errorf("RuleCount = %d, want 10", n)
+	}
+	if got := after.TotalAlloc - before.TotalAlloc; got > 8<<20 {
+		t.Errorf("AddPatterns allocated %d MB, want under 8 MB", got>>20)
+	}
+	if w := m.Warnings(); len(w) != 1 || w[0].Message != "maximum pattern count reached, excess patterns truncated" {
+		t.Errorf("Warnings = %v, want one truncation warning", w)
+	}
+}
+
+// Exactly as many rules as the limit allows, followed by lines that are not
+// rules, is not a truncation.
+func TestAddPatterns_ExactlyAtLimit(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{MaxPatterns: 2})
+	m.AddPatterns("", []byte("a\nb\n# done\n\n"))
+	if n, w := m.RuleCount(), m.Warnings(); n != 2 || len(w) != 0 {
+		t.Errorf("RuleCount = %d, Warnings = %v; want 2 rules and no warning", n, w)
+	}
+}
+
+// Concurrent adds share the capacity: the matcher never holds more than
+// MaxPatterns rules.
+func TestAddPatterns_ConcurrentRespectsLimit(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{MaxPatterns: 100})
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() { m.AddPatterns("", []byte(strings.Repeat("x\n", 30))) })
+	}
+	wg.Wait()
+	if n := m.RuleCount(); n != 100 {
+		t.Errorf("RuleCount = %d, want 100", n)
+	}
+}

@@ -21,29 +21,22 @@ test-cover:
 bench:
 	go test -bench=. -benchmem -run=^$$ ./...
 
-# Run fuzz tests (30 seconds each)
-fuzz:
-	go test -fuzz=FuzzAddPatterns -fuzztime=30s .
-	go test -fuzz=FuzzMatch -fuzztime=30s .
-	go test -fuzz=FuzzPatternAndPath -fuzztime=30s .
-	go test -fuzz=FuzzGlob -fuzztime=30s .
-	go test -fuzz=FuzzNormalizePath -fuzztime=30s .
-	go test -fuzz=FuzzNormalizeContent -fuzztime=30s .
-	go test -fuzz=FuzzSegmentMatching -fuzztime=30s .
-	go test -fuzz=FuzzConcurrentAccess -fuzztime=30s .
+# Run every Fuzz* function in the package for FUZZTIME each (default 30s,
+# about 4.5 min for 9). All of them run even if one fails; the target fails
+# at the end. A failing input is written to testdata/fuzz/<Name>/.
+FUZZTIME ?= 30s
 
-# Run fuzz tests in long-form (30 minutes each — ~4 hours total).
-# Intended for pre-release verification before tagging stable releases.
-# The standard 30s `fuzz` target is a smoke check; this is the real one.
+fuzz:
+	@list=$$(go test -list '^Fuzz' .) || exit 1; \
+	fuzzers=$$(printf '%s\n' "$$list" | grep '^Fuzz') || { echo "no fuzzers found" >&2; exit 1; }; \
+	rc=0; for f in $$fuzzers; do \
+		go test -run '^$$' -fuzz="^$$f\$$" -fuzztime=$(FUZZTIME) . || rc=1; \
+	done; exit $$rc
+
+# Long-form fuzz (30m each, about 4.5 hours for 9), for pre-release
+# verification of vX.Y.0 tags.
 fuzz-long:
-	go test -fuzz=FuzzAddPatterns -fuzztime=30m .
-	go test -fuzz=FuzzMatch -fuzztime=30m .
-	go test -fuzz=FuzzPatternAndPath -fuzztime=30m .
-	go test -fuzz=FuzzGlob -fuzztime=30m .
-	go test -fuzz=FuzzNormalizePath -fuzztime=30m .
-	go test -fuzz=FuzzNormalizeContent -fuzztime=30m .
-	go test -fuzz=FuzzSegmentMatching -fuzztime=30m .
-	go test -fuzz=FuzzConcurrentAccess -fuzztime=30m .
+	$(MAKE) fuzz FUZZTIME=30m
 
 # Run git parity tests
 test-git:

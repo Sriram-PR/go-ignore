@@ -103,15 +103,16 @@ jobs:
           go-version: stable
 
       - name: Run fuzz tests
-        run: |
-          go test -fuzz=FuzzAddPatterns -fuzztime=30s
-          go test -fuzz=FuzzMatch -fuzztime=30s
-          go test -fuzz=FuzzPatternAndPath -fuzztime=30s
-          go test -fuzz=FuzzGlob -fuzztime=30s
-          go test -fuzz=FuzzNormalizePath -fuzztime=30s
-          go test -fuzz=FuzzNormalizeContent -fuzztime=30s
-          go test -fuzz=FuzzSegmentMatching -fuzztime=30s
-          go test -fuzz=FuzzConcurrentAccess -fuzztime=30s
+        run: make fuzz
+
+      - name: Upload failing inputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-failing-inputs
+          path: testdata/fuzz/
+          if-no-files-found: ignore
+          retention-days: 14
 
   parity:
     name: Git Parity
@@ -157,14 +158,14 @@ jobs:
           GOIGNORE_PARITY_SEEDS: ${{ github.run_id }}
         run: go test -run '^TestParity$' -count=1 -v .
 
-  # Long-form fuzz: 30 minutes per fuzzer, ~4 hours total. Runs only when
+  # Long-form fuzz: 30 minutes per fuzzer, ~4.5 hours total. Runs only when
   # explicitly dispatched (never on push/PR) — burns hours of CI compute and
   # is intended for pre-release verification of stable tags.
   fuzz-long:
     name: Fuzz Tests (long)
     if: ${{ github.event_name == 'workflow_dispatch' && contains(fromJson('["fuzz-long"]'), github.event.inputs.job) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 330
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -175,22 +176,16 @@ jobs:
           go-version: stable
 
       - name: Run long-form fuzz tests
-        run: |
-          go test -fuzz=FuzzAddPatterns -fuzztime=30m
-          go test -fuzz=FuzzMatch -fuzztime=30m
-          go test -fuzz=FuzzPatternAndPath -fuzztime=30m
-          go test -fuzz=FuzzGlob -fuzztime=30m
-          go test -fuzz=FuzzNormalizePath -fuzztime=30m
-          go test -fuzz=FuzzNormalizeContent -fuzztime=30m
-          go test -fuzz=FuzzSegmentMatching -fuzztime=30m
-          go test -fuzz=FuzzConcurrentAccess -fuzztime=30m
+        run: make fuzz-long
 
-      - name: Upload corpus on failure
+      - name: Upload failing inputs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: fuzz-corpus-on-failure
+          name: fuzz-long-failing-inputs
           path: testdata/fuzz/
+          if-no-files-found: ignore
+          retention-days: 14
 
   benchmark:
     name: Benchmarks

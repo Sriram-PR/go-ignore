@@ -79,20 +79,19 @@ CI runs the harness on every push. To look for new divergence classes, dispatch 
 
 ### Fuzz Testing
 
-Run fuzz tests to catch edge cases. Each can only run one at a time per
-invocation; pick whichever surface your change touches, or run all of them
-via `make fuzz` (30s each):
+`make fuzz` runs every `Fuzz*` function in the package for 30s each and
+`make fuzz-long` for 30m each; `make fuzz FUZZTIME=1m` sets another time.
+Every fuzzer runs even if one fails. To fuzz only the surface your change
+touches:
 
 ```bash
-go test -fuzz=FuzzAddPatterns      -fuzztime=1m .  # pattern parsing
-go test -fuzz=FuzzMatch            -fuzztime=1m .  # matching against fixed patterns
-go test -fuzz=FuzzPatternAndPath   -fuzztime=1m .  # pattern + path combinations
-go test -fuzz=FuzzGlob             -fuzztime=1m .  # glob fast-path vs slow-path invariant
-go test -fuzz=FuzzNormalizePath    -fuzztime=1m .  # path normalization
-go test -fuzz=FuzzNormalizeContent -fuzztime=1m .  # content normalization (BOM/CRLF)
-go test -fuzz=FuzzSegmentMatching  -fuzztime=1m .  # internal segment matcher
-go test -fuzz=FuzzConcurrentAccess -fuzztime=1m .  # concurrent Match/AddPatterns
+go test -list '^Fuzz' .                              # list the fuzzers
+go test -run '^$' -fuzz='^FuzzMatch$' -fuzztime=1m .  # run one
 ```
+
+A failing input is written to `testdata/fuzz/<FuzzName>/`. Fix the bug and
+commit that file with the fix as a regression case. CI uploads the directory
+as an artifact when a fuzz job fails.
 
 ## Pull Request Process
 

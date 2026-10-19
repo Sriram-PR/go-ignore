@@ -216,8 +216,9 @@ func (t *Tree) read(d *dirRules, dir string, chain int) []ParseWarning {
 	content, err := readPatternFile(t.src, name, false, maxPatternFileSize)
 	if err != nil {
 		// ENOTDIR: a path below a file, as in Check("file.txt/x"), asks
-		// for file.txt/.gitignore, which can't exist.
-		if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
+		// for file.txt/.gitignore, which can't exist. ENAMETOOLONG: a
+		// missing path past PATH_MAX would otherwise fail every deeper level.
+		if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) && !errors.Is(err, syscall.ENAMETOOLONG) {
 			d.err = fmt.Errorf("reading %s: %w", name, err)
 		}
 		return nil

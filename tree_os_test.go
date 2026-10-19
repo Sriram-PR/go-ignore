@@ -1,7 +1,9 @@
 package ignore
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -25,6 +27,17 @@ func TestTree_OS(t *testing.T) {
 	}
 	if mustCheck(t, tr, "src/build").Ignored {
 		t.Error("src/build (a file) ignored by build/")
+	}
+}
+
+// A missing path longer than PATH_MAX fails each deep .gitignore read with
+// ENAMETOOLONG, which is no .gitignore, not an error per level.
+func TestTree_OSPathTooLong(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{".gitignore": "*.tmp\n"})
+	res, err := New().Tree(root).Check(strings.Repeat("d/", 4000) + "x.tmp")
+	if err != nil || !res.Ignored {
+		t.Errorf("Check(deep x.tmp) = %+v, error of %d bytes; want ignored by *.tmp, no error", res, len(fmt.Sprint(err)))
 	}
 }
 

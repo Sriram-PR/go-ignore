@@ -212,23 +212,17 @@ func FuzzGlob(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, pattern, s string) {
-		// Invariant: the fast-path wrapper matchGlob must agree with the
-		// slow path matchGlobRecursive for every input. Both sides get the
-		// same modest budget (production default); pathological inputs
-		// exhaust at the same point and are skipped below.
-		ctxA := testCtx(DefaultMaxBacktrackIterations)
-		ctxB := testCtx(DefaultMaxBacktrackIterations)
-		fast := matchGlob(pattern, s, ctxA)
-		slow := matchGlobRecursive(pattern, s, ctxB)
-		// Skip the comparison when either side exhausted its budget — a
-		// pathological pattern can still produce divergent partial results
-		// without indicating a correctness bug.
-		if ctxA.exhausted() || ctxB.exhausted() {
+		// The live glob matcher, fast paths included, must agree with the
+		// reference wherever the reference finishes within its budget.
+		ctx := testCtx(DefaultMaxBacktrackIterations)
+		got := matchGlob(pattern, s, ctx)
+		b := newRefBudget()
+		want := refMatchGlob(pattern, s, b)
+		if ctx.exhausted() || b.exhausted() {
 			return
 		}
-		if fast != slow {
-			t.Errorf("matchGlob(%q, %q) = %v but matchGlobRecursive = %v",
-				pattern, s, fast, slow)
+		if got != want {
+			t.Errorf("matchGlob(%q, %q) = %v, reference %v", pattern, s, got, want)
 		}
 	})
 }

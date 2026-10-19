@@ -19,7 +19,7 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 **Performance**
 
 - **Parsing stops at the pattern limit.** Lines past `MaxPatterns` used to be parsed and then dropped, so 1 MB of patterns with `MaxPatterns: 10` allocated 140 MB. Their parse warnings are no longer reported either.
-- **`Match` is faster.** One-segment rules such as `*.log` skip the general matcher, and floating `**` rules no longer try every start position: 20-40% faster on common rule sets, 5-8× on deep `**` paths.
+- **`Match` is faster.** One-segment rules such as `*.log` skip the general matcher, and floating `**` rules no longer try every start position: 10-35% faster on common rule sets, 6-8× on deep paths.
 
 ### v1.3.0
 
@@ -404,7 +404,7 @@ Use this checklist before tagging a new release.
 #### Stability Audit
 
 - [ ] No breaking changes to the API surface listed in README's "Stability Guarantees" section (skip for v0.x where breaking changes are allowed)
-- [ ] If any defensive limit constant (`MaxPathDepth`, `HardMaxBacktrackIterations`) changed, ensure it was *raised*, never lowered
+- [ ] If `MaxPathDepth` changed, ensure it was *raised*, never lowered
 
 ### Release Process
 

@@ -99,7 +99,7 @@ type MatcherOptions struct {
 	// Default: DefaultMaxPatterns (100000). Set to -1 for unlimited.
 	//
 	// Together with MaxPatternLength it bounds memory. A rule keeps about
-	// 16 times its length when it has many short segments (a 4 KB a/a/...
+	// 17 times its length when it has many short segments (a 4 KB a/a/...
 	// pattern keeps about 70 KB), so the defaults allow about 7 GB. Lower
 	// either limit for untrusted input.
 	MaxPatterns int

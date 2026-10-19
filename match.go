@@ -141,7 +141,7 @@ func matchSegments(pattern []segment, path []string) bool {
 // Handles literal strings, * wildcards, ? wildcards, \ escapes, and [ character classes.
 func matchSingleSegment(seg segment, pathSeg string) bool {
 	if seg.doubleStar {
-		// ** must be handled by matchSegmentsExact;
+		// ** must be handled by matchSegments;
 		// if it ever leaks here, fail closed rather than report a spurious match.
 		return false
 	}

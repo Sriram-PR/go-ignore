@@ -832,9 +832,12 @@ func TestMatchRule_PathologicalPattern(t *testing.T) {
 	path := "a/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/b/x/x/x/x/c/x/x/x/e"
 	pathSegs := splitPath(path)
 
-	got := matchRule(r, path, pathSegs, false)
-	if got {
-		t.Error("expected no match for pathological pattern")
+	if matchRule(r, path, pathSegs, false) {
+		t.Error("path without d: want no match")
+	}
+	path += "/d"
+	if !matchRule(r, path, splitPath(path), false) {
+		t.Error("same path ending in d: want a match")
 	}
 }
 

@@ -193,7 +193,7 @@ func FuzzGlob(f *testing.F) {
 		{"[[:alpha:]]", "a"},
 		{"[unclosed", "x"},
 		{"[]abc]", "]"},
-		// Backtrack-heavy patterns near the budget boundary.
+		// Backtrack-heavy patterns.
 		{"*a*a*a*b", "aaab"},
 		{"*a*a*a*a*a*", "aaaaa"},
 		// Escape + meta combinations.

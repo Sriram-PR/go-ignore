@@ -235,7 +235,7 @@ func TestTree_CaseInsensitive(t *testing.T) {
 // Paths that match nothing in Match match nothing here, without an error.
 func TestTree_OutOfRangePaths(t *testing.T) {
 	tr := NewWithOptions(MatcherOptions{}).TreeFS(fstest.MapFS{".gitignore": file("*\n")}, ".")
-	for _, p := range []string{"", "..", "../x", "a/../.."} {
+	for _, p := range []string{"", ".", "./.", "..", "../x", "a/../.."} {
 		if res, err := tr.Check(p); res.Matched || err != nil {
 			t.Errorf("Check(%q) = %+v, %v; want no match and no error", p, res, err)
 		}

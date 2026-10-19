@@ -51,9 +51,10 @@ func normalizePath(p string) string {
 
 	p = strings.TrimSuffix(p, "/")
 
-	// path.Clean resolves "."/".." so a path can't climb out of its scope; one
-	// resolving to the root or above (".", "..", "../…") is treated as no match.
-	if strings.Contains(p, "..") || strings.Contains(p, "/./") {
+	// path.Clean resolves "."/".." so a path can't climb out of its scope, and
+	// so a . segment is not matched as a name; one resolving to the root or
+	// above (".", "..", "../…") is treated as no match.
+	if strings.Contains(p, "..") || strings.Contains(p, "/./") || p == "." || strings.HasSuffix(p, "/.") {
 		p = path.Clean(p)
 		if p == "." || p == "/" {
 			return ""

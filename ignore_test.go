@@ -1230,3 +1230,15 @@ func TestWarnings_Capped(t *testing.T) {
 		t.Errorf("handler saw %d warnings, want %d", got, maxRetainedWarnings+500)
 	}
 }
+
+// A . segment names the directory it is in, as in git: a/. is a, and . is
+// the root, which matches nothing. So a rule "." never matches a path.
+func TestMatch_DotSegments(t *testing.T) {
+	m := New()
+	m.AddPatterns("", []byte(".\nb\n"))
+	for path, want := range map[string]bool{".": false, "./.": false, "c/.": false, "b/.": true, "b/./": true, "x/b/.": true} {
+		if got := m.Match(path, true); got != want {
+			t.Errorf("Match(%q, true) = %v, want %v", path, got, want)
+		}
+	}
+}

@@ -62,7 +62,11 @@ func TestNormalizePath(t *testing.T) {
 		{"dotdot no effect", "a/b/c", "a/b/c", false},
 
 		// Edge cases
-		{"just dot", ".", ".", false},
+		{"just dot", ".", "", false},
+		{"dot after dot slash", "./.", "", false},
+		{"trailing dot", "a/.", "a", false},
+		{"trailing dot slash", "a/./", "a", false},
+		{"trailing dot deep", "a/b/.", "a/b", false},
 		{"dot in middle", "foo/./bar", "foo/bar", false},
 		{"multiple dot in middle", "a/./././b", "a/b", false},
 		{"dot middle deep", "src/./lib/./test.go", "src/lib/test.go", false},

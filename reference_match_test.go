@@ -193,8 +193,8 @@ func FuzzSegments(f *testing.F) {
 			} else {
 				want = refMatchSegmentsExact(segs, pathSegs, b)
 			}
-			got, ok := liveSegments(segs, pathSegs, floating)
-			if !ok || b.gaveUp(segs) {
+			got := liveSegments(segs, pathSegs, floating)
+			if b.gaveUp(segs) {
 				continue
 			}
 			if got != want {
@@ -205,14 +205,10 @@ func FuzzSegments(f *testing.F) {
 	})
 }
 
-// liveSegments runs the production segment matcher. ok is false when its
-// answer may be wrong.
-func liveSegments(segs []segment, path []string, floating bool) (got, ok bool) {
-	ctx := testCtx(DefaultMaxBacktrackIterations)
+// liveSegments runs the production segment matcher.
+func liveSegments(segs []segment, path []string, floating bool) bool {
 	if floating {
-		got = matchFloating(&rule{segments: segs}, path, ctx)
-	} else {
-		got = matchSegmentsExact(segs, path, ctx)
+		return matchFloating(&rule{segments: segs}, path)
 	}
-	return got, !ctx.exhausted() && len(segs) < maxRecursionDepth
+	return matchSegments(segs, path)
 }

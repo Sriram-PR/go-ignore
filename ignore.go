@@ -82,20 +82,12 @@ type MatcherOptions struct {
 	// (including AddPatterns) — no library-side mutex is held during dispatch.
 	WarningHandler WarningHandler
 
-	// MaxBacktrackIterations limits ** pattern matching iterations per Match
-	// call. The budget is shared across all rules and covers both segment-level
-	// ** matching and character-level glob matching (*, ?).
+	// MaxBacktrackIterations was a per-Match budget for wildcard backtracking.
+	// When it ran out, every later rule was skipped.
 	//
-	//   - Default (0):   DefaultMaxBacktrackIterations (10,000). Safe for
-	//                    untrusted input; raise it if your rules legitimately
-	//                    need more backtracking and exhaust the budget.
-	//   - Negative (-1): the soft limit is raised to HardMaxBacktrackIterations
-	//                    (10,000,000). Truly unlimited backtracking is NOT
-	//                    offered because pathological patterns can otherwise
-	//                    hang the process. Use this only when you trust the
-	//                    pattern source.
-	//   - Positive:      exact soft limit. Match returns no-match for any rule
-	//                    whose evaluation would exceed it.
+	// Deprecated: matching no longer backtracks exponentially, so no input
+	// can exhaust a budget and Match always gives git's answer. The value is
+	// ignored.
 	MaxBacktrackIterations int
 
 	// CaseInsensitive enables case-insensitive matching.
@@ -159,7 +151,7 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 // New/NewWithOptions bake the defaults into opts, but a Matcher built another
 // way (notably the zero value) skips that; resolving them per use keeps such a
 // Matcher usable instead of taking a 0 limit literally and dropping every rule.
-// A negative value (unlimited, or the raised backtrack cap) passes through.
+// A negative value (unlimited) passes through.
 func (m *Matcher) effectiveMaxPatterns() int {
 	if m.opts.MaxPatterns == 0 {
 		return DefaultMaxPatterns
@@ -172,13 +164,6 @@ func (m *Matcher) effectiveMaxPatternLength() int {
 		return DefaultMaxPatternLength
 	}
 	return m.opts.MaxPatternLength
-}
-
-func (m *Matcher) effectiveMaxBacktrackIterations() int {
-	if m.opts.MaxBacktrackIterations == 0 {
-		return DefaultMaxBacktrackIterations
-	}
-	return m.opts.MaxBacktrackIterations
 }
 
 // AddPatterns parses gitignore content and adds rules.
@@ -392,9 +377,8 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 	}
 
 	// opts is fixed at construction (see Matcher.opts) and safe to read
-	// without holding mu. Doing the case-insensitive lowering and the
-	// backtrack-context setup outside the read lock keeps the critical
-	// section as tight as possible.
+	// without holding mu. Doing the case-insensitive lowering outside the
+	// read lock keeps the critical section as tight as possible.
 	var segBuf [32]string
 	pathSegments := splitPathBuf(path, segBuf[:0])
 
@@ -417,19 +401,13 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 		}
 	}
 
-	// Single shared backtrack budget for the entire Match call.
-	// This prevents pathological patterns across many rules from causing
-	// excessive CPU usage — previously each rule got a fresh budget.
-	ctx := newMatchContext(m.effectiveMaxBacktrackIterations())
-
 	m.mu.RLock()
 
-	result := evaluateRules(m.rules, path, pathSegments, isDir, &ctx)
+	result := evaluateRules(m.rules, path, pathSegments, isDir)
 
 	// As in git, an ignored parent directory decides: the path is ignored by
 	// that parent's rule and no negation can re-include it. Shallowest first,
-	// so the outermost ignored parent is reported. The path's own result is
-	// computed first so that it stands if the budget runs out mid-walk.
+	// so the outermost ignored parent is reported.
 	//
 	// We slice the original `path` at internal slash positions rather than
 	// strings.Join'ing slices of pathSegments. Joining was O(i) per ancestor
@@ -449,12 +427,7 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 			}
 			segCount++
 			ancestor := path[start:j]
-			ancRes := evaluateRules(m.rules, ancestor, pathSegments[:segCount], true, &ctx)
-			// An exhausted budget skipped some of this parent's rules, so its
-			// verdict is partial; keep the path's own result.
-			if ctx.exhausted() {
-				break
-			}
+			ancRes := evaluateRules(m.rules, ancestor, pathSegments[:segCount], true)
 			if ancRes.Matched && ancRes.Ignored {
 				m.mu.RUnlock()
 				return ancRes
@@ -467,11 +440,11 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 }
 
 // evaluateRules runs all rules against a single path with last-match-wins semantics.
-func evaluateRules(rules []rule, path string, pathSegments []string, isDir bool, ctx *matchContext) MatchResult {
+func evaluateRules(rules []rule, path string, pathSegments []string, isDir bool) MatchResult {
 	var result MatchResult
 	for i := range rules {
 		r := &rules[i]
-		if matchRule(r, path, pathSegments, isDir, ctx) {
+		if matchRule(r, path, pathSegments, isDir) {
 			result.Matched = true
 			result.Rule = r.pattern
 			result.Source = r.source

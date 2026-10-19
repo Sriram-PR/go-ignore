@@ -35,12 +35,6 @@ func matchGlob(pattern, s string) bool {
 	return matchGlobLoop(pattern, s)
 }
 
-// testCtx creates a matchContext for tests and returns a pointer to it.
-func testCtx(maxIter int) *matchContext {
-	c := newMatchContext(maxIter)
-	return &c
-}
-
 func TestMatchSingleSegment_Literal(t *testing.T) {
 	tests := []struct {
 		pattern string
@@ -562,10 +556,9 @@ func TestMatchSegments_Simple(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := testCtx(0)
-			got := matchSegmentsExact(tt.pattern, tt.path, ctx)
+			got := matchSegments(tt.pattern, tt.path)
 			if got != tt.want {
-				t.Errorf("matchSegmentsExact() = %v, want %v", got, tt.want)
+				t.Errorf("matchSegments() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -692,36 +685,31 @@ func TestMatchSegments_DoubleStar(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := testCtx(0)
-			got := matchSegmentsExact(tt.pattern, tt.path, ctx)
+			got := matchSegments(tt.pattern, tt.path)
 			if got != tt.want {
-				t.Errorf("matchSegmentsExact() = %v, want %v", got, tt.want)
+				t.Errorf("matchSegments() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestMatchSegmentsExact_RecursionDepthLimit(t *testing.T) {
-	// Build a pattern with 250 ** segments (exceeds maxRecursionDepth of 200)
-	// followed by a literal target segment.
+// Many ** segments need neither recursion nor a depth limit.
+func TestMatchSegments_ManyDoubleStars(t *testing.T) {
 	pattern := make([]segment, 251)
-	for i := 0; i < 250; i++ {
+	for i := range 250 {
 		pattern[i] = segment{doubleStar: true}
 	}
 	pattern[250] = segment{value: "target"}
-
-	// Build a path with 250 segments ending in "target"
 	path := make([]string, 250)
-	for i := 0; i < 249; i++ {
+	for i := range 249 {
 		path[i] = "a"
 	}
 	path[249] = "target"
-
-	// Use a high tick budget so depth is the limiting factor
-	ctx := testCtx(1_000_000)
-	got := matchSegmentsExact(pattern, path, ctx)
-	if got {
-		t.Error("expected false when recursion depth exceeds maxRecursionDepth")
+	if !matchSegments(pattern, path) {
+		t.Error("250 ** then target: want a match")
+	}
+	if matchSegments(pattern, path[:249]) {
+		t.Error("path without target: want no match")
 	}
 }
 
@@ -779,7 +767,7 @@ func TestMatchRule_Basic(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, testCtx(0))
+			got := matchRule(r, path, pathSegs, tt.isDir)
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q, isDir=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.isDir, got, tt.want)
@@ -823,40 +811,12 @@ func TestMatchRule_BasePath(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, false, testCtx(0))
+			got := matchRule(r, path, pathSegs, false)
 			if got != tt.want {
 				t.Errorf("matchRule(%q, basePath=%q, path=%q) = %v, want %v",
 					tt.pattern, tt.basePath, tt.path, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestMatchContext_Limit(t *testing.T) {
-	// Test that backtrack limit prevents runaway matching
-	ctx := newMatchContext(5)
-
-	for i := 0; i < 5; i++ {
-		if !ctx.tick() {
-			t.Errorf("tick() returned false at iteration %d, expected true", i+1)
-		}
-	}
-
-	// 6th tick should fail
-	if ctx.tick() {
-		t.Error("tick() should return false after limit exceeded")
-	}
-}
-
-func TestMatchContext_Unlimited(t *testing.T) {
-	// Test unlimited mode (-1)
-	ctx := newMatchContext(-1)
-
-	for i := 0; i < 100000; i++ {
-		if !ctx.tick() {
-			t.Errorf("tick() returned false at iteration %d with unlimited mode", i)
-			break
-		}
 	}
 }
 
@@ -872,8 +832,7 @@ func TestMatchRule_PathologicalPattern(t *testing.T) {
 	path := "a/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/b/x/x/x/x/c/x/x/x/e"
 	pathSegs := splitPath(path)
 
-	// Should complete without hanging (due to backtrack limit)
-	got := matchRule(r, path, pathSegs, false, testCtx(1000))
+	got := matchRule(r, path, pathSegs, false)
 	if got {
 		t.Error("expected no match for pathological pattern")
 	}
@@ -936,7 +895,7 @@ func TestMatchRule_CaseInsensitive(t *testing.T) {
 					pathSegs[i] = strings.ToLower(seg)
 				}
 			}
-			got := matchRule(r, path, pathSegs, false, testCtx(0))
+			got := matchRule(r, path, pathSegs, false)
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q, caseInsensitive=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.caseInsensitive, got, tt.want)
@@ -1032,7 +991,7 @@ func TestMatchRule_DirectoryContents(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			if got := matchRule(r, path, pathSegs, tt.isDir, testCtx(0)); got != tt.wantRule {
+			if got := matchRule(r, path, pathSegs, tt.isDir); got != tt.wantRule {
 				t.Errorf("matchRule(%q, %q, isDir=%v) = %v, want %v",
 					tt.pattern, tt.path, tt.isDir, got, tt.wantRule)
 			}
@@ -1073,7 +1032,7 @@ func TestMatchRule_EscapedWildcards(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, false, testCtx(0))
+			got := matchRule(r, path, pathSegs, false)
 			if got != tt.want {
 				t.Errorf("matchRule(%q, %q) = %v, want %v",
 					tt.pattern, tt.path, got, tt.want)
@@ -1136,7 +1095,7 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, tt.isDir, testCtx(0))
+			got := matchRule(r, path, pathSegs, tt.isDir)
 			if got != tt.want {
 				t.Errorf("pattern %q, path %q: got %v, want %v",
 					tt.pattern, tt.path, got, tt.want)
@@ -1165,8 +1124,7 @@ func BenchmarkMatchSegments_Simple(b *testing.B) {
 	path := []string{"src", "main.go"}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := testCtx(0)
-		matchSegmentsExact(pattern, path, ctx)
+		matchSegments(pattern, path)
 	}
 }
 
@@ -1176,7 +1134,6 @@ func BenchmarkMatchSegments_DoubleStar(b *testing.B) {
 	path := []string{"src", "lib", "test", "unit", "foo_test.go"}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := testCtx(0)
-		matchSegmentsExact(pattern, path, ctx)
+		matchSegments(pattern, path)
 	}
 }

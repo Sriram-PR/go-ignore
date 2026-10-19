@@ -134,7 +134,7 @@ Key entry points:
 Semantic versioning. Within the v1.x line:
 
 - Exported identifiers keep their names and signatures. New ones may be added.
-- The `Default*` limits keep their values. `HardMaxBacktrackIterations` and `MaxPathDepth` may be raised, never lowered.
+- The `Default*` limits keep their values. `MaxPathDepth` may be raised, never lowered. `MaxBacktrackIterations`, `DefaultMaxBacktrackIterations` and `HardMaxBacktrackIterations` are deprecated and ignored.
 - Documented matching semantics stay the same, except bug fixes where the library disagreed with `git check-ignore`. Those ship in a patch or minor release with a note in [CHANGELOG.md](CHANGELOG.md).
 - Unexported code and the wording of `ParseWarning.Message` are not part of the API.
 

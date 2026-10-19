@@ -58,28 +58,6 @@ func TestNewWithOptions_DefaultBacktrack(t *testing.T) {
 	}
 }
 
-func TestMatchWithReason_SharedBacktrackBudget(t *testing.T) {
-	// Verify that all rules share a single backtrack budget per Match call.
-	// With a low limit and many complex rules, the budget should be exhausted
-	// across rules, not reset per rule.
-	m := NewWithOptions(MatcherOptions{
-		MaxBacktrackIterations: 100,
-	})
-
-	// Add many pathological patterns — each would consume significant budget
-	for i := 0; i < 50; i++ {
-		m.AddPatterns("", []byte("*a*a*a*a*b\n"))
-	}
-
-	// Match against a string that won't match but requires backtracking.
-	// With shared budget of 100, this should terminate quickly.
-	// With per-rule budget of 100 * 50 rules = 5000, it would take much longer.
-	result := m.MatchWithReason("aaaaaaaaaa", false)
-	if result.Ignored {
-		t.Error("expected no match for pathological patterns")
-	}
-}
-
 func TestAddPatterns_Basic(t *testing.T) {
 	m := New()
 	content := []byte("*.log\nbuild/\n")
@@ -1087,14 +1065,13 @@ func TestMatch_DirOnlyNegationReincludesDirOnly(t *testing.T) {
 	}
 }
 
-// If the budget runs out while checking parents, a parent's partial verdict
-// must not override the path's own complete one: later rules such as !*/ were
-// skipped, so the parent may look ignored when it is not.
-func TestMatch_BudgetExhaustedInParentCheckKeepsOwnResult(t *testing.T) {
-	m := NewWithOptions(MatcherOptions{MaxBacktrackIterations: 20})
+// A parent's verdict uses every rule: *, re-included by !*/ for directories,
+// leaves no parent ignored, so !*.go decides for the file.
+func TestMatch_ParentCheckWithChainRule(t *testing.T) {
+	m := New()
 	m.AddPatterns("", []byte("*\n**/q/**/q/**/q/**/z\n!*/\n!*.go\n"))
 	if got := m.MatchWithReason("a/b/c/d/e/f/x.go", false); got.Ignored || got.Rule != "!*.go" {
-		t.Errorf("MatchWithReason = %+v, want the path's own result, re-included by !*.go", got)
+		t.Errorf("MatchWithReason = %+v, want re-included by !*.go", got)
 	}
 }
 
@@ -1128,5 +1105,59 @@ func TestMatch_PathologicalGlobKeepsLaterRules(t *testing.T) {
 	name := strings.Repeat("a", 40) + ".env"
 	if !m.Match(name, false) {
 		t.Errorf("Match(%q) = false, want true (ignored by *.env)", name)
+	}
+}
+
+// A rule's answer does not depend on the work earlier rules took: a chain of
+// ** segments used to spend the shared budget and skip every later rule.
+func TestMatch_DoubleStarChainKeepsLaterRules(t *testing.T) {
+	path := strings.Repeat("a/", 30) + "secret/x"
+	for _, later := range []string{"secret/", "x", "**/secret/**"} {
+		m := New()
+		m.AddPatterns("", []byte("**/a/**/b/**/c/**/d/**/e\n"+later+"\n"))
+		if !m.Match(path, false) {
+			t.Errorf("rules [chain, %s]: Match(%q) = false, want true", later, path)
+		}
+	}
+}
+
+// Patterns longer than 200 segments match, as in git.
+func TestMatch_LongPatternMatches(t *testing.T) {
+	path := strings.Repeat("a/", 300) + "b"
+	m := New()
+	m.AddPatterns("", []byte(path+"\n"))
+	if !m.Match(path, false) {
+		t.Errorf("a %d-segment pattern does not match its own path", 301)
+	}
+}
+
+// Matching is polynomial, so many pathological rules stay fast, and the rule
+// after them still applies.
+func TestMatch_ManyPathologicalRulesFast(t *testing.T) {
+	var sb strings.Builder
+	for range 50 {
+		sb.WriteString("*a*a*a*a*a*a*a*a*b\n**/a/**/a/**/a/**/a/**/b\n")
+	}
+	sb.WriteString("*.env\n")
+	m := New()
+	m.AddPatterns("", []byte(sb.String()))
+	path := strings.Repeat("a/", 40) + strings.Repeat("a", 40) + ".env"
+	start := time.Now()
+	got := m.Match(path, false)
+	if d := time.Since(start); d > 2*time.Second {
+		t.Errorf("Match took %v, want well under 2s", d)
+	}
+	if !got {
+		t.Errorf("Match(%q) = false, want true (ignored by *.env)", path)
+	}
+}
+
+// The deprecated budget option is ignored: a budget of 1 used to stop the
+// first ** rule, and so every rule after it.
+func TestMatch_BacktrackOptionIgnored(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{MaxBacktrackIterations: 1})
+	m.AddPatterns("", []byte("*a*a*a*a*b\n**/a/**/b\n*.log\n"))
+	if !m.Match("x/aaaa/debug.log", false) {
+		t.Error("x/aaaa/debug.log not ignored; *.log must apply whatever the budget option says")
 	}
 }

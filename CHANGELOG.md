@@ -4,6 +4,21 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### Unreleased
+
+**Behavior changes**
+
+- **A rule's answer no longer depends on the rules before it.** One backtrack budget was shared by every rule in a `Match` call, and once a pathological rule (`*a*a*a*a*b`, a chain of `**`) spent it, every later rule was skipped, so `.env` or `secret/` after such a rule could stop matching. Matching now backs up only to the last `*` or `**`, as git's wildmatch effectively does, so it costs polynomial time and never gives up.
+- **Patterns longer than 200 segments match.** They used to be silently dead.
+
+**Deprecated**
+
+- `MatcherOptions.MaxBacktrackIterations`, `DefaultMaxBacktrackIterations` and `HardMaxBacktrackIterations`. There is no budget left to set; the value is ignored.
+
+**Performance**
+
+- **`Match` is faster.** One-segment rules such as `*.log` skip the general matcher, and floating `**` rules no longer try every start position: 20-40% faster on common rule sets, 5-8× on deep `**` paths.
+
 ### v1.3.0
 
 `core.excludesFile` parity. `LoadRepo`, `WalkRepo` and `RepoFiles` now load the one excludes file git itself uses for the repository, instead of both the system and global files, and `AddGlobalPatterns` and `AddSystemPatterns` follow includes. No exported identifiers change, and matching is untouched.

@@ -5,36 +5,28 @@ import (
 	"strings"
 )
 
-// DefaultMaxBacktrackIterations is the default limit for pattern matching iterations.
-// This prevents pathological patterns from causing excessive CPU usage.
-// The budget is shared across all rules for a single Match call and covers both
-// segment-level ** matching and character-level glob matching (*, ?).
-// Can be overridden via MatcherOptions.
+// DefaultMaxBacktrackIterations was the default for
+// MatcherOptions.MaxBacktrackIterations.
+//
+// Deprecated: matching no longer backtracks exponentially, so there is no
+// budget to set. NewWithOptions still fills it in, and nothing reads it.
 const DefaultMaxBacktrackIterations = 10000
 
-// HardMaxBacktrackIterations is the absolute upper bound the library enforces
-// on backtracking iterations per Match call. It is applied even when the
-// caller sets MaxBacktrackIterations to -1; "truly unlimited" backtracking is
-// intentionally not offered because exponential blow-up in pathological glob
-// patterns (e.g., *a*a*a*...*b) can hang a process indefinitely. Callers who
-// need to reason about worst-case CPU per Match can use this constant as the
-// upper bound.
+// HardMaxBacktrackIterations was the cap applied when
+// MatcherOptions.MaxBacktrackIterations is -1.
+//
+// Deprecated: matching no longer backtracks exponentially, so there is no
+// budget to cap. Match costs at most O(P·N) segment comparisons per rule, for
+// P pattern segments and N path segments.
 const HardMaxBacktrackIterations = 10_000_000
-
-// maxRecursionDepth bounds recursion in segment-matching functions to prevent
-// stack overflow. It applies to every recursive call in matchSegmentsExact,
-// including the linear tail-recursive segment walk (not just ** branches).
-// Patterns or paths with more than 200 segments are treated as non-matching
-// once the limit is reached.
-const maxRecursionDepth = 200
 
 // MaxPathDepth is the hard upper bound on the segment count of a path
 // supplied to Match / MatchWithReason. Paths exceeding this depth
 // short-circuit to "no match" without evaluating any rules. The cap exists
 // because Match checks every parent directory against every rule, so its cost
-// is O(M·N) for N segments and M rules, plus ** backtracking bounded by
-// MaxBacktrackIterations. Arbitrarily deep inputs (constructible by fuzzers
-// or malicious callers) would otherwise be a denial-of-service vector.
+// grows with N segments times M rules. Arbitrarily deep inputs (constructible
+// by fuzzers or malicious callers) would otherwise be a denial-of-service
+// vector.
 //
 // 4096 was chosen as ~the byte limit of PATH_MAX on Linux, vastly more than
 // any realistic filesystem depth (typical: <30, deeply nested: <100). If
@@ -43,58 +35,18 @@ const maxRecursionDepth = 200
 // MatcherOptions field.
 const MaxPathDepth = 4096
 
-// matchContext tracks state during matching to prevent runaway backtracking.
-type matchContext struct {
-	iterations int
-	maxIter    int
-	depth      int
-}
-
-// newMatchContext creates a new match context with the specified limit.
-func newMatchContext(maxIter int) matchContext {
-	if maxIter == 0 {
-		maxIter = DefaultMaxBacktrackIterations
-	} else if maxIter < 0 {
-		maxIter = HardMaxBacktrackIterations
-	}
-	return matchContext{
-		maxIter: maxIter,
-	}
-}
-
-// tick consumes one unit of the backtrack budget, returning false once spent.
-func (ctx *matchContext) tick() bool {
-	ctx.iterations++
-	return ctx.iterations <= ctx.maxIter
-}
-
-// exhausted reports whether the iteration budget is already used up,
-// without consuming a unit. Used to short-circuit later rules after
-// earlier backtracking has used the budget.
-func (ctx *matchContext) exhausted() bool {
-	return ctx.iterations >= ctx.maxIter
-}
-
 // matchRule checks if a path matches a single rule.
 // path should already be normalized (and pre-lowered if case-insensitive).
 // pathSegments is the path split by "/".
 // isDir indicates whether the path is a directory.
-// ctx is the shared backtrack budget for the entire Match call.
-func matchRule(r *rule, path string, pathSegments []string, isDir bool, ctx *matchContext) bool {
-	// Short-circuit if earlier backtracking exhausted the budget.
-	// Read-only — rule enumeration must not itself consume budget,
-	// or large rule sets would silently false-negative late rules.
-	if ctx.exhausted() {
-		return false
-	}
-
-	matchSegments := resolveMatchSegments(r, path, pathSegments)
-	if matchSegments == nil {
+func matchRule(r *rule, path string, pathSegments []string, isDir bool) bool {
+	matchSegs := resolveMatchSegments(r, path, pathSegments)
+	if matchSegs == nil {
 		return false // path not under basePath
 	}
 
 	// Empty path after basePath stripping
-	if len(matchSegments) == 0 {
+	if len(matchSegs) == 0 {
 		// Only matches if pattern is also empty (shouldn't happen with valid rules)
 		return len(r.segments) == 0
 	}
@@ -106,10 +58,10 @@ func matchRule(r *rule, path string, pathSegments []string, isDir bool, ctx *mat
 	}
 
 	if r.anchored {
-		return matchSegmentsExact(r.segments, matchSegments, ctx)
+		return matchSegments(r.segments, matchSegs)
 	}
 
-	return matchFloating(r, matchSegments, ctx)
+	return matchFloating(r, matchSegs)
 }
 
 // resolveMatchSegments applies basePath scoping and returns the segments to match against.
@@ -131,82 +83,58 @@ func resolveMatchSegments(r *rule, path string, pathSegments []string) []string 
 }
 
 // matchFloating tries to match a floating (unanchored) pattern at any position in the path.
-func matchFloating(r *rule, matchSegments []string, ctx *matchContext) bool {
-	maxStart := len(matchSegments) - len(r.segments)
+func matchFloating(r *rule, path []string) bool {
+	// Most rules are one segment, such as *.log: compare the last segment.
+	if len(r.segments) == 1 && !r.segments[0].doubleStar {
+		return len(path) > 0 && matchSingleSegment(r.segments[0], path[len(path)-1])
+	}
+	// A floating pattern with ** always starts with it (see
+	// determineAnchoring), and a leading ** already lets the match start at
+	// any segment.
+	if slices.ContainsFunc(r.segments, isDoubleStar) {
+		return matchSegments(r.segments, path)
+	}
 	// Without **, a match consumes one path segment per pattern segment, so
-	// it can only start at maxStart.
-	start := 0
-	if !slices.ContainsFunc(r.segments, isDoubleStar) {
-		start = max(maxStart, 0)
-	}
-	for i := start; i <= maxStart; i++ {
-		if ctx.exhausted() {
-			return false
-		}
-		if matchSegmentsExact(r.segments, matchSegments[i:], ctx) {
-			return true
-		}
-	}
-
-	// Special case: pattern with ** can match even if more segments than path
-	if len(r.segments) > 0 && r.segments[0].doubleStar {
-		return matchSegmentsExact(r.segments, matchSegments, ctx)
-	}
-
-	return false
+	// it can only start at len(path) - len(r.segments).
+	start := len(path) - len(r.segments)
+	return start >= 0 && matchSegments(r.segments, path[start:])
 }
 
 func isDoubleStar(s segment) bool { return s.doubleStar }
 
-// matchSegmentsExact recursively matches pattern segments against path segments.
-// This is the core matching algorithm with ** support.
-func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) bool {
-	// Bound recursion depth; budget is only consumed inside backtrack loops.
-	if ctx.exhausted() || ctx.depth >= maxRecursionDepth {
-		return false
-	}
-
-	if len(pattern) == 0 {
-		return len(path) == 0
-	}
-
-	seg := pattern[0]
-
-	if seg.doubleStar {
-		// ** can match zero or more path segments.
-		// Trailing ** (last segment) must consume at least one segment:
-		// abc/** should match abc/file but not abc itself (matches git behavior).
-		minI := 0
-		if len(pattern) == 1 {
-			minI = 1
-		}
-		ctx.depth++
-		for i := minI; i <= len(path); i++ {
-			if matchSegmentsExact(pattern[1:], path[i:], ctx) {
-				ctx.depth--
+// matchSegments matches pattern against all of path. ** matches any run of
+// segments, except that a trailing ** needs at least one (abc/** matches
+// abc/x, not abc, as in git); every other pattern segment matches exactly
+// one. Like matchGlobLoop, on a mismatch it backs up only to the most recent
+// **, so the cost is at most O(len(pattern)·len(path)) segment comparisons.
+func matchSegments(pattern []segment, path []string) bool {
+	p, i := 0, 0
+	starP, starI := -1, 0
+	for i < len(path) {
+		if p < len(pattern) && pattern[p].doubleStar {
+			for p < len(pattern) && pattern[p].doubleStar {
+				p++
+			}
+			// A trailing ** takes the rest, and at least one segment is left.
+			if p == len(pattern) {
 				return true
 			}
-			if !ctx.tick() {
-				ctx.depth--
-				return false
-			}
+			starP, starI = p, i
+			continue
 		}
-		ctx.depth--
-		return false
+		if p < len(pattern) && matchSingleSegment(pattern[p], path[i]) {
+			p, i = p+1, i+1
+			continue
+		}
+		if starP < 0 {
+			return false
+		}
+		starI++
+		p, i = starP, starI
 	}
-
-	if len(path) == 0 {
-		return false
-	}
-
-	if !matchSingleSegment(seg, path[0]) {
-		return false
-	}
-
-	ctx.depth++
-	result := matchSegmentsExact(pattern[1:], path[1:], ctx)
-	ctx.depth--
-	return result
+	// Leftover ** here would have to match zero segments, which a trailing
+	// ** may not.
+	return p == len(pattern)
 }
 
 // matchSingleSegment matches a single pattern segment against a path segment.

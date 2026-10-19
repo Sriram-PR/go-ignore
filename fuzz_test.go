@@ -340,8 +340,7 @@ func FuzzSegmentMatching(f *testing.F) {
 		pathSegs := splitPath(path)
 
 		// Should never panic
-		ctx := testCtx(1000) // Limit iterations for fuzzing
-		_ = matchSegmentsExact(segments, pathSegs, ctx)
+		_ = matchSegments(segments, pathSegs)
 	})
 }
 

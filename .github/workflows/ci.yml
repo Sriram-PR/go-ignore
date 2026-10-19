@@ -133,7 +133,10 @@ jobs:
       - name: Run parity harness
         env:
           GOIGNORE_PARITY: "1"
-        run: go test -run '^TestParity$' -count=1 .
+        shell: bash
+        run: |
+          go test -run '^TestParity$' -count=1 -v . | tee parity.out
+          grep -q '^--- PASS: TestParity ' parity.out
 
   # Report-only exploration on a fresh seed; never compared with the baseline.
   parity-explore:

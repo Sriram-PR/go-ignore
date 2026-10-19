@@ -13,12 +13,17 @@ import (
 	"testing"
 )
 
-// requireParity skips unless GOIGNORE_PARITY=1, and fails if it is set but
-// git is missing so CI cannot pass without running the comparison.
+// requireParity skips when GOIGNORE_PARITY is unset, and fails when it is set
+// to anything but 1 or git is missing, so CI cannot pass without running the
+// comparison.
 func requireParity(t *testing.T) {
 	t.Helper()
-	if os.Getenv("GOIGNORE_PARITY") != "1" {
+	switch v := os.Getenv("GOIGNORE_PARITY"); v {
+	case "":
 		t.Skip("set GOIGNORE_PARITY=1 to run the git parity harness")
+	case "1":
+	default:
+		t.Fatalf("GOIGNORE_PARITY must be 1, got %q", v)
 	}
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Fatal("GOIGNORE_PARITY=1 but git is not on PATH")

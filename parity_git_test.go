@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -53,6 +54,13 @@ func gitRepo(t *testing.T, s scenario) (string, map[string]bool) {
 	if s.icase {
 		runGit(t, s, dir, nil, "config", "core.ignorecase", "true")
 	}
+	return dir, writeScenario(t, s, dir)
+}
+
+// writeScenario creates s's .gitignore files and paths under dir and returns
+// whether each path is a directory on disk.
+func writeScenario(t *testing.T, s scenario, dir string) map[string]bool {
+	t.Helper()
 	for f, content := range s.files {
 		full := filepath.Join(dir, filepath.FromSlash(f))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -88,12 +96,31 @@ func gitRepo(t *testing.T, s scenario) (string, map[string]bool) {
 		}
 		isDir[p] = fi.IsDir()
 	}
-	return dir, isDir
+	return isDir
+}
+
+// gitVerdict is git check-ignore -v's answer for one path. source and line
+// are empty and 0 when no pattern matched.
+type gitVerdict struct {
+	source  string
+	line    int
+	ignored bool
 }
 
 // gitCheckIgnore asks git about every path in one call. A path is ignored
 // when git reports a matching pattern that is not a negation.
 func gitCheckIgnore(t *testing.T, s scenario, dir string, paths []string) map[string]bool {
+	t.Helper()
+	res := make(map[string]bool, len(paths))
+	for p, v := range gitCheckIgnoreVerbose(t, s, dir, paths) {
+		res[p] = v.ignored
+	}
+	return res
+}
+
+// gitCheckIgnoreVerbose is gitCheckIgnore with the source file and line of
+// the deciding pattern.
+func gitCheckIgnoreVerbose(t *testing.T, s scenario, dir string, paths []string) map[string]gitVerdict {
 	t.Helper()
 	var in bytes.Buffer
 	for _, p := range paths {
@@ -102,10 +129,11 @@ func gitCheckIgnore(t *testing.T, s scenario, dir string, paths []string) map[st
 	}
 	out := runGit(t, s, dir, in.Bytes(), "check-ignore", "--no-index", "-v", "-n", "-z", "--stdin")
 	fields := strings.Split(string(out), "\x00")
-	res := make(map[string]bool, len(paths))
+	res := make(map[string]gitVerdict, len(paths))
 	for i := 0; i+3 < len(fields); i += 4 {
 		source, pattern, p := fields[i], fields[i+2], fields[i+3]
-		res[p] = source != "" && !strings.HasPrefix(pattern, "!")
+		line, _ := strconv.Atoi(fields[i+1])
+		res[p] = gitVerdict{source, line, source != "" && !strings.HasPrefix(pattern, "!")}
 	}
 	return res
 }

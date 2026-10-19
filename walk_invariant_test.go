@@ -22,30 +22,8 @@ import (
 // cannot exist on a case-insensitive filesystem. On Windows, paths with a
 // backslash in a name are left out too: there it is a path separator.
 func TestWalkAgreesWithMatch(t *testing.T) {
-	var scens []scenario
-	for _, s := range parityCurated() {
-		if !s.icase {
-			scens = append(scens, s)
-		}
-	}
-	for _, seed := range paritySeeds {
-		scens = append(scens, paritySeeded(seed, parityPerSeed, false)...)
-	}
-	for _, s := range scens {
-		fsys := fstest.MapFS{}
-		for p, dir := range s.paths {
-			if runtime.GOOS == "windows" && strings.Contains(p, `\`) {
-				continue
-			}
-			if dir {
-				fsys[p] = &fstest.MapFile{Mode: fs.ModeDir | 0o755}
-			} else {
-				fsys[p] = &fstest.MapFile{}
-			}
-		}
-		for f, content := range s.files {
-			fsys[f] = &fstest.MapFile{Data: []byte(content)}
-		}
+	for _, s := range walkInvariantScenarios() {
+		fsys := scenarioFS(s)
 		m := parityMatcher(s)
 
 		want := map[string]bool{}
@@ -77,4 +55,39 @@ func TestWalkAgreesWithMatch(t *testing.T) {
 			}
 		}
 	}
+}
+
+// walkInvariantScenarios is the parity scenario set without the
+// case-insensitive scenarios TestWalkAgreesWithMatch leaves out.
+func walkInvariantScenarios() []scenario {
+	var scens []scenario
+	for _, s := range parityCurated() {
+		if !s.icase {
+			scens = append(scens, s)
+		}
+	}
+	for _, seed := range paritySeeds {
+		scens = append(scens, paritySeeded(seed, parityPerSeed, false)...)
+	}
+	return scens
+}
+
+// scenarioFS is s as an fs.FS. On Windows, paths with a backslash in a name
+// are left out.
+func scenarioFS(s scenario) fstest.MapFS {
+	fsys := fstest.MapFS{}
+	for p, dir := range s.paths {
+		if runtime.GOOS == "windows" && strings.Contains(p, `\`) {
+			continue
+		}
+		if dir {
+			fsys[p] = &fstest.MapFile{Mode: fs.ModeDir | 0o755}
+		} else {
+			fsys[p] = &fstest.MapFile{}
+		}
+	}
+	for f, content := range s.files {
+		fsys[f] = &fstest.MapFile{Data: []byte(content)}
+	}
+	return fsys
 }

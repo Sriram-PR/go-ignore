@@ -58,6 +58,9 @@ func TestParity(t *testing.T) {
 		recs = append(recs, r.String())
 	}
 	checkBaseline(t, parityBaselineFile, recs, os.Getenv("GOIGNORE_PARITY_UPDATE") == "1")
+	if bad := runCheckMode(t, append(plain, icase...)); len(bad) > 0 {
+		t.Errorf("check mode: %d explanations differ from git check-ignore -v:\n%s", len(bad), strings.Join(bad, "\n"))
+	}
 }
 
 // exploreParity runs match and walk on the given comma-separated seeds and
@@ -148,10 +151,57 @@ func runWalkMode(t *testing.T, scens []scenario) []parityRecord {
 	return recs
 }
 
+// runCheckMode compares Tree.Check's explanation with git check-ignore -v.
+// Where both agree whether a path is ignored, a path git reports a pattern
+// for must be matched by the same file and line. Disagreements about Ignored
+// are match mode's records.
+func runCheckMode(t *testing.T, scens []scenario) []string {
+	t.Helper()
+	var bad []string
+	for _, s := range scens {
+		dir, isDir := gitRepo(t, s)
+		var paths []string
+		for _, p := range slices.Sorted(maps.Keys(isDir)) {
+			if path.Base(p) != ".gitignore" {
+				paths = append(paths, p)
+			}
+		}
+		g := gitCheckIgnoreVerbose(t, s, dir, paths)
+		tr := ignore.NewWithOptions(parityOptions(s)).Tree(dir)
+		for _, p := range paths {
+			gv, ok := g[p]
+			if !ok {
+				continue
+			}
+			res, err := tr.Check(p)
+			if err != nil {
+				bad = append(bad, fmt.Sprintf("%s path=%q: %v", s.name, p, err))
+				continue
+			}
+			if res.Ignored != gv.ignored {
+				continue
+			}
+			src := ""
+			if res.Matched {
+				rel, err := filepath.Rel(dir, res.Source)
+				if err != nil {
+					t.Fatal(err)
+				}
+				src = filepath.ToSlash(rel)
+			}
+			if src != gv.source || res.Line != gv.line {
+				bad = append(bad, fmt.Sprintf("%s path=%q git=%s:%d lib=%s:%d", s.name, p, gv.source, gv.line, src, res.Line))
+			}
+		}
+	}
+	return bad
+}
+
 // parityMatcher loads the scenario's .gitignore files shallowest first, as
 // the walker does. Any order that loads a directory's file before its
 // descendants' is equivalent: sibling directories' rules never apply to the
-// same path.
+// same path. Each rule's Source is its file's scenario path, as a Tree over
+// the scenario's fs.FS reports it.
 func parityMatcher(s scenario) *ignore.Matcher {
 	m := ignore.NewWithOptions(parityOptions(s))
 	files := slices.SortedFunc(maps.Keys(s.files), func(a, b string) int {
@@ -165,7 +215,7 @@ func parityMatcher(s scenario) *ignore.Matcher {
 		if base == "." {
 			base = ""
 		}
-		m.AddPatterns(base, []byte(s.files[f]))
+		m.AddPatternsWithSource(base, f, []byte(s.files[f]))
 	}
 	return m
 }

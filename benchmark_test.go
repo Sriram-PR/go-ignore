@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 // BenchmarkNew measures Matcher creation overhead
@@ -456,5 +457,51 @@ func BenchmarkWalkDir_NestedGitignores(b *testing.B) {
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*entries), "ns/entry")
 		})
+	}
+}
+
+// siblingTreeRoot and siblingTreeDir are the .gitignore files of a tree with
+// 200 sibling directories: a Tree evaluates the root's rules and one
+// directory's, a preloaded matcher every directory's.
+const (
+	siblingTreeRoot = "*.log\nbuild/\n.cache/\n*.o\n!keep.o\n"
+	siblingTreeDir  = "*.tmp\ncache/\n!keep.tmp\n/dist\n*.bak\n"
+)
+
+func siblingTree() fstest.MapFS {
+	fsys := fstest.MapFS{".gitignore": {Data: []byte(siblingTreeRoot)}}
+	for i := range 200 {
+		fsys[fmt.Sprintf("d%d/.gitignore", i)] = &fstest.MapFile{Data: []byte(siblingTreeDir)}
+	}
+	return fsys
+}
+
+func BenchmarkTree_CheckIsDirWarm(b *testing.B) {
+	tr := New().TreeFS(siblingTree(), ".")
+	_, _ = tr.CheckIsDir("d150/src/main.go", false)
+	b.ReportAllocs()
+	for b.Loop() {
+		_, _ = tr.CheckIsDir("d150/src/main.go", false)
+	}
+}
+
+func BenchmarkTree_PreloadedMatchWithReason(b *testing.B) {
+	m := New()
+	m.AddPatterns("", []byte(siblingTreeRoot))
+	for i := range 200 {
+		m.AddPatterns(fmt.Sprintf("d%d", i), []byte(siblingTreeDir))
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		m.MatchWithReason("d150/src/main.go", false)
+	}
+}
+
+func BenchmarkTree_CheckCold(b *testing.B) {
+	fsys := siblingTree()
+	m := New()
+	b.ReportAllocs()
+	for b.Loop() {
+		_, _ = m.TreeFS(fsys, ".").Check("d150/src/main.go")
 	}
 }

@@ -4,10 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	pathpkg "path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 )
 
 // Tree checks single paths in a work tree against every .gitignore that
@@ -42,6 +45,17 @@ type dirRules struct {
 	rules []rule
 	chain int // rule count of the snapshot, the ancestors' files and this one
 	err   error
+}
+
+// Tree returns a Tree for the work tree at root on the OS filesystem. Paths
+// passed to Check are relative to root, as in Match, and MatchResult.Source
+// names .gitignore files by OS path, as WalkDir does.
+//
+// The Tree takes a snapshot of m's rules and options: later changes to m do
+// not affect it, and m is never changed. Like WalkDir, the Tree reads root's
+// .gitignore itself.
+func (m *Matcher) Tree(root string) *Tree {
+	return m.newTree(root, osSource{}, filepath.Join, os.Lstat)
 }
 
 // TreeFS returns a Tree for the work tree at root inside fsys. Paths passed
@@ -187,7 +201,9 @@ func (t *Tree) read(d *dirRules, dir string, chain int) []ParseWarning {
 	name := t.join(t.root, dir, ".gitignore")
 	content, err := readPatternFile(t.src, name, false, maxPatternFileSize)
 	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
+		// ENOTDIR: a path below a file, as in Check("file.txt/x"), asks
+		// for file.txt/.gitignore, which can't exist.
+		if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
 			d.err = fmt.Errorf("reading %s: %w", name, err)
 		}
 		return nil

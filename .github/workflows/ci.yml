@@ -49,8 +49,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
           check-latest: true
 
-      - name: Verify dependencies
-        run: go mod verify
+      - name: Check go.mod is tidy
+        run: go mod tidy -diff
 
       - name: Build
         run: go build -v ./...

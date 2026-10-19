@@ -4,7 +4,9 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
-### Unreleased
+### v1.4.0
+
+Matcher resource limits. Matching no longer runs on a backtrack budget, so a pathological rule can't make later rules stop matching, and `Match` always gives git's answer in polynomial time. Parsing stops at `MaxPatterns`, and `Warnings()` is capped. The three backtrack-budget identifiers are deprecated and ignored; no exported identifiers are added or removed.
 
 **Behavior changes**
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"testing/fstest"
 
 	ignore "github.com/Sriram-PR/go-ignore"
 )
@@ -182,4 +183,25 @@ func ExampleNewWithOptions() {
 	// Output:
 	// true
 	// true
+}
+
+func ExampleMatcher_TreeFS() {
+	fsys := fstest.MapFS{
+		".gitignore":     {Data: []byte("*.log\n")},
+		"src/.gitignore": {Data: []byte("*.tmp\n!keep.log\n")},
+	}
+	tr := ignore.New().TreeFS(fsys, ".")
+	for _, p := range []string{"src/cache.tmp", "src/keep.log", "debug.log", "lib/cache.tmp"} {
+		r, err := tr.Check(p)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		fmt.Printf("%-14s ignored=%-5v %s:%d %s\n", p, r.Ignored, r.Source, r.Line, r.Rule)
+	}
+	// Output:
+	// src/cache.tmp  ignored=true  src/.gitignore:1 *.tmp
+	// src/keep.log   ignored=false src/.gitignore:2 !keep.log
+	// debug.log      ignored=true  .gitignore:1 *.log
+	// lib/cache.tmp  ignored=false :0
 }

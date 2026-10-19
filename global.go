@@ -49,9 +49,10 @@ var gitConfigTimeout = 5 * time.Second
 // .gitignore must not be a symlink (git does not follow one); otherwise the
 // error wraps ErrPatternFileSkipped.
 //
-// Nested .gitignore files under subdirectories are NOT walked — use WalkDir or
-// WalkRepo for that (they auto-discover per-directory .gitignore files), or call
-// AddPatterns with the appropriate basePath yourself if you need finer control.
+// Nested .gitignore files under subdirectories are NOT loaded, so Match is
+// wrong for paths they govern. To check single paths with them, use OpenTree;
+// to visit a whole tree, WalkRepo or WalkDir (both read each directory's
+// .gitignore as they descend).
 //
 // Trust model: the repository's own config can choose the excludes file, as
 // in git. git skips that config when the repository is owned by another user

@@ -4,6 +4,12 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### Unreleased
+
+**Added**
+
+- **Single-path checks with nested `.gitignore` files.** `OpenTree(root, opts)`, `Matcher.Tree(root)` and `Matcher.TreeFS(fsys, root)` return a `Tree`, whose `Check(path)` and `CheckIsDir(path, isDir)` answer as `git check-ignore -v` does: every `.gitignore` from the root down to the path applies, and the `MatchResult` names the file and line that decided. `Check` tells a directory from a file as git does (a trailing `/`, else lstat). Each `.gitignore` is read once per `Tree`, none inside an ignored directory, and one that can't be read is reported with the answer instead of failing it. `LoadRepo` + `Match` was wrong for paths governed by nested files.
+
 ### v1.4.0
 
 Matcher resource limits. Matching no longer runs on a backtrack budget, so a pathological rule can't make later rules stop matching, and `Match` always gives git's answer in polynomial time. Parsing stops at `MaxPatterns`, and `Warnings()` is capped. The three backtrack-budget identifiers are deprecated and ignored; no exported identifiers are added or removed.

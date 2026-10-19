@@ -233,6 +233,9 @@ func TestRepoLoaders_MalformedGitconfigErrors(t *testing.T) {
 	if _, err := LoadRepo(repo, MatcherOptions{}); err == nil || !strings.Contains(err.Error(), "bad config") {
 		t.Errorf("LoadRepo err = %v, want a bad config error", err)
 	}
+	if _, err := OpenTree(repo, MatcherOptions{}); err == nil || !strings.Contains(err.Error(), "bad config") {
+		t.Errorf("OpenTree err = %v, want a bad config error", err)
+	}
 
 	calls := 0
 	err := WalkRepo(repo, MatcherOptions{}, func(string, fs.DirEntry, error) error {

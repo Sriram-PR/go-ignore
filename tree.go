@@ -53,7 +53,7 @@ type dirRules struct {
 //
 // The Tree takes a snapshot of m's rules and options: later changes to m do
 // not affect it, and m is never changed. Like WalkDir, the Tree reads root's
-// .gitignore itself.
+// .gitignore itself. For a repository's standard sources, use OpenTree.
 func (m *Matcher) Tree(root string) *Tree {
 	return m.newTree(root, osSource{}, filepath.Join, os.Lstat)
 }
@@ -69,6 +69,20 @@ func (m *Matcher) TreeFS(fsys fs.FS, root string) *Tree {
 	return m.newTree(root, fsSource{fsys}, pathpkg.Join, func(name string) (fs.FileInfo, error) {
 		return fs.Lstat(fsys, name)
 	})
+}
+
+// OpenTree returns a Tree for the repository work tree at root, loaded like
+// WalkRepo: core.excludesFile and info/exclude as LoadRepo loads them, then
+// every .gitignore from root down, read on demand. A failure loading the
+// first two is returned; a root .gitignore that can't be read is reported by
+// each check, like any nested one. Use it to check single paths the way git
+// check-ignore does.
+func OpenTree(root string, opts MatcherOptions) (*Tree, error) {
+	m, err := loadRepoConfig(root, opts)
+	if err != nil {
+		return nil, err
+	}
+	return m.Tree(root), nil
 }
 
 func (m *Matcher) newTree(root string, src patternSource, join func(...string) string, lstat func(string) (fs.FileInfo, error)) *Tree {

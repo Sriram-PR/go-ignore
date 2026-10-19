@@ -9,7 +9,7 @@ Zero-dependency `.gitignore` matching for Go, verified byte-for-byte against `gi
 ## Highlights
 
 - **Correct** — full gitignore syntax (`*`, `?`, `**`, `!`, `/`, `\` escapes, character classes, and all 12 POSIX classes), with an automated parity test suite against the system `git`.
-- **Batteries included** — a filesystem walker with nested `.gitignore` auto-discovery and directory pruning, plus one-call loading of the standard gitignore sources (`core.excludesFile` as git resolves it, `.git/info/exclude`, and the repo root).
+- **Batteries included** — a filesystem walker with nested `.gitignore` auto-discovery and directory pruning, single-path checks that apply nested `.gitignore` files, plus one-call loading of the standard gitignore sources (`core.excludesFile` as git resolves it, `.git/info/exclude`, and the repo root).
 - **Fast and safe** — a zero-allocation match path, safe for concurrent use, fuzz- and race-tested.
 - **Zero dependencies** — the standard library only.
 
@@ -73,6 +73,21 @@ The iterator form is `for path, err := range ignore.RepoFiles(".", ignore.Matche
 r := m.MatchWithReason("debug.log", false)
 fmt.Println(r.Ignored, r.Rule, r.Line) // true *.log 1
 ```
+
+### Check one path
+
+A `Matcher` from `LoadRepo` knows only the root `.gitignore`. `OpenTree` also applies every nested `.gitignore` on the way to a path, as `git check-ignore` does, and tells whether the path is a directory by looking at the disk:
+
+```go
+tr, err := ignore.OpenTree(".", ignore.MatcherOptions{})
+if err != nil {
+	return err
+}
+r, err := tr.Check("src/cache.tmp")
+fmt.Println(r.Ignored, r.Source, r.Line) // true src/.gitignore 1
+```
+
+Each `.gitignore` is read once per `Tree`, so checking a long list of paths stays cheap.
 
 ## Supported Syntax
 

@@ -24,7 +24,10 @@
 // .gitignore. WalkDir and WalkRepo walk a tree, auto-discovering nested
 // .gitignore files and pruning ignored (and .git/) directories; Files and
 // RepoFiles are their range-over-func form, and WalkDirFS/FilesFS operate
-// over an fs.FS. See each function's own documentation for details.
+// over an fs.FS. To check single paths with nested .gitignore files applied,
+// as git check-ignore does, use a Tree: OpenTree for a repository, or
+// Matcher.Tree and Matcher.TreeFS. See each function's own documentation for
+// details.
 //
 // # Match provenance
 //

@@ -214,11 +214,10 @@ func FuzzGlob(f *testing.F) {
 	f.Fuzz(func(t *testing.T, pattern, s string) {
 		// The live glob matcher, fast paths included, must agree with the
 		// reference wherever the reference finishes within its budget.
-		ctx := testCtx(DefaultMaxBacktrackIterations)
-		got := matchGlob(pattern, s, ctx)
+		got := matchGlob(pattern, s)
 		b := newRefBudget()
 		want := refMatchGlob(pattern, s, b)
-		if ctx.exhausted() || b.exhausted() {
+		if b.exhausted() {
 			return
 		}
 		if got != want {

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 // matchGlob matches a glob pattern against a string (test helper).
 // Moved from match.go — only used by tests and benchmarks.
-func matchGlob(pattern, s string, ctx *matchContext) bool {
+func matchGlob(pattern, s string) bool {
 	hasWild := strings.ContainsAny(pattern, "*?\\[")
 
 	if !hasWild {
@@ -31,7 +32,7 @@ func matchGlob(pattern, s string, ctx *matchContext) bool {
 		}
 	}
 
-	return matchGlobRecursive(pattern, s, ctx)
+	return matchGlobLoop(pattern, s)
 }
 
 // testCtx creates a matchContext for tests and returns a pointer to it.
@@ -60,7 +61,7 @@ func TestMatchSingleSegment_Literal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.pattern+"_"+tt.input, func(t *testing.T) {
 			seg := segment{value: tt.pattern, wildcard: false}
-			got := matchSingleSegment(seg, tt.input, testCtx(0))
+			got := matchSingleSegment(seg, tt.input)
 			if got != tt.want {
 				t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
 					tt.pattern, tt.input, got, tt.want)
@@ -123,7 +124,7 @@ func TestMatchSingleSegment_Wildcard(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.pattern+"_"+tt.input, func(t *testing.T) {
 			seg := segment{value: tt.pattern, wildcard: true}
-			got := matchSingleSegment(seg, tt.input, testCtx(0))
+			got := matchSingleSegment(seg, tt.input)
 			if got != tt.want {
 				t.Errorf("matchSingleSegment(%q, %q) = %v, want %v",
 					tt.pattern, tt.input, got, tt.want)
@@ -170,7 +171,7 @@ func TestMatchSingleSegment_CaseInsensitive(t *testing.T) {
 			if tt.caseInsensitive {
 				input = strings.ToLower(input)
 			}
-			got := matchSingleSegment(seg, input, testCtx(0))
+			got := matchSingleSegment(seg, input)
 			if got != tt.want {
 				t.Errorf("matchSingleSegment(%q, %q, caseInsensitive=%v) = %v, want %v",
 					tt.pattern, tt.input, tt.caseInsensitive, got, tt.want)
@@ -290,7 +291,7 @@ func TestMatchGlob(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s_%s", tt.pattern, tt.s), func(t *testing.T) {
-			got := matchGlob(tt.pattern, tt.s, testCtx(0))
+			got := matchGlob(tt.pattern, tt.s)
 			if got != tt.want {
 				t.Errorf("matchGlob(%q, %q) = %v, want %v",
 					tt.pattern, tt.s, got, tt.want)
@@ -487,7 +488,7 @@ func TestMatchGlob_CharClass(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s_%s", tt.pattern, tt.s), func(t *testing.T) {
-			got := matchGlob(tt.pattern, tt.s, testCtx(0))
+			got := matchGlob(tt.pattern, tt.s)
 			if got != tt.want {
 				t.Errorf("matchGlob(%q, %q) = %v, want %v",
 					tt.pattern, tt.s, got, tt.want)
@@ -878,38 +879,19 @@ func TestMatchRule_PathologicalPattern(t *testing.T) {
 	}
 }
 
-func TestMatchGlob_PathologicalPattern(t *testing.T) {
-	// Pathological glob pattern that causes exponential backtracking without limits.
-	// Pattern *a*a*a*a*b against a string of only 'a's has no match but
-	// requires exploring an exponential number of branches.
-	pattern := "*a*a*a*a*a*a*b"
-	s := "aaaaaaaaaaaaaaaaaaaaaaaa" // 24 a's, no b — no match possible
-
-	ctx := newMatchContext(500) // Low limit to verify it terminates
-	got := matchGlob(pattern, s, &ctx)
-	if got {
-		t.Error("expected no match for pathological glob pattern")
-	}
-	// Verify the limit was actually hit (not just a fast rejection)
-	if ctx.iterations < 100 {
-		t.Errorf("expected significant iteration count, got %d", ctx.iterations)
-	}
-}
-
-func TestMatchGlob_HardCapUnlimited(t *testing.T) {
-	// When MaxBacktrackIterations is -1, the hard cap should prevent hanging.
-	// This pattern causes exponential backtracking without a budget.
+// The byte loop gives the right answer on the classic exponential inputs,
+// fast: a match when one exists and no match otherwise.
+func TestMatchGlob_PathologicalPatternCorrect(t *testing.T) {
 	pattern := strings.Repeat("*a", 15) + "*b"
-	s := strings.Repeat("a", 30)
-
-	ctx := newMatchContext(-1) // "unlimited" — should use hard cap
-	got := matchGlob(pattern, s, &ctx)
-	if got {
-		t.Error("expected no match for pathological pattern")
+	start := time.Now()
+	if matchGlob(pattern, strings.Repeat("a", 30)) {
+		t.Error("no b in input: want no match")
 	}
-	// Verify it terminated via the hard cap, not instantly
-	if ctx.iterations < 1000 {
-		t.Errorf("expected significant iterations, got %d", ctx.iterations)
+	if !matchGlob(pattern, strings.Repeat("a", 30)+"b") {
+		t.Error("15 a's then b: want a match")
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("took %v, want well under a second", d)
 	}
 }
 
@@ -1166,14 +1148,14 @@ func TestMatchRule_SpecExamples(t *testing.T) {
 func BenchmarkMatchGlob_Simple(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		matchGlob("*.log", "test.log", testCtx(0))
+		matchGlob("*.log", "test.log")
 	}
 }
 
 func BenchmarkMatchGlob_Complex(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		matchGlob("*test*spec*.go", "my_test_spec_file.go", testCtx(0))
+		matchGlob("*test*spec*.go", "my_test_spec_file.go")
 	}
 }
 

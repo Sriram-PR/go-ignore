@@ -199,7 +199,7 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) boo
 		return false
 	}
 
-	if !matchSingleSegment(seg, path[0], ctx) {
+	if !matchSingleSegment(seg, path[0]) {
 		return false
 	}
 
@@ -211,9 +211,7 @@ func matchSegmentsExact(pattern []segment, path []string, ctx *matchContext) boo
 
 // matchSingleSegment matches a single pattern segment against a path segment.
 // Handles literal strings, * wildcards, ? wildcards, \ escapes, and [ character classes.
-// The matchContext is shared with the caller so glob-level backtracking
-// counts against the same budget as segment-level matching.
-func matchSingleSegment(seg segment, pathSeg string, ctx *matchContext) bool {
+func matchSingleSegment(seg segment, pathSeg string) bool {
 	if seg.doubleStar {
 		// ** must be handled by matchSegmentsExact;
 		// if it ever leaks here, fail closed rather than report a spurious match.
@@ -228,12 +226,12 @@ func matchSingleSegment(seg segment, pathSeg string, ctx *matchContext) bool {
 		return pattern == pathSeg
 	}
 
-	return matchGlobSeg(&seg, pathSeg, ctx)
+	return matchGlobSeg(&seg, pathSeg)
 }
 
 // matchGlobSeg matches a glob pattern against a string using pre-computed segment flags.
 // This is the fast path used by matchSingleSegment.
-func matchGlobSeg(seg *segment, s string, ctx *matchContext) bool {
+func matchGlobSeg(seg *segment, s string) bool {
 	pattern := seg.value
 
 	// Fast path: single * matches everything
@@ -256,93 +254,67 @@ func matchGlobSeg(seg *segment, s string, ctx *matchContext) bool {
 		}
 	}
 
-	// General case: use recursive matching
-	return matchGlobRecursive(pattern, s, ctx)
+	return matchGlobLoop(pattern, s)
 }
 
-// matchGlobRecursive performs recursive glob matching.
-// This handles patterns with * (zero or more chars), ? (exactly one char),
-// \ (escape next character for literal matching), and [ character classes.
-// Backtracking is bounded by the shared matchContext to prevent pathological
-// patterns (e.g., *a*a*a*a*b) from causing excessive CPU usage.
-func matchGlobRecursive(pattern, s string, ctx *matchContext) bool {
-	for len(pattern) > 0 {
-		if ctx.exhausted() {
-			return false
-		}
-
-		if pattern[0] == '*' {
-			return matchGlobStar(pattern, s, ctx)
-		}
-
-		if pattern[0] == '?' {
-			if len(s) == 0 {
-				return false
+// matchGlobLoop matches pattern against s: * matches any run of bytes, and ?,
+// a character class and \x each match exactly one. On a mismatch it backs up
+// only to the most recent *, which suffices because every other token has a
+// fixed width, so the cost is at most O(len(pattern)·len(s)).
+func matchGlobLoop(pattern, s string) bool {
+	p, i := 0, 0
+	starP, starI := -1, 0
+	for i < len(s) {
+		if p < len(pattern) && pattern[p] == '*' {
+			for p < len(pattern) && pattern[p] == '*' {
+				p++
 			}
-			pattern = pattern[1:]
-			s = s[1:]
+			if p == len(pattern) {
+				return true
+			}
+			starP, starI = p, i
 			continue
 		}
-
-		if pattern[0] == '[' {
-			if len(s) == 0 {
-				return false
-			}
-			// '/' never matches a character class (FNM_PATHNAME)
-			if s[0] == '/' {
-				return false
-			}
-			matched, newPos, valid := matchCharClass(pattern, 0, s[0])
-			if valid {
-				if !matched {
-					return false
-				}
-				pattern = pattern[newPos:]
-				s = s[1:]
-				continue
-			}
-			// Invalid (unclosed bracket) — treat '[' as literal, fall through
+		if next, ok := matchGlobToken(pattern, p, s[i]); ok {
+			p, i = next, i+1
+			continue
 		}
-
-		if pattern[0] == '\\' && len(pattern) > 1 {
-			pattern = pattern[1:] // escape: compare the next char literally below
-		}
-
-		if len(s) == 0 {
+		if starP < 0 {
 			return false
 		}
-
-		if pattern[0] != s[0] {
-			return false
-		}
-
-		pattern = pattern[1:]
-		s = s[1:]
+		starI++
+		p, i = starP, starI
 	}
-
-	return len(s) == 0
+	for p < len(pattern) && pattern[p] == '*' {
+		p++
+	}
+	return p == len(pattern)
 }
 
-// matchGlobStar handles the * wildcard branch of glob matching.
-// It skips consecutive stars, then tries matching the remaining pattern
-// against increasingly longer consumed prefixes of s.
-func matchGlobStar(pattern, s string, ctx *matchContext) bool {
-	for len(pattern) > 0 && pattern[0] == '*' {
-		pattern = pattern[1:]
+// matchGlobToken matches the one-byte token at pattern[p] (?, a character
+// class, \x or a literal byte) against ch, and returns the position after it.
+func matchGlobToken(pattern string, p int, ch byte) (next int, ok bool) {
+	if p >= len(pattern) {
+		return 0, false
 	}
-	// Trailing * matches rest of string
-	if len(pattern) == 0 {
-		return true
-	}
-	for i := 0; i <= len(s); i++ {
-		if matchGlobRecursive(pattern, s[i:], ctx) {
-			return true
+	switch pattern[p] {
+	case '?':
+		return p + 1, true
+	case '[':
+		// '/' never matches a character class (FNM_PATHNAME)
+		if ch == '/' {
+			return 0, false
 		}
-		if !ctx.tick() {
-			return false
+		if matched, newPos, valid := matchCharClass(pattern, p, ch); valid {
+			return newPos, matched
+		}
+		// An unclosed [ is a literal.
+	case '\\':
+		if p+1 < len(pattern) {
+			p++
 		}
 	}
-	return false
+	return p + 1, pattern[p] == ch
 }
 
 // matchCharClass checks if ch matches a character class starting at pattern[pos].

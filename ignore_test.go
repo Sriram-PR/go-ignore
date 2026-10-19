@@ -1119,3 +1119,14 @@ func TestAddPatternsReader_EndlessReaderRefused(t *testing.T) {
 		t.Errorf("RuleCount = %d, want 0", n)
 	}
 }
+
+// A pathological glob rule must not stop later rules from matching the same
+// name, as git's answer does not depend on rule order.
+func TestMatch_PathologicalGlobKeepsLaterRules(t *testing.T) {
+	m := New()
+	m.AddPatterns("", []byte("*a*a*a*a*a*a*a*a*b\n*.env\n"))
+	name := strings.Repeat("a", 40) + ".env"
+	if !m.Match(name, false) {
+		t.Errorf("Match(%q) = false, want true (ignored by *.env)", name)
+	}
+}

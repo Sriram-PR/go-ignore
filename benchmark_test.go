@@ -373,19 +373,19 @@ func BenchmarkMatchGlob(b *testing.B) {
 	b.Run("simple", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			matchGlob("*.log", "test.log", testCtx(0))
+			matchGlob("*.log", "test.log")
 		}
 	})
 	b.Run("prefix", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			matchGlob("test_*", "test_foo_bar", testCtx(0))
+			matchGlob("test_*", "test_foo_bar")
 		}
 	})
 	b.Run("complex", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			matchGlob("*test*spec*", "my_test_file_spec_v2", testCtx(0))
+			matchGlob("*test*spec*", "my_test_file_spec_v2")
 		}
 	})
 }
@@ -395,25 +395,25 @@ func BenchmarkMatchGlob_CharClass(b *testing.B) {
 	b.Run("simple", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			matchGlob("[abc]", "b", testCtx(0))
+			matchGlob("[abc]", "b")
 		}
 	})
 	b.Run("range", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			matchGlob("[a-z]", "m", testCtx(0))
+			matchGlob("[a-z]", "m")
 		}
 	})
 	b.Run("negated", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			matchGlob("[!0-9]", "a", testCtx(0))
+			matchGlob("[!0-9]", "a")
 		}
 	})
 	b.Run("combined", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			matchGlob("*.[ch]", "main.c", testCtx(0))
+			matchGlob("*.[ch]", "main.c")
 		}
 	})
 }

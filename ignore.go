@@ -409,34 +409,13 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 // prunes every directory match reports as ignored, so no path it visits has
 // an ignored parent.
 func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
-	path = normalizePath(path)
-	if path == "" {
-		return MatchResult{Ignored: false, Matched: false}
-	}
-
 	// opts is fixed at construction (see Matcher.opts) and safe to read
 	// without holding mu. Doing the case-insensitive lowering outside the
 	// read lock keeps the critical section as tight as possible.
 	var segBuf [32]string
-	pathSegments := splitPathBuf(path, segBuf[:0])
-
-	// Defensive: paths past MaxPathDepth short-circuit. The parent check
-	// runs every rule once per parent directory, so without this cap a fuzzer
-	// or malicious caller could make a single call pathologically slow.
-	// Realistic paths are nowhere near this limit; see MaxPathDepth's docs.
-	if len(pathSegments) > MaxPathDepth {
-		return MatchResult{Ignored: false, Matched: false}
-	}
-
-	// Pre-lowercase path and segments once for case-insensitive matching,
-	// instead of lowering per-segment per-rule in matchSingleSegment.
-	// Re-split after lowering so segments point into the lowered string (1 alloc vs N+1).
-	if m.opts.CaseInsensitive {
-		lowered := strings.ToLower(path)
-		if lowered != path {
-			path = lowered
-			pathSegments = splitPathBuf(path, segBuf[:0])
-		}
+	_, path, pathSegments, ok := preparePath(path, m.opts.CaseInsensitive, segBuf[:0])
+	if !ok {
+		return MatchResult{}
 	}
 
 	m.mu.RLock()
@@ -475,6 +454,33 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 
 	m.mu.RUnlock()
 	return result
+}
+
+// preparePath normalizes path and splits it into segments, appending to buf.
+// ok is false for a path that matches nothing: empty, resolving outside the
+// root, or deeper than MaxPathDepth. Under icase, match and segs are lowered
+// once here instead of per segment per rule; disk keeps the caller's
+// spelling, for reading files.
+func preparePath(path string, icase bool, buf []string) (disk, match string, segs []string, ok bool) {
+	path = normalizePath(path)
+	if path == "" {
+		return "", "", nil, false
+	}
+	segs = splitPathBuf(path, buf)
+	// The parent check runs every rule once per parent directory, so without
+	// this cap a fuzzer or malicious caller could make one call
+	// pathologically slow. See MaxPathDepth's docs.
+	if len(segs) > MaxPathDepth {
+		return "", "", nil, false
+	}
+	disk, match = path, path
+	if icase {
+		if lowered := strings.ToLower(path); lowered != path {
+			match = lowered
+			segs = splitPathBuf(match, buf[:0])
+		}
+	}
+	return disk, match, segs, true
 }
 
 // evaluateRules runs all rules against a single path with last-match-wins semantics.

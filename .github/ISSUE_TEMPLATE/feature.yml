@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest an addition within scope (gitignore matching and walking, stdlib only)
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you're trying to do and why the current API doesn't cover it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API or behavior
+      render: go
+  - type: textarea
+    id: git
+    attributes:
+      label: What git does
+      description: If it relates to matching, how git behaves for the same input.

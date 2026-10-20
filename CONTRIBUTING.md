@@ -60,13 +60,17 @@ go test -bench=. -benchmem
 
 ### Git Parity
 
-If your change affects matching behavior, verify against Git:
+Two kinds of test compare go-ignore with git:
 
-```bash
-go test -v -run TestGitParity
-```
+- `TestGitParity_*` in `git_parity_test.go` are hand-written cases. For a
+  specific bug where go-ignore and git disagree, add a case there:
 
-If you find a discrepancy with Git, add a test case to `git_parity_test.go`.
+  ```bash
+  go test -v -run TestGitParity
+  ```
+
+- `TestParity` is the generated harness below. Run it for any change to
+  matching or walking.
 
 ### Parity harness
 
@@ -107,18 +111,15 @@ as an artifact when a fuzz job fails.
 
 3. **Run the full test suite**
    ```bash
-   go test ./...
-   go test -race ./...
-   go vet ./...
-   golangci-lint run
-
-   # Or, equivalent shortcut:
-   make ci
+   make ci   # fmt, vet, test, test-race, lint
    ```
 
-4. **Commit with a clear message**
+   `make ci` needs golangci-lint v2.15.0 or newer (the version CI runs).
+
+4. **Commit with a one-line Conventional Commits message** (`fix:`, `feat:`,
+   `docs:`, `test:`, `refactor:`, `perf:`, `ci:`)
    ```bash
-   git commit -m "Add feature X: brief description"
+   git commit -m "fix: short description of the change"
    ```
 
 5. **Push and create PR**
@@ -140,7 +141,10 @@ When reporting bugs, please include:
 - Operating system
 - Minimal reproduction case
 - Expected vs actual behavior
-- If it's a Git parity issue, include `git check-ignore` output
+- If it's a Git parity issue, include `git check-ignore -v` output
+
+The bug report form asks for all of this. Report security problems privately,
+as described in [SECURITY.md](SECURITY.md).
 
 ## Feature Requests
 
@@ -159,6 +163,6 @@ Before requesting features, consider:
 
 ## Questions?
 
-Open an issue with the "question" label or start a discussion.
+Open an issue with the "question" label.
 
 Thank you for contributing!

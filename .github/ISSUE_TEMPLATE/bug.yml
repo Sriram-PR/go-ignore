@@ -1,0 +1,39 @@
+name: Bug report
+description: go-ignore gives a different answer than git, or misbehaves
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: go-ignore version
+      placeholder: v1.5.0
+    validations:
+      required: true
+  - type: input
+    id: go
+    attributes:
+      label: Go version and OS
+      description: Output of `go version`, plus the OS if it isn't in there.
+      placeholder: go version go1.27.2 linux/amd64
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal repro
+      description: The .gitignore content (or patterns), the paths you checked, and the code you ran.
+      render: go
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected vs actual
+    validations:
+      required: true
+  - type: textarea
+    id: git
+    attributes:
+      label: git check-ignore -v output
+      description: For a matching difference, run `git check-ignore -v <paths>` in a repo with the same .gitignore files. git is the reference.
+      render: text

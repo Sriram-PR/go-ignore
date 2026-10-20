@@ -155,7 +155,7 @@ Semantic versioning. Within the v1.x line:
 
 ## Contributing
 
-Contributions are welcome. Please run `go test ./...`, `go test -race ./...`, and `go fmt ./...`, and include tests for new behavior.
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Run `make ci` and include tests for new behavior.
 
 ## License
 

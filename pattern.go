@@ -28,7 +28,8 @@ type rule struct {
 	anchored      bool      // true if pattern should match from basePath only
 }
 
-// segment represents one part of a pattern split by "/".
+// segment represents one part of a pattern split at '/' or '\/' (not inside
+// a bracket expression).
 // Each segment can be a literal string, contain wildcards, or be a double-star.
 type segment struct {
 	value        string // literal or pattern text (empty for **)
@@ -37,7 +38,7 @@ type segment struct {
 	minOne       bool   // ** followed by \/: matches at least one directory
 	hasQuestion  bool   // contains ?
 	hasEscape    bool   // contains backslash
-	hasCharClass bool   // contains [ (character class or literal bracket)
+	hasCharClass bool   // contains [ (a character class)
 	starCount    int    // number of * characters
 }
 
@@ -91,7 +92,8 @@ func parseLines(basePath string, content []byte, maxPatternLength, maxRules int,
 
 // parseLine parses a single line from a .gitignore file.
 // Returns nil rule for empty lines, comments, and malformed patterns.
-// Returns a warning for patterns that become empty after processing.
+// Returns a warning for patterns that become empty after processing, and for
+// patterns git never matches (see parseSegments).
 // source is propagated onto the returned rule for provenance reporting.
 func parseLine(line string, lineNum int, basePath, source string) (*rule, *ParseWarning) {
 	// Trim trailing whitespace (Git behavior)
@@ -219,9 +221,9 @@ const (
 	problemUnknownClass  = "unknown character class name (pattern never matches)"
 )
 
-// parseSegments splits a pattern at '/' and '\/' and classifies each segment. A '/'
-// inside a bracket expression does not split, as git's class scan runs past
-// it. A non-empty bad is why git never matches the pattern: it does not
+// parseSegments splits a pattern at '/' and '\/' and classifies each segment.
+// A '/' inside a bracket expression does not split, as git's class scan runs
+// past it. A non-empty bad is why git never matches the pattern: it does not
 // normalize empty segments, and it rejects unclosed classes and unknown class
 // names when matching.
 func parseSegments(pattern string) (segs []segment, bad string) {

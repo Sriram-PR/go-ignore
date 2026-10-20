@@ -104,9 +104,10 @@ func isDoubleStar(s segment) bool { return s.doubleStar }
 
 // matchSegments matches pattern against all of path. ** matches any run of
 // segments, except that a trailing ** needs at least one (abc/** matches
-// abc/x, not abc, as in git), and a ** followed by \/ needs at least one too;
-// every other pattern segment matches exactly one. Like matchGlobLoop, on a mismatch it backs up only to the most recent
-// **, so the cost is at most O(len(pattern)·len(path)) segment comparisons.
+// abc/x, not abc, as in git), and so does a ** followed by \/; every other
+// pattern segment matches exactly one. Like matchGlobLoop, on a mismatch it
+// backs up only to the most recent **, so the cost is at most
+// O(len(pattern)·len(path)) segment comparisons.
 func matchSegments(pattern []segment, path []string) bool {
 	p, i := 0, 0
 	starP, starI := -1, 0
@@ -242,7 +243,8 @@ func matchGlobToken(pattern string, p int, ch byte) (next int, ok bool) {
 		if matched, newPos, valid := matchCharClass(pattern, p, ch); valid {
 			return newPos, matched
 		}
-		// An unclosed [ is a literal.
+		// An unclosed [ is a literal. Parsing rejects such patterns, as git
+		// never matches them, so only direct callers get here.
 	case '\\':
 		if p+1 < len(pattern) {
 			p++
@@ -258,7 +260,8 @@ func matchGlobToken(pattern string, p int, ch byte) (next int, ok bool) {
 //   - newPos: position after the closing ']'
 //   - valid: whether the class was well-formed (has closing ']')
 //
-// If valid is false, the caller should treat '[' as a literal character.
+// If valid is false, the caller treats '[' as a literal character. Parsed
+// rules never hold an unclosed class (see classEnd).
 func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int, valid bool) {
 	i := pos + 1
 	if i >= len(pattern) {
@@ -399,7 +402,8 @@ func matchCharClassPosix(pattern string, i int, ch byte) (matched bool, advance 
 		if pred != nil {
 			return pred(ch), 2 + end + 2 // skip past ":]"
 		}
-		// Invalid POSIX name: treat '[' as a literal member
+		// Unknown name: parsing rejects it (see classEnd), so only direct
+		// callers get here. Treat '[' as a literal member.
 		return ch == '[', 1
 	}
 	// No closing ":]" — treat '[' as literal member

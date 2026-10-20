@@ -47,7 +47,8 @@
 // case, character classes and escaped letters included. git (core.ignorecase)
 // leaves class members and escaped letters as written, so in git [A]x matches
 // neither Ax nor ax and \Fo* matches nothing; its ranges and [:upper:] also
-// accept extra letters in that mode. Both fold ASCII letters only.
+// accept extra letters in that mode. go-ignore and git both fold ASCII
+// letters only.
 //
 // Rules from a nested .gitignore are scoped by the spelling of the path.
 // With CaseInsensitive, rules added for Sub apply to SUB/x, as on a

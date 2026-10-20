@@ -4,6 +4,27 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.6.0
+
+Pattern parsing and case folding now match git for every known divergence but two, which are documented in the package docs under "Differences from git". No exported API changes.
+
+**Behavior changes**
+
+- **`CaseInsensitive` folds ASCII letters only,** as git does. `É` no longer matches `é`, the Kelvin sign no longer matches `k`, and bytes that aren't valid UTF-8 are compared as they are, so `a?` now matches `A\xff`.
+- **A pattern with an empty segment never matches.** `a//b`, `//a` and `build//` used to work like `a/b`, `/a` and `build/`. git never matches them, so they are now skipped with a warning.
+- **A pattern with an unclosed `[` never matches.** `x[` and `[a-` used to match the names `x[` and `[a-`. They are skipped with a warning, and so is a pattern naming an unknown class, like `[[:foo:]]`.
+
+**Fixed**
+
+- A segment of three or more stars (`***/b`, `a/****/b`) works like `**`.
+- `\/` separates path segments, so `a\/b` matches `a/b`. `**\/b` needs at least one directory before `b`, as in git.
+- A `/` inside a bracket expression no longer splits the pattern: `[a/b]x` matches `ax` and `bx`.
+- A reversed range keeps its first character: `[z-a]x` matches `zx`.
+
+**Performance**
+
+- Case-insensitive matching is about 10% faster. A chain of `**` such as `a/**/b/**/c/**/d` matches up to 8% slower; typical rule sets are unchanged.
+
 ### v1.5.1
 
 `Tree` stops at a symlinked directory instead of reading `.gitignore` files through it, as git refuses such paths, and `Check` lstats a path only when its answer needs it. No exported API changes; `Match` and the walker are unchanged.

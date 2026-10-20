@@ -1242,3 +1242,62 @@ func TestMatch_DotSegments(t *testing.T) {
 		}
 	}
 }
+
+func TestASCIILower(t *testing.T) {
+	for in, want := range map[string]string{
+		"":          "",
+		"abc":       "abc",
+		"ABC":       "abc",
+		"aBc/É\xff": "abc/É\xff",
+		"Ǆ":         "Ǆ",
+	} {
+		if got := asciiLower(in); got != want {
+			t.Errorf("asciiLower(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if n := testing.AllocsPerRun(100, func() { _ = asciiLower("already/lower/é") }); n != 0 {
+		t.Errorf("asciiLower allocated %v times with nothing to fold", n)
+	}
+}
+
+// git folds ASCII letters only (sane-ctype.h), and compares other bytes,
+// valid UTF-8 or not, as they are.
+func TestCaseInsensitive_ASCIIOnly(t *testing.T) {
+	tests := []struct {
+		pattern, path string
+		want          bool
+	}{
+		{"FOO", "foo", true},
+		{"foo", "FOO", true},
+		{"É", "é", false},
+		{"é", "É", false},
+		{"K", "K", false}, // Kelvin sign
+		{"K", "k", false},
+		{"ǅ", "ǆ", false},
+		{"a\xff", "a\xfe", false},
+		{"a\xff", "A\xff", true},
+		{"a?", "A\xff", true},
+	}
+	for _, tt := range tests {
+		m := NewWithOptions(MatcherOptions{CaseInsensitive: true})
+		m.AddPatterns("", []byte(tt.pattern+"\n"))
+		if got := m.Match(tt.path, false); got != tt.want {
+			t.Errorf("pattern %q, Match(%q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
+		}
+	}
+}
+
+func TestCaseInsensitive_ASCIIOnlyBasePath(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{CaseInsensitive: true})
+	m.AddPatterns("Dir", []byte("x\n"))
+	m.AddPatterns("É", []byte("y\n"))
+	if !m.Match("dir/x", false) {
+		t.Error("Match(dir/x) = false, want true")
+	}
+	if !m.Match("É/y", false) {
+		t.Error("Match(É/y) = false, want true")
+	}
+	if m.Match("é/y", false) {
+		t.Error("Match(é/y) = true, want false")
+	}
+}

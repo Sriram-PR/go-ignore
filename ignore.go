@@ -238,16 +238,16 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	newRules, parseWarnings, truncated := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), maxRules, source)
 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
-	// This avoids calling strings.ToLower on every match call.
+	// This avoids lowering on every match call. git folds ASCII only.
 	if m.opts.CaseInsensitive {
 		for i := range newRules {
 			// Only the scoping key is lowered; basePath keeps the caller's
 			// spelling for MatchResult.BasePath.
-			newRules[i].basePathSlash = strings.ToLower(newRules[i].basePathSlash)
+			newRules[i].basePathSlash = asciiLower(newRules[i].basePathSlash)
 			for j := range newRules[i].segments {
 				seg := &newRules[i].segments[j]
 				if !seg.doubleStar {
-					seg.value = strings.ToLower(seg.value)
+					seg.value = asciiLower(seg.value)
 				}
 			}
 		}
@@ -475,7 +475,7 @@ func preparePath(path string, icase bool, buf []string) (disk, match string, seg
 	}
 	disk, match = path, path
 	if icase {
-		if lowered := strings.ToLower(path); lowered != path {
+		if lowered := asciiLower(path); lowered != path {
 			match = lowered
 			segs = splitPathBuf(match, buf[:0])
 		}
@@ -506,4 +506,28 @@ func (m *Matcher) RuleCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.rules)
+}
+
+// asciiLower lowers A-Z only, as git's case folding does. Other bytes,
+// including invalid UTF-8, are kept, so they stay distinct and ? still
+// matches one byte.
+func asciiLower(s string) string {
+	i := 0
+	for i < len(s) && (s[i] < 'A' || s[i] > 'Z') {
+		i++
+	}
+	if i == len(s) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	b.WriteString(s[:i])
+	for ; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }

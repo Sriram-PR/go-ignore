@@ -36,7 +36,6 @@ match-icase files={".gitignore":"/[--a]\n"} path="b" dir=false git=true lib=fals
 match-icase files={".gitignore":"/[--a]\n"} path="x" dir=true git=true lib=false
 match-icase files={".gitignore":"/[--a]\n"} path="x/-" dir=true git=true lib=false
 match-icase files={".gitignore":"/[--a]\n"} path="x/-/#a" dir=false git=true lib=false
-match-icase files={".gitignore":"K\n"} path="K" dir=false git=false lib=true
 match-icase files={".gitignore":"[!A]x\n"} path="Ax" dir=false git=true lib=false
 match-icase files={".gitignore":"[!A]x\n"} path="ax" dir=false git=true lib=false
 match-icase files={".gitignore":"[[:upper:]]\n"} path=".x/b" dir=false git=true lib=false
@@ -47,18 +46,7 @@ match-icase files={".gitignore":"[[:upper:]]x\n"} path="Ax" dir=false git=true l
 match-icase files={".gitignore":"[[:upper:]]x\n"} path="ax" dir=false git=true lib=false
 match-icase files={".gitignore":"\\Fo*\n"} path="FOO" dir=false git=false lib=true
 match-icase files={".gitignore":"\\Fo*\n"} path="foo" dir=false git=false lib=true
-match-icase files={".gitignore":"\xff\n"} path="\xfe" dir=false git=false lib=true
-match-icase files={".gitignore":"a?\n"} path="A\xff" dir=false git=true lib=false
-match-icase files={".gitignore":"a?\n"} path="a\xff" dir=false git=true lib=false
-match-icase files={".gitignore":"a\xff\n"} path="A\xfe" dir=false git=false lib=true
-match-icase files={".gitignore":"a\xff\n"} path="a\xfe" dir=false git=false lib=true
 match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="x" dir=true git=true lib=false
-match-icase files={".gitignore":"k\n"} path="K" dir=false git=false lib=true
-match-icase files={".gitignore":"É\n"} path="é" dir=false git=false lib=true
-match-icase files={".gitignore":"é\n"} path="É" dir=false git=false lib=true
-match-icase files={".gitignore":"İ\n"} path="i" dir=false git=false lib=true
-match-icase files={".gitignore":"ǅ\n"} path="Ǆ" dir=false git=false lib=true
-match-icase files={".gitignore":"ǅ\n"} path="ǆ" dir=false git=false lib=true
 walk files={".gitignore":"***/b\n"} path="a/x/b/c" dir=false git=false lib=true
 walk files={".gitignore":"***/b\n"} path="b" dir=false git=false lib=true
 walk files={".gitignore":"**\\/a\n"} path="foo/a/x" dir=false git=false lib=true

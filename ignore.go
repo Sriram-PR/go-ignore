@@ -90,7 +90,8 @@ type MatcherOptions struct {
 	// ignored.
 	MaxBacktrackIterations int
 
-	// CaseInsensitive enables case-insensitive matching.
+	// CaseInsensitive enables case-insensitive matching. Only ASCII letters
+	// are folded, as in git.
 	// Default: false (case-sensitive, matching Git's default behavior).
 	// Note: This affects pattern matching only, not filesystem behavior.
 	CaseInsensitive bool

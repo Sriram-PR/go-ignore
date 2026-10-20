@@ -41,6 +41,19 @@
 // normalized (slashes, leading "./", trailing "/", and "."/".." resolved so a
 // path cannot bypass a scoped rule); patterns keep their original escapes.
 //
+// # Differences from git
+//
+// With MatcherOptions.CaseInsensitive, the whole pattern is folded to lower
+// case, character classes and escaped letters included. git (core.ignorecase)
+// leaves class members and escaped letters as written, so in git [A]x matches
+// neither Ax nor ax and \Fo* matches nothing; its ranges and [:upper:] also
+// accept extra letters in that mode. Both fold ASCII letters only.
+//
+// Rules from a nested .gitignore are scoped by the spelling of the path.
+// With CaseInsensitive, rules added for Sub apply to SUB/x, as on a
+// case-insensitive filesystem; git on a case-sensitive one would not read
+// SUB/.gitignore at all.
+//
 // # Thread safety
 //
 // A Matcher is safe for concurrent use: many goroutines may call Match while

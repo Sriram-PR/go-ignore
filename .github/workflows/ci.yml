@@ -161,13 +161,14 @@ jobs:
           GOIGNORE_PARITY_SEEDS: ${{ github.run_id }}
         run: go test -run '^TestParity$' -count=1 -v .
 
-  # Long-form fuzz: 30 minutes per fuzzer, ~4.5 hours total. Runs only when
+  # Long-form fuzz: 30 minutes per fuzzer. Runs only when
   # explicitly dispatched (never on push/PR) — burns hours of CI compute and
   # is intended for pre-release verification of stable tags.
   fuzz-long:
     name: Fuzz Tests (long)
     if: ${{ github.event_name == 'workflow_dispatch' && contains(fromJson('["fuzz-long"]'), github.event.inputs.job) }}
     runs-on: ubuntu-latest
+    # 30m per fuzzer plus build time; raise it when adding fuzzers.
     timeout-minutes: 330
     steps:
       - name: Checkout code

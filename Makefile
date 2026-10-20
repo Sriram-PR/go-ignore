@@ -21,9 +21,8 @@ test-cover:
 bench:
 	go test -bench=. -benchmem -run=^$$ ./...
 
-# Run every Fuzz* function in the package for FUZZTIME each (default 30s,
-# about 4.5 min for 9). All of them run even if one fails; the target fails
-# at the end. A failing input is written to testdata/fuzz/<Name>/.
+# Run every Fuzz* function in the package for FUZZTIME each (default 30s).
+# All of them run even if one fails; the target fails at the end. A failing input is written to testdata/fuzz/<Name>/.
 FUZZTIME ?= 30s
 
 fuzz:
@@ -33,7 +32,7 @@ fuzz:
 		go test -run '^$$' -fuzz="^$$f\$$" -fuzztime=$(FUZZTIME) . || rc=1; \
 	done; exit $$rc
 
-# Long-form fuzz (30m each, about 4.5 hours for 9), for pre-release
+# Long-form fuzz (30m each), for pre-release
 # verification of vX.Y.0 tags.
 fuzz-long:
 	$(MAKE) fuzz FUZZTIME=30m
@@ -82,12 +81,12 @@ help:
 	@echo "  test       - Run all tests"
 	@echo "  test-race  - Run tests with race detector"
 	@echo "  test-cover - Run tests with coverage report"
-	@echo "  test-git   - Run git parity tests"
+	@echo "  test-git   - Run hand-written git parity cases (TestGitParity_*)"
 	@echo "  parity     - Run git parity harness vs baseline"
 	@echo "  parity-update - Regenerate the parity baseline"
 	@echo "  bench      - Run benchmarks"
-	@echo "  fuzz       - Run fuzz tests (30s each, smoke)"
-	@echo "  fuzz-long  - Run fuzz tests (30m each, pre-release)"
+	@echo "  fuzz       - Run every fuzzer (FUZZTIME each, default 30s)"
+	@echo "  fuzz-long  - Run every fuzzer (30m each, pre-release)"
 	@echo "  lint       - Run golangci-lint"
 	@echo "  fmt        - Format code"
 	@echo "  vet        - Run go vet"

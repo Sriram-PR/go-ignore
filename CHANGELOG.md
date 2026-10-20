@@ -393,8 +393,8 @@ Use this checklist before tagging a new release.
 #### Test Coverage
 
 - [ ] Edge case tests pass: `go test -run TestEdgeCases`
-- [ ] Git parity tests pass: `go test -run TestGitParity`
-- [ ] Standard fuzz smoke pass: `make fuzz` (every `Fuzz*` function, 30s each, about 4.5 min for 9)
+- [ ] Git parity tests pass: `go test -run TestGitParity` and `make parity`
+- [ ] Standard fuzz smoke pass: `make fuzz` (every `Fuzz*` function, 30s each)
 
 #### Documentation
 
@@ -408,7 +408,7 @@ Use this checklist before tagging a new release.
 
 #### Extended Fuzz
 
-- [ ] Long-form fuzz pass clean: `make fuzz-long` (every `Fuzz*` function, 30 min each, about 4.5 hours for 9) **or** trigger the GitHub Actions `fuzz-long` job via workflow_dispatch
+- [ ] Long-form fuzz pass clean: `make fuzz-long` (every `Fuzz*` function, 30 min each) **or** trigger the GitHub Actions `fuzz-long` job via workflow_dispatch
 - [ ] No new crash inputs persisted to `testdata/fuzz/` (or, if any, fix them and patch the failing scenario before tagging)
 
 #### Benchmarks

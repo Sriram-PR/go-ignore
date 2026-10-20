@@ -384,10 +384,17 @@ func TestMatchGlob_CharClass(t *testing.T) {
 		{"[a-\\z]", "a", true},
 		{"[a-\\z]", "z", true},
 
-		// Invalid range (reversed) — matches nothing
+		// Reversed range: git compares the start as a plain member before it
+		// sees the '-' (wildmatch.c), so only the start matches.
 		{"[z-a]", "m", false},
 		{"[z-a]", "a", false},
-		{"[z-a]", "z", false},
+		{"[z-a]", "z", true},
+		{"[b-a]x", "bx", true},
+		{"[b-a]x", "ax", false},
+		{"[a-\\]]x", "ax", true},
+		{"[a-\\]]x", "]x", false},
+		{"[a-\\]]x", "bx", false},
+		{"[\\z-a]x", "zx", true},
 
 		// Wildcards inside class are literal
 		{"[*?]", "*", true},

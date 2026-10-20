@@ -348,11 +348,14 @@ func matchCharClassPosix(pattern string, i int, ch byte) (matched bool, advance 
 func matchCharClassRange(pattern string, i int, lo byte, ch byte) (matched bool, advance int) {
 	if i+2 < len(pattern) && pattern[i+1] == '-' && pattern[i+2] != ']' {
 		hi := pattern[i+2]
+		advance = 3
 		if hi == '\\' && i+3 < len(pattern) {
 			hi = pattern[i+3]
-			return lo <= hi && ch >= lo && ch <= hi, 4
+			advance = 4
 		}
-		return lo <= hi && ch >= lo && ch <= hi, 3
+		// git matches the start as a plain member, so a reversed range
+		// still matches it.
+		return ch == lo || (lo <= hi && ch >= lo && ch <= hi), advance
 	}
 	return ch == lo, 1
 }

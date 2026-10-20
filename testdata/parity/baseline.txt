@@ -14,10 +14,7 @@ match files={".gitignore":"**\\/a\n"} path="z/a/x" dir=true git=true lib=false
 match files={".gitignore":"**\\/a\n"} path="z/a/x/y" dir=true git=true lib=false
 match files={".gitignore":"//a\n"} path="a" dir=false git=false lib=true
 match files={".gitignore":"[[:alpha:]x\n"} path="[:x" dir=false git=false lib=true
-match files={".gitignore":"[a-\\]]x\n"} path="ax" dir=true git=true lib=false
-match files={".gitignore":"[b-a]x\n"} path="bx" dir=false git=true lib=false
 match files={".gitignore":"[x\n"} path="[x" dir=false git=false lib=true
-match files={".gitignore":"[z-a]x\n"} path="zx" dir=false git=true lib=false
 match files={".gitignore":"a/****/b\n"} path="a/b" dir=true git=true lib=false
 match files={".gitignore":"a/****/b\n"} path="a/b/c" dir=true git=true lib=false
 match files={".gitignore":"a/****/b\n"} path="a/b/c/d" dir=false git=true lib=false
@@ -52,9 +49,7 @@ walk files={".gitignore":"***/b\n"} path="b" dir=false git=false lib=true
 walk files={".gitignore":"**\\/a\n"} path="foo/a/x" dir=false git=false lib=true
 walk files={".gitignore":"//a\n"} path="a" dir=false git=true lib=false
 walk files={".gitignore":"[[:alpha:]x\n"} path="[:x" dir=false git=true lib=false
-walk files={".gitignore":"[b-a]x\n"} path="bx" dir=false git=false lib=true
 walk files={".gitignore":"[x\n"} path="[x" dir=false git=true lib=false
-walk files={".gitignore":"[z-a]x\n"} path="zx" dir=false git=false lib=true
 walk files={".gitignore":"a/****/b\n"} path="a/b/c/d" dir=false git=false lib=true
 walk files={".gitignore":"a/***/b\n"} path="a/b/c/d" dir=false git=false lib=true
 walk files={".gitignore":"a///b\n"} path="a/b" dir=false git=true lib=false

@@ -388,18 +388,19 @@ Use this checklist before tagging a new release.
 - [ ] `make ci` passes — equivalent to `fmt + vet + test + test-race + lint`
 - [ ] No new diagnostics from `golangci-lint run --timeout=300s`
 - [ ] Coverage has not regressed: `go test -cover ./...`
+- [ ] API check: `go run golang.org/x/exp/cmd/gorelease@v0.0.0-20261014143641-f0251eb4aa3e -version=vX.Y.Z` passes. At v1 it fails on any incompatible change. It treats deprecated identifiers as ordinary exports, so `MaxBacktrackIterations`, `DefaultMaxBacktrackIterations` and `HardMaxBacktrackIterations` must stay. `x/exp` has no tags: when the pin stops building, move it to the current pseudo-version (`https://proxy.golang.org/golang.org/x/exp/@latest`).
 
 #### Test Coverage
 
 - [ ] Edge case tests pass: `go test -run TestEdgeCases`
 - [ ] Git parity tests pass: `go test -run TestGitParity`
-- [ ] Standard fuzz smoke pass: `make fuzz` (30s per fuzzer, 4 min total)
+- [ ] Standard fuzz smoke pass: `make fuzz` (every `Fuzz*` function, 30s each, about 4.5 min for 9)
 
 #### Documentation
 
 - [ ] README examples and key entry points match the current API; the full reference is godoc — spot-check `go doc -all` output against the README
 - [ ] The Version History above has an entry for the new version, above the previous one
-- [ ] CONTRIBUTING.md fuzz list and lint commands are current
+- [ ] CONTRIBUTING.md lint version and commands are current
 - [ ] All exported functions/methods/types/constants/fields have GoDoc comments
 - [ ] No `TODO`/`FIXME`/`XXX` in production code (test fixtures may contain `XXX` as data)
 
@@ -407,7 +408,7 @@ Use this checklist before tagging a new release.
 
 #### Extended Fuzz
 
-- [ ] Long-form fuzz pass clean: `make fuzz-long` (30 min per fuzzer, ~4 hours total) **or** trigger the GitHub Actions `fuzz-long` job via workflow_dispatch
+- [ ] Long-form fuzz pass clean: `make fuzz-long` (every `Fuzz*` function, 30 min each, about 4.5 hours for 9) **or** trigger the GitHub Actions `fuzz-long` job via workflow_dispatch
 - [ ] No new crash inputs persisted to `testdata/fuzz/` (or, if any, fix them and patch the failing scenario before tagging)
 
 #### Benchmarks
@@ -419,6 +420,14 @@ Use this checklist before tagging a new release.
 
 - [ ] No breaking changes to the API surface listed in README's "Stability Guarantees" section (skip for v0.x where breaking changes are allowed)
 - [ ] If `MaxPathDepth` changed, ensure it was *raised*, never lowered
+
+#### Tooling
+
+- [ ] golangci-lint is bumped by hand: `version:` in ci.yml's lint job and the local binary together, and the CONTRIBUTING.md minimum to match. Dependabot updates the action SHAs but not that input.
+
+### Go version policy
+
+CI tests the two Go releases the Go team supports. When a new Go release ships, the matrix moves to the two newest, and go.mod's `go` line rises to the older of them, in a minor release with a Version History note. The lint job's `go-version` moves with the matrix's newest once golangci-lint supports it. Next: Go 1.28 (expected about February 2027) gives matrix `1.27` + `1.28` and `go 1.27`.
 
 ### Release Process
 

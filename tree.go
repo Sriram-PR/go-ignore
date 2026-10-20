@@ -45,6 +45,9 @@ type dirRules struct {
 	rules []rule
 	chain int // rule count of the snapshot, the ancestors' files and this one
 	err   error
+	// outside: lstat says the directory is a symlink or another
+	// non-directory, so nothing at or past it is read.
+	outside bool
 }
 
 // Tree returns a Tree for the work tree at root on the OS filesystem. Paths
@@ -104,16 +107,11 @@ func (m *Matcher) newTree(root string, src patternSource, join func(...string) s
 // CheckIsDir does. Whether path is a directory is decided as git does: a
 // trailing slash (or backslash on Windows) means a directory; otherwise path
 // is a directory only if lstat says so, so a symlink to a directory, a path
-// that does not exist, and one that can't be stat'ed count as files.
+// that does not exist, one that can't be stat'ed, and one past a symlinked
+// directory count as files. lstat runs only when the answer needs it.
 func (t *Tree) Check(path string) (MatchResult, error) {
 	isDir := strings.HasSuffix(path, "/") || runtime.GOOS == "windows" && strings.HasSuffix(path, `\`)
-	if !isDir {
-		if p := normalizePath(path); p != "" {
-			fi, err := t.lstat(t.join(t.root, p))
-			isDir = err == nil && fi.IsDir()
-		}
-	}
-	return t.CheckIsDir(path, isDir)
+	return t.check(path, isDir, !isDir)
 }
 
 // CheckIsDir reports whether path, relative to the Tree's root, is ignored,
@@ -126,11 +124,20 @@ func (t *Tree) Check(path string) (MatchResult, error) {
 // As in git, a path inside an ignored directory is ignored, and the result
 // names the rule that ignored the outermost such directory.
 //
+// A parent that is a symlink (or lstat says is not a directory) ends the
+// work tree, as in git, which refuses such paths: no .gitignore at or past
+// it is read, and the rules from above still apply.
+//
 // A .gitignore on the way to path that can't be read does not stop the
 // check: the result is git's answer without that file, and the error,
 // wrapping ErrPatternFileSkipped or the read error, comes with it on every
 // check that consults that directory. Several are combined with errors.Join.
 func (t *Tree) CheckIsDir(path string, isDir bool) (MatchResult, error) {
+	return t.check(path, isDir, false)
+}
+
+// check is CheckIsDir, with isDir taken from lstat instead when stat is set.
+func (t *Tree) check(path string, isDir, stat bool) (MatchResult, error) {
 	var segBuf [32]string
 	disk, match, segs, ok := preparePath(path, t.opts.CaseInsensitive, segBuf[:0])
 	if !ok {
@@ -153,19 +160,27 @@ func (t *Tree) CheckIsDir(path string, isDir bool) (MatchResult, error) {
 		diskStart, matchStart = 1, 1
 	}
 	di, mi := diskStart, matchStart
+	outside := false
 	for k := 1; k < len(segs); k++ {
 		di += strings.IndexByte(disk[di:], '/')
 		mi += strings.IndexByte(match[mi:], '/')
 		if res := evaluateGroups(groups, match[matchStart:mi], segs[:k], true); res.Matched && res.Ignored {
 			return res, errors.Join(errs...)
 		}
-		d = t.load(disk[diskStart:di], d.chain)
-		groups = append(groups, d.rules)
-		if d.err != nil {
-			errs = append(errs, d.err)
+		if !outside {
+			d = t.load(disk[diskStart:di], d.chain)
+			outside = d.outside
+			groups = append(groups, d.rules)
+			if d.err != nil {
+				errs = append(errs, d.err)
+			}
 		}
 		di++
 		mi++
+	}
+	if stat && !outside {
+		fi, err := t.lstat(t.join(t.root, disk))
+		isDir = err == nil && fi.IsDir()
 	}
 	return evaluateGroups(groups, match, segs, isDir), errors.Join(errs...)
 }
@@ -212,6 +227,14 @@ func (t *Tree) load(dir string, chain int) *dirRules {
 // handler wants them.
 func (t *Tree) read(d *dirRules, dir string, chain int) []ParseWarning {
 	d.chain = chain
+	if dir != "" {
+		// The OS would follow a symlinked dir to its target's .gitignore,
+		// which may be outside the work tree.
+		if fi, err := t.lstat(t.join(t.root, dir)); err == nil && !fi.IsDir() {
+			d.outside = true
+			return nil
+		}
+	}
 	name := t.join(t.root, dir, ".gitignore")
 	content, err := readPatternFile(t.src, name, false, maxPatternFileSize)
 	if err != nil {

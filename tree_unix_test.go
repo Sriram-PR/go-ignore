@@ -41,3 +41,20 @@ func TestTree_OSUnreadableGitignore(t *testing.T) {
 		t.Errorf("src/x.tmp: %+v, want not ignored (its .gitignore is unreadable)", res)
 	}
 }
+
+// A symlinked directory pointing outside the work tree is not read through.
+func TestTree_OSSymlinkedDirNotFollowed(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "repo")
+	writeTree(t, base, map[string]string{"repo/.gitignore": "secret\n", "outside/.gitignore": "*.log\n"})
+	if err := os.Symlink(filepath.Join("..", "outside"), filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	tr := New().Tree(root)
+	if res := mustCheck(t, tr, "link/a.log"); res.Ignored {
+		t.Errorf("link/a.log: %+v, want not ignored (outside/.gitignore read through link)", res)
+	}
+	if !mustCheck(t, tr, "link/secret").Ignored {
+		t.Error("link/secret not ignored by the root .gitignore")
+	}
+}

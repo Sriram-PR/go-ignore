@@ -4,6 +4,16 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### Unreleased
+
+**Fixed**
+
+- **`Tree` no longer reads a `.gitignore` through a symlinked directory.** `Check("link/a.log")`, where `link` is a symlink to a directory, read `link/.gitignore` from the link's target, which can be outside the work tree, and lstat'ed through the link to decide whether the path was a directory. git refuses such paths. Now a parent that is a symlink (or isn't a directory) ends the work tree: no `.gitignore` at or past it is read, a path past it counts as a file in `Check`, and the rules from above still apply.
+
+**Performance**
+
+- **`Check` lstats the path only when the answer needs it,** not when an ignored parent already decided. The first check through each directory costs one more lstat, to spot symlinks; checks after that are unchanged.
+
 ### v1.5.0
 
 Single-path checks with nested `.gitignore` files. A `Tree` from `OpenTree`, `Matcher.Tree` or `Matcher.TreeFS` checks one path at a time against every `.gitignore` from the root down to it, the way `git check-ignore -v` does, and reads each file once per `Tree`. Also fixes `.` path segments, which were matched as names. Only additions to the exported API; `Match` and the walker are unchanged.

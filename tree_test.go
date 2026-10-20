@@ -132,6 +132,67 @@ func TestTree_CheckDecidesIsDir(t *testing.T) {
 	}
 }
 
+// A directory reached through a symlink is the end of the work tree, as in
+// git: no .gitignore at or past it is read, and a path past it is a file.
+// Rules from above still apply.
+func TestTree_SymlinkedDirNotFollowed(t *testing.T) {
+	fsys := newCountingFS(fstest.MapFS{
+		".gitignore":             file("secret\n"),
+		"outside/.gitignore":     file("*.log\nsub/\n"),
+		"outside/sub/.gitignore": file("*\n"),
+		"outside/sub/x":          file(""),
+		"link":                   &fstest.MapFile{Data: []byte("outside"), Mode: fs.ModeSymlink},
+	})
+	tr := New().TreeFS(fsys, ".")
+	for _, tc := range []struct {
+		path string
+		want bool
+	}{
+		{"link/a.log", false},
+		{"link/sub", false},
+		{"link/sub/x", false},
+		{"link/secret", true},
+		{"outside/a.log", true},
+	} {
+		if got := mustCheck(t, tr, tc.path).Ignored; got != tc.want {
+			t.Errorf("Check(%q).Ignored = %v, want %v", tc.path, got, tc.want)
+		}
+	}
+	if res, _ := tr.CheckIsDir("link/sub", true); res.Ignored {
+		t.Errorf("CheckIsDir(link/sub, true): %+v, want no .gitignore read through link", res)
+	}
+	for _, name := range []string{"link/.gitignore", "link/sub/.gitignore"} {
+		if n := fsys.count(name); n != 0 {
+			t.Errorf("%s opened %d times, want 0 (through a symlink)", name, n)
+		}
+	}
+}
+
+// Check lstats the path only when its answer needs it: not when an ignored
+// parent decides, and never through a symlinked directory.
+func TestTree_CheckLstatsOnlyWhenNeeded(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore": file("a/\n"),
+		"a/b":        dirEntry,
+		"real/c":     dirEntry,
+		"link":       &fstest.MapFile{Data: []byte("real"), Mode: fs.ModeSymlink},
+	}
+	tr := New().TreeFS(fsys, ".")
+	var stats []string
+	lstat := tr.lstat
+	tr.lstat = func(name string) (fs.FileInfo, error) {
+		stats = append(stats, name)
+		return lstat(name)
+	}
+	mustCheck(t, tr, "a/b")
+	mustCheck(t, tr, "link/c")
+	for _, name := range stats {
+		if name == "a/b" || name == "link/c" {
+			t.Errorf("lstat(%q) called; want it skipped", name)
+		}
+	}
+}
+
 // A .gitignore that can't be read gives git's answer without it, plus an
 // error, on every check that consults its directory.
 func TestTree_UnreadableGitignore(t *testing.T) {

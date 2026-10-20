@@ -1,0 +1,11 @@
+name: Question
+description: Ask how to use go-ignore or why it behaves the way it does
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Include the patterns, paths and code involved, if any.
+    validations:
+      required: true

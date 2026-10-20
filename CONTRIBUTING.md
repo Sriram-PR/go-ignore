@@ -163,6 +163,6 @@ Before requesting features, consider:
 
 ## Questions?
 
-Open an issue with the "question" label.
+Open an issue with the Question form.
 
 Thank you for contributing!

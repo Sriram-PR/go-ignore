@@ -4,7 +4,9 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
-### Unreleased
+### v1.5.1
+
+`Tree` stops at a symlinked directory instead of reading `.gitignore` files through it, as git refuses such paths, and `Check` lstats a path only when its answer needs it. No exported API changes; `Match` and the walker are unchanged.
 
 **Fixed**
 

@@ -173,11 +173,17 @@ func FuzzSegments(f *testing.F) {
 		{"**", "x"},
 		{"*/b", "a/b"},
 		{"a/*a*a*b/c", "a/aaab/c"},
+		{"***/b", "a/x/b"},
+		{"a/****/b", "a/b"},
+		{"a//b", "a/b"},
 	} {
 		f.Add(s[0], s[1])
 	}
 	f.Fuzz(func(t *testing.T, pattern, path string) {
-		segs := parseSegments(pattern)
+		segs, bad := parseSegments(pattern)
+		if bad != "" {
+			return
+		}
 		pathSegs := splitPath(path)
 		for _, floating := range []bool{false, true} {
 			// The parser only makes a pattern floating when it has one

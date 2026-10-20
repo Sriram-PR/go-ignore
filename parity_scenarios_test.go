@@ -125,6 +125,20 @@ func curatedCases() []curatedCase {
 	for _, p := range []string{"\\*", "\\?", "\\[a]", "\\a", "a\\b", "a\\\\b", "\\\\", "\\\\\\*", "*\\", "*\\*", "\\*\\*", "a\\/b", "a\\/", "\\/a", "a/\\/b", "\\", "\\\\\\", "\\a*", "*\\a", "x\\*y", "\\ ", "\\\t"} {
 		add(R(p+"\n", "*", "?", "[a]", "a", "ab", "a\\b", "\\", "\\\\", "\\*", "a/b", "a/", "/a", "x*y", "xay", "a*", "a?", " ", "\t", "aa"))
 	}
+	// patterns git never matches, and classes holding '/'
+	add(R("x[\n", "x[", "x"))
+	add(R("[a-\n", "[a-", "a"))
+	add(R("[[:foo:]]x\n", "f]x", "[]x", "o]x", "x"))
+	add(R("[[::]]x\n", "[]x", ":]x", "x"))
+	add(R("[a/b]x\n", "ax", "bx", "cx", "a/x"))
+	add(R("[!/]x\n", "ax", "bx", "x"))
+	add(R("[/]x\n", "[/]x", "x"))
+	add(R("[a/]\n", "a/", "a/x", "b"))
+	add(R("a//\n", "a/", "a/b"))
+	// star runs
+	add(R("***\n", "a", "a/b"))
+	add(R("a/***\n", "a/", "a/x", "a/x/y"))
+	add(R("x/***/y\n", "x/", "x/y", "x/a/", "x/a/y", "x/a/b/y"))
 	// star matching
 	for _, p := range []string{"a*b", "a*b*c", "*a*", "a*", "*a", "**", "a?b", "*?", "?*", "a*?b", "*.", ".*", "*.*", "a**b", "a***b", "*/*", "*/**", "**/*", "a/*/b"} {
 		add(R(p+"\n", "ab", "axb", "axbxc", "a", "b", ".", ".x", "a.", "x.y", "a/b", "a/x/b", "a/", "a/x/", "a/x/y", "abc", "aab", "a.b", "..", "a/b/", "x/y"))

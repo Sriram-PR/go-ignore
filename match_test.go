@@ -1147,3 +1147,38 @@ func BenchmarkMatchSegments_DoubleStar(b *testing.B) {
 		matchSegments(pattern, path)
 	}
 }
+
+func TestClassEnd(t *testing.T) {
+	tests := []struct {
+		pattern string
+		end     int
+		problem string
+	}{
+		{"[abc]x", 5, ""},
+		{"[]a]x", 4, ""},
+		{"[!]a]x", 5, ""},
+		{"[]]", 3, ""},
+		{"[\\]]x", 4, ""},
+		{"[[:alpha:]]x", 11, ""},
+		{"[[:]]x", 4, ""},          // "[:]" is not a class name: '[' and ':' are members
+		{"[[:a]b:]]", 5, ""},       // first ']' after "[:" is not preceded by ':'
+		{"[a-[:alpha:]]x", 12, ""}, // '[' ends the range, so "[:" starts nothing
+		{"[[:alpha:]-z]x", 13, ""},
+		{"[a/b]x", 5, ""},
+		{"[", 0, problemUnclosedClass},
+		{"[]", 0, problemUnclosedClass},
+		{"[!]", 0, problemUnclosedClass},
+		{"[abc", 0, problemUnclosedClass},
+		{"[a\\", 0, problemUnclosedClass},
+		{"[[:alpha:]", 0, problemUnclosedClass},
+		{"[[:alpha", 0, problemUnclosedClass},
+		{"[[:foo:]]", 0, problemUnknownClass},
+		{"[[::]]", 0, problemUnknownClass},
+	}
+	for _, tt := range tests {
+		end, problem := classEnd(tt.pattern, 0)
+		if end != tt.end || problem != tt.problem {
+			t.Errorf("classEnd(%q) = %d, %q, want %d, %q", tt.pattern, end, problem, tt.end, tt.problem)
+		}
+	}
+}

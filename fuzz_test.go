@@ -336,7 +336,7 @@ func FuzzSegmentMatching(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, pattern, path string) {
 		// Parse pattern into segments
-		segments := parseSegments(pattern)
+		segments, _ := parseSegments(pattern)
 		pathSegs := splitPath(path)
 
 		// Should never panic
@@ -369,6 +369,28 @@ func FuzzConcurrentAccess(f *testing.F) {
 		// Wait for all goroutines
 		for i := 0; i < 10; i++ {
 			<-done
+		}
+	})
+}
+
+// FuzzClassEnd checks that the matcher and the tokenizer agree on where a
+// bracket expression ends, for every class the tokenizer accepts.
+func FuzzClassEnd(f *testing.F) {
+	for _, s := range []string{"[abc]", "[]a]", "[!]a]", "[a-[:alpha:]]", "[[:alpha:]-z]", "[\\]]", "[[:]a]", "[[:a]b:]]", "[a/b]", "[z-a]", "[]-a]", "[[:-a]"} {
+		f.Add(s, byte('a'))
+	}
+	f.Fuzz(func(t *testing.T, pattern string, ch byte) {
+		for pos := range len(pattern) {
+			if pattern[pos] != '[' {
+				continue
+			}
+			end, problem := classEnd(pattern, pos)
+			if problem != "" {
+				continue
+			}
+			if _, newPos, valid := matchCharClass(pattern, pos, ch); !valid || newPos != end {
+				t.Errorf("pattern %q at %d: matchCharClass valid=%v end=%d, classEnd end=%d", pattern, pos, valid, newPos, end)
+			}
 		}
 	})
 }

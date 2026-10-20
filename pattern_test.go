@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -534,7 +535,10 @@ func TestParseSegments(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseSegments(tt.pattern)
+			got, bad := parseSegments(tt.pattern)
+			if bad != "" {
+				t.Fatalf("parseSegments(%q) bad = %q", tt.pattern, bad)
+			}
 			if len(got) != len(tt.wantSegs) {
 				t.Fatalf("parseSegments(%q) = %d segments, want %d\ngot: %v",
 					tt.pattern, len(got), len(tt.wantSegs), segmentsString(got))
@@ -798,6 +802,77 @@ func TestRuleString(t *testing.T) {
 		got := tt.rule.String()
 		if got != tt.want {
 			t.Errorf("rule.String() = %q, want %q", got, tt.want)
+		}
+	}
+}
+
+func TestParseSegments_Tokenizer(t *testing.T) {
+	tests := []struct {
+		pattern string
+		want    []string // segment values; "**" marks a doubleStar segment
+		bad     string
+	}{
+		{"***", []string{"**"}, ""},
+		{"***/b", []string{"**", "b"}, ""},
+		{"a/****/b", []string{"a", "**", "b"}, ""},
+		{"a***/b", []string{"a***", "b"}, ""},
+		{"a/***b", []string{"a", "***b"}, ""},
+		{"[a/b]x", []string{"[a/b]x"}, ""},
+		{"x/[!/]y/z", []string{"x", "[!/]y", "z"}, ""},
+		{"[]/]x/y", []string{"[]/]x", "y"}, ""},
+		{"[[:]]x", []string{"[[:]]x"}, ""},
+		{"[a-[:alpha:]]x", []string{"[a-[:alpha:]]x"}, ""},
+		{"a\\/b", []string{"a\\/b"}, ""},
+		{"a//b", nil, problemEmptySegment},
+		{"/a", nil, problemEmptySegment},
+		{"a/", nil, problemEmptySegment},
+		{"x[", nil, problemUnclosedClass},
+		{"[a-", nil, problemUnclosedClass},
+		{"[[:alpha:]x", nil, problemUnclosedClass},
+		{"[\\", nil, problemUnclosedClass},
+		{"[[:foo:]]x", nil, problemUnknownClass},
+		{"[[::]]x", nil, problemUnknownClass},
+		{"a//[x", nil, problemEmptySegment},
+		{"[x/a//b", nil, problemUnclosedClass},
+	}
+	for _, tt := range tests {
+		segs, bad := parseSegments(tt.pattern)
+		if bad != tt.bad {
+			t.Errorf("parseSegments(%q) bad = %q, want %q", tt.pattern, bad, tt.bad)
+			continue
+		}
+		got := make([]string, 0, len(segs))
+		for _, s := range segs {
+			if s.doubleStar {
+				got = append(got, "**")
+			} else {
+				got = append(got, s.value)
+			}
+		}
+		if tt.want == nil {
+			tt.want = []string{}
+		}
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("parseSegments(%q) = %q, want %q", tt.pattern, got, tt.want)
+		}
+	}
+}
+
+func TestParseLine_NeverMatchingPatterns(t *testing.T) {
+	for pattern, msg := range map[string]string{
+		"a//b":      problemEmptySegment,
+		"//a":       problemEmptySegment,
+		"a//":       problemEmptySegment,
+		"x[":        problemUnclosedClass,
+		"!x[":       problemUnclosedClass,
+		"[[:foo:]]": problemUnknownClass,
+	} {
+		r, w := parseLine(pattern, 3, "", "")
+		if r != nil {
+			t.Errorf("parseLine(%q) returned a rule, want none", pattern)
+		}
+		if w == nil || w.Message != msg || w.Line != 3 || w.Pattern != pattern {
+			t.Errorf("parseLine(%q) warning = %+v, want message %q on line 3", pattern, w, msg)
 		}
 	}
 }

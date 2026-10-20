@@ -3,29 +3,11 @@
 # Fields: mode, the scenario's .gitignore files, the path, whether it is a
 # directory, and each side's verdict (ignored, or listed for walk).
 # Update this file in the same commit as the change that alters it.
-match files={".gitignore":"***/b\n"} path="a/x/b" dir=true git=true lib=false
-match files={".gitignore":"***/b\n"} path="a/x/b/c" dir=false git=true lib=false
-match files={".gitignore":"***/b\n"} path="a/x/y/b" dir=true git=true lib=false
-match files={".gitignore":"***/b\n"} path="b" dir=false git=true lib=false
 match files={".gitignore":"**\\/a\n"} path="foo/a" dir=true git=true lib=false
 match files={".gitignore":"**\\/a\n"} path="foo/a/x" dir=false git=true lib=false
 match files={".gitignore":"**\\/a\n"} path="z/a" dir=true git=true lib=false
 match files={".gitignore":"**\\/a\n"} path="z/a/x" dir=true git=true lib=false
 match files={".gitignore":"**\\/a\n"} path="z/a/x/y" dir=true git=true lib=false
-match files={".gitignore":"//a\n"} path="a" dir=false git=false lib=true
-match files={".gitignore":"[[:alpha:]x\n"} path="[:x" dir=false git=false lib=true
-match files={".gitignore":"[x\n"} path="[x" dir=false git=false lib=true
-match files={".gitignore":"a/****/b\n"} path="a/b" dir=true git=true lib=false
-match files={".gitignore":"a/****/b\n"} path="a/b/c" dir=true git=true lib=false
-match files={".gitignore":"a/****/b\n"} path="a/b/c/d" dir=false git=true lib=false
-match files={".gitignore":"a/****/b\n"} path="a/x/y/b" dir=true git=true lib=false
-match files={".gitignore":"a/***/b\n"} path="a/b" dir=true git=true lib=false
-match files={".gitignore":"a/***/b\n"} path="a/b/c" dir=true git=true lib=false
-match files={".gitignore":"a/***/b\n"} path="a/b/c/d" dir=false git=true lib=false
-match files={".gitignore":"a/***/b\n"} path="a/x/y/b" dir=true git=true lib=false
-match files={".gitignore":"a///b\n"} path="a/b" dir=false git=false lib=true
-match files={".gitignore":"a//\n"} path="a" dir=true git=false lib=true
-match files={".gitignore":"a//b\n"} path="a/b" dir=false git=false lib=true
 match files={".gitignore":"a\\/b\n"} path="a/b" dir=false git=true lib=false
 match-icase files={".gitignore":"!ab/a\\ \n[[:upper:]]\n??/a?/**\n/[]a]/[[:digit:]]/[^a]\n"} path="a" dir=true git=true lib=false
 match-icase files={".gitignore":"*.LOG\n" "Sub/.gitignore":"!x.log\n"} path="SUB/x.log" dir=false git=true lib=false
@@ -44,14 +26,5 @@ match-icase files={".gitignore":"[[:upper:]]x\n"} path="ax" dir=false git=true l
 match-icase files={".gitignore":"\\Fo*\n"} path="FOO" dir=false git=false lib=true
 match-icase files={".gitignore":"\\Fo*\n"} path="foo" dir=false git=false lib=true
 match-icase files={".gitignore":"b\r\n[--a]\r\na** \r\n![%--]/??/[a-c-e]/\r\n"} path="x" dir=true git=true lib=false
-walk files={".gitignore":"***/b\n"} path="a/x/b/c" dir=false git=false lib=true
-walk files={".gitignore":"***/b\n"} path="b" dir=false git=false lib=true
 walk files={".gitignore":"**\\/a\n"} path="foo/a/x" dir=false git=false lib=true
-walk files={".gitignore":"//a\n"} path="a" dir=false git=true lib=false
-walk files={".gitignore":"[[:alpha:]x\n"} path="[:x" dir=false git=true lib=false
-walk files={".gitignore":"[x\n"} path="[x" dir=false git=true lib=false
-walk files={".gitignore":"a/****/b\n"} path="a/b/c/d" dir=false git=false lib=true
-walk files={".gitignore":"a/***/b\n"} path="a/b/c/d" dir=false git=false lib=true
-walk files={".gitignore":"a///b\n"} path="a/b" dir=false git=true lib=false
-walk files={".gitignore":"a//b\n"} path="a/b" dir=false git=true lib=false
 walk files={".gitignore":"a\\/b\n"} path="a/b" dir=false git=false lib=true

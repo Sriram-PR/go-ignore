@@ -294,8 +294,9 @@ func TestEdgeCases_SpecialPatterns(t *testing.T) {
 		{"double star only", "**", "a/b/c", true, false},
 		{"triple star", "***", "file", true, false}, // treated as wildcard
 
-		// Consecutive slashes in pattern (normalized)
-		{"double slash pattern", "a//b", "a/b", true, false},
+		// git does not normalize consecutive slashes in a pattern, so it
+		// never matches.
+		{"double slash pattern", "a//b", "a/b", false, false},
 
 		// Pattern with dots
 		{"extension dots", "*.tar.gz", "archive.tar.gz", true, true},

@@ -325,6 +325,64 @@ func matchCharClass(pattern string, pos int, ch byte) (matched bool, newPos int,
 	return false, 0, false
 }
 
+// classEnd returns the index just past the bracket expression at
+// pattern[pos], which must be '['. It follows the class scan in git's
+// wildmatch.c, which does not stop at '/'. A non-empty problem is why git
+// never matches a pattern holding this class.
+func classEnd(pattern string, pos int) (end int, problem string) {
+	i := pos + 1
+	if i < len(pattern) && (pattern[i] == '!' || pattern[i] == '^') {
+		i++
+	}
+	// rangeStart is git's prev_ch: whether the last member can start a range.
+	// A range or a [:name:] can't.
+	rangeStart := false
+	for first := true; i < len(pattern); first = false {
+		c := pattern[i]
+		switch {
+		case c == ']' && !first:
+			return i + 1, ""
+		case c == '\\':
+			if i+1 >= len(pattern) {
+				return 0, problemUnclosedClass
+			}
+			i += 2
+			rangeStart = true
+		case c == '-' && rangeStart && i+1 < len(pattern) && pattern[i+1] != ']':
+			i++
+			if pattern[i] == '\\' {
+				if i+1 >= len(pattern) {
+					return 0, problemUnclosedClass
+				}
+				i++
+			}
+			i++
+			rangeStart = false
+		case c == '[' && i+1 < len(pattern) && pattern[i+1] == ':':
+			j := strings.IndexByte(pattern[i+2:], ']')
+			if j < 0 {
+				return 0, problemUnclosedClass
+			}
+			rb := i + 2 + j
+			if j == 0 || pattern[rb-1] != ':' {
+				// Not a [:name:]: '[' is a member, and the scan resumes at ':'.
+				i++
+				rangeStart = true
+				break
+			}
+			if posixClass(pattern[i+2:rb-1]) == nil {
+				return 0, problemUnknownClass
+			}
+			i = rb + 1
+			rangeStart = false
+		default:
+			i++
+			rangeStart = true
+		}
+	}
+	return 0, problemUnclosedClass
+}
+
 // matchCharClassPosix handles [:name:] POSIX class parsing inside a character class.
 // Returns whether ch matched and how many bytes to advance past this element.
 func matchCharClassPosix(pattern string, i int, ch byte) (matched bool, advance int) {

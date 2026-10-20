@@ -168,7 +168,14 @@ func parseLine(line string, lineNum int, basePath, source string) (*rule, *Parse
 		}
 	}
 
-	segments := parseSegments(line)
+	segments, bad := parseSegments(line)
+	if bad != "" {
+		return nil, &ParseWarning{
+			Line:    lineNum,
+			Pattern: original,
+			Message: bad,
+		}
+	}
 
 	r := &rule{
 		pattern:  original,
@@ -205,46 +212,70 @@ func determineAnchoring(line string) (anchored bool, trimmed string, emptyAfterS
 	return false, line, false
 }
 
-// parseSegments splits a pattern by "/" and classifies each segment.
-func parseSegments(pattern string) []segment {
-	parts := strings.Split(pattern, "/")
-	segments := make([]segment, 0, len(parts))
+const (
+	problemEmptySegment  = "empty path segment (pattern never matches)"
+	problemUnclosedClass = "unclosed character class (pattern never matches)"
+	problemUnknownClass  = "unknown character class name (pattern never matches)"
+)
 
-	for _, part := range parts {
-		// Skip empty parts (from leading/trailing/double slashes)
-		if part == "" {
+// parseSegments splits a pattern at '/' and classifies each segment. A '/'
+// inside a bracket expression does not split, as git's class scan runs past
+// it. A non-empty bad is why git never matches the pattern: it does not
+// normalize empty segments, and it rejects unclosed classes and unknown class
+// names when matching.
+func parseSegments(pattern string) (segs []segment, bad string) {
+	segs = make([]segment, 0, strings.Count(pattern, "/")+1)
+	start := 0
+	for i := 0; i <= len(pattern); {
+		if i == len(pattern) || pattern[i] == '/' {
+			if i == start {
+				return nil, problemEmptySegment
+			}
+			segs = append(segs, newSegment(pattern[start:i]))
+			i++
+			start = i
 			continue
 		}
-
-		seg := segment{value: part}
-
-		if part == "**" {
-			seg.doubleStar = true
-			seg.value = ""
-		} else {
-			// Single pass to detect wildcard characters and compute flags.
-			for i := 0; i < len(part); i++ {
-				switch part[i] {
-				case '*':
-					seg.wildcard = true
-					seg.starCount++
-				case '?':
-					seg.wildcard = true
-					seg.hasQuestion = true
-				case '\\':
-					seg.wildcard = true
-					seg.hasEscape = true
-				case '[':
-					seg.wildcard = true
-					seg.hasCharClass = true
-				}
+		switch pattern[i] {
+		case '\\':
+			i = min(i+2, len(pattern))
+		case '[':
+			end, problem := classEnd(pattern, i)
+			if problem != "" {
+				return nil, problem
 			}
+			i = end
+		default:
+			i++
 		}
-
-		segments = append(segments, seg)
 	}
+	return segs, ""
+}
 
-	return segments
+// newSegment classifies one pattern segment. A run of two or more stars
+// filling the segment is **, as in git (wildmatch.c).
+func newSegment(part string) segment {
+	if len(part) >= 2 && strings.Trim(part, "*") == "" {
+		return segment{doubleStar: true}
+	}
+	seg := segment{value: part}
+	for i := 0; i < len(part); i++ {
+		switch part[i] {
+		case '*':
+			seg.wildcard = true
+			seg.starCount++
+		case '?':
+			seg.wildcard = true
+			seg.hasQuestion = true
+		case '\\':
+			seg.wildcard = true
+			seg.hasEscape = true
+		case '[':
+			seg.wildcard = true
+			seg.hasCharClass = true
+		}
+	}
+	return seg
 }
 
 // String returns a debug representation of a rule.

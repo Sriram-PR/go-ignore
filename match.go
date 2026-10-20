@@ -104,21 +104,27 @@ func isDoubleStar(s segment) bool { return s.doubleStar }
 
 // matchSegments matches pattern against all of path. ** matches any run of
 // segments, except that a trailing ** needs at least one (abc/** matches
-// abc/x, not abc, as in git); every other pattern segment matches exactly
-// one. Like matchGlobLoop, on a mismatch it backs up only to the most recent
+// abc/x, not abc, as in git), and a ** followed by \/ needs at least one too;
+// every other pattern segment matches exactly one. Like matchGlobLoop, on a mismatch it backs up only to the most recent
 // **, so the cost is at most O(len(pattern)·len(path)) segment comparisons.
 func matchSegments(pattern []segment, path []string) bool {
 	p, i := 0, 0
 	starP, starI := -1, 0
 	for i < len(path) {
 		if p < len(pattern) && pattern[p].doubleStar {
+			need := 0 // segments the run must consume: one per **\/
 			for p < len(pattern) && pattern[p].doubleStar {
+				if pattern[p].minOne {
+					need++
+				}
 				p++
 			}
-			// A trailing ** takes the rest, and at least one segment is left.
+			// A trailing ** takes the rest, which must be one segment more
+			// than the run needs.
 			if p == len(pattern) {
-				return true
+				return len(path)-i > need
 			}
+			i += need
 			starP, starI = p, i
 			continue
 		}

@@ -34,6 +34,7 @@ type segment struct {
 	value        string // literal or pattern text (empty for **)
 	wildcard     bool   // needs glob matching (contains *, ?, \, or [; not **)
 	doubleStar   bool   // is ** - matches zero or more directories
+	minOne       bool   // ** followed by \/: matches at least one directory
 	hasQuestion  bool   // contains ?
 	hasEscape    bool   // contains backslash
 	hasCharClass bool   // contains [ (character class or literal bracket)
@@ -218,7 +219,7 @@ const (
 	problemUnknownClass  = "unknown character class name (pattern never matches)"
 )
 
-// parseSegments splits a pattern at '/' and classifies each segment. A '/'
+// parseSegments splits a pattern at '/' and '\/' and classifies each segment. A '/'
 // inside a bracket expression does not split, as git's class scan runs past
 // it. A non-empty bad is why git never matches the pattern: it does not
 // normalize empty segments, and it rejects unclosed classes and unknown class
@@ -227,12 +228,23 @@ func parseSegments(pattern string) (segs []segment, bad string) {
 	segs = make([]segment, 0, strings.Count(pattern, "/")+1)
 	start := 0
 	for i := 0; i <= len(pattern); {
-		if i == len(pattern) || pattern[i] == '/' {
+		sep := 0 // length of the separator at i: 1 for '/', 2 for '\/'
+		switch {
+		case i == len(pattern) || pattern[i] == '/':
+			sep = 1
+		case pattern[i] == '\\' && i+1 < len(pattern) && pattern[i+1] == '/':
+			sep = 2
+		}
+		if sep > 0 {
 			if i == start {
 				return nil, problemEmptySegment
 			}
-			segs = append(segs, newSegment(pattern[start:i]))
-			i++
+			seg := newSegment(pattern[start:i])
+			// git's zero-directory shortcut for ** only fires before a
+			// plain '/' (wildmatch.c), so **\/ needs one directory.
+			seg.minOne = seg.doubleStar && sep == 2
+			segs = append(segs, seg)
+			i += sep
 			start = i
 			continue
 		}

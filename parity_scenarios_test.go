@@ -139,6 +139,12 @@ func curatedCases() []curatedCase {
 	add(R("***\n", "a", "a/b"))
 	add(R("a/***\n", "a/", "a/x", "a/x/y"))
 	add(R("x/***/y\n", "x/", "x/y", "x/a/", "x/a/y", "x/a/b/y"))
+	// escaped slash
+	add(R("a\\/**\n", "a/", "a/b", "a/x/", "a/x/b"))
+	add(R("a/**\\/b\n", "a/", "a/b", "a/x/", "a/x/b", "a/x/y/b"))
+	add(R("**\\/b\n", "b", "a/", "a/b", "a/x/b"))
+	add(R("***\\/b\n", "b", "a/", "a/b"))
+	add(R("**\\/**\n", "a", "x/", "x/y"))
 	// star matching
 	for _, p := range []string{"a*b", "a*b*c", "*a*", "a*", "*a", "**", "a?b", "*?", "?*", "a*?b", "*.", ".*", "*.*", "a**b", "a***b", "*/*", "*/**", "**/*", "a/*/b"} {
 		add(R(p+"\n", "ab", "axb", "axbxc", "a", "b", ".", ".x", "a.", "x.y", "a/b", "a/x/b", "a/", "a/x/", "a/x/y", "abc", "aab", "a.b", "..", "a/b/", "x/y"))

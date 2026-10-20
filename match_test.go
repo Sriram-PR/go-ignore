@@ -1182,3 +1182,32 @@ func TestClassEnd(t *testing.T) {
 		}
 	}
 }
+
+// In git, ** followed by \/ skips the zero-directory shortcut
+// (wildmatch.c), so it must match at least one directory.
+func TestMatchSegments_MinOne(t *testing.T) {
+	tests := []struct {
+		pattern, path string
+		want          bool
+	}{
+		{"**\\/b", "b", false},
+		{"**\\/b", "a/b", true},
+		{"**\\/b", "a/x/b", true},
+		{"a/**\\/b", "a/b", false},
+		{"a/**\\/b", "a/x/b", true},
+		{"**\\/**", "x", false},
+		{"**\\/**", "x/y", true},
+		{"**/**", "x", true},
+		{"**\\/**\\/b", "x/b", false},
+		{"**\\/**\\/b", "x/y/b", true},
+	}
+	for _, tt := range tests {
+		segs, bad := parseSegments(tt.pattern)
+		if bad != "" {
+			t.Fatalf("parseSegments(%q) bad = %q", tt.pattern, bad)
+		}
+		if got := matchSegments(segs, splitPath(tt.path)); got != tt.want {
+			t.Errorf("matchSegments(%q, %q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
+		}
+	}
+}

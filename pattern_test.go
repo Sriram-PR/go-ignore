@@ -822,7 +822,12 @@ func TestParseSegments_Tokenizer(t *testing.T) {
 		{"[]/]x/y", []string{"[]/]x", "y"}, ""},
 		{"[[:]]x", []string{"[[:]]x"}, ""},
 		{"[a-[:alpha:]]x", []string{"[a-[:alpha:]]x"}, ""},
-		{"a\\/b", []string{"a\\/b"}, ""},
+		{"a\\/b", []string{"a", "b"}, ""},
+		{"a\\\\/b", []string{"a\\\\", "b"}, ""}, // escaped backslash, then a plain '/'
+		{"a\\/**", []string{"a", "**"}, ""},
+		{"**\\/a", []string{"**", "a"}, ""},
+		{"\\/a", nil, problemEmptySegment},
+		{"a\\/\\/b", nil, problemEmptySegment},
 		{"a//b", nil, problemEmptySegment},
 		{"/a", nil, problemEmptySegment},
 		{"a/", nil, problemEmptySegment},
@@ -873,6 +878,30 @@ func TestParseLine_NeverMatchingPatterns(t *testing.T) {
 		}
 		if w == nil || w.Message != msg || w.Line != 3 || w.Pattern != pattern {
 			t.Errorf("parseLine(%q) warning = %+v, want message %q on line 3", pattern, w, msg)
+		}
+	}
+}
+
+func TestParseSegments_MinOne(t *testing.T) {
+	for pattern, want := range map[string][]bool{
+		"**/a":      {false, false},
+		"**\\/a":    {true, false},
+		"***\\/a":   {true, false},
+		"a/**\\/b":  {false, true, false},
+		"a\\/**":    {false, false},
+		"**\\/**/b": {true, false, false},
+	} {
+		segs, bad := parseSegments(pattern)
+		if bad != "" {
+			t.Errorf("parseSegments(%q) bad = %q", pattern, bad)
+			continue
+		}
+		got := make([]bool, len(segs))
+		for i, s := range segs {
+			got[i] = s.minOne
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("parseSegments(%q) minOne = %v, want %v", pattern, got, want)
 		}
 	}
 }

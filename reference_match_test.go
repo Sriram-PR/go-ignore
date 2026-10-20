@@ -60,7 +60,7 @@ func refMatchSegmentsExact(pattern []segment, path []string, b *refBudget) bool 
 	seg := pattern[0]
 	if seg.doubleStar {
 		minI := 0
-		if len(pattern) == 1 {
+		if len(pattern) == 1 || seg.minOne {
 			minI = 1
 		}
 		b.depth++
@@ -176,6 +176,9 @@ func FuzzSegments(f *testing.F) {
 		{"***/b", "a/x/b"},
 		{"a/****/b", "a/b"},
 		{"a//b", "a/b"},
+		{"**\\/b", "a/b"},
+		{"a/**\\/b", "a/b"},
+		{"**\\/**", "x/y"},
 	} {
 		f.Add(s[0], s[1])
 	}

@@ -121,10 +121,15 @@ type MatcherOptions struct {
 // performance, batch all AddPatterns calls before starting concurrent Match
 // operations.
 type Matcher struct {
+	// mu guards rules and warnings. rules is append-only: a rule is never
+	// changed once added, so a reader may take rules[:len:len] under the
+	// read lock and use it after unlocking (match, Tree, the walker).
 	mu       sync.RWMutex
 	rules    []rule
 	warnings []ParseWarning
-	opts     MatcherOptions
+	// opts is set before the Matcher is shared and never changed after, so
+	// it is read without mu.
+	opts MatcherOptions
 }
 
 // New creates an empty Matcher with default options.
@@ -410,9 +415,8 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 // prunes every directory match reports as ignored, so no path it visits has
 // an ignored parent.
 func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
-	// opts is fixed at construction (see Matcher.opts) and safe to read
-	// without holding mu. Doing the case-insensitive lowering outside the
-	// read lock keeps the critical section as tight as possible.
+	// opts needs no lock (see Matcher). Lowering happens here, before the
+	// snapshot, so nothing slow runs under mu.
 	var segBuf [32]string
 	_, path, pathSegments, ok := preparePath(path, m.opts.CaseInsensitive, segBuf[:0])
 	if !ok {
@@ -420,41 +424,44 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 	}
 
 	m.mu.RLock()
+	rules := m.rules[:len(m.rules):len(m.rules)]
+	m.mu.RUnlock()
 
-	result := evaluateRules(m.rules, path, pathSegments, isDir)
-
-	// As in git, an ignored parent directory decides: the path is ignored by
-	// that parent's rule and no negation can re-include it. Shallowest first,
-	// so the outermost ignored parent is reported.
-	//
-	// We slice the original `path` at internal slash positions rather than
-	// strings.Join'ing slices of pathSegments. Joining was O(i) per ancestor
-	// and O(N²) overall; a 100k-segment path took tens of seconds that way
-	// (observed via FuzzMatch timeout in CI). Slicing is O(N) total and
-	// zero-alloc on the hot path.
-	if checkParents && len(pathSegments) > 1 {
-		// Skip any leading slash so ancestor[:j] is a name, not "/" prefix.
-		start := 0
-		if len(path) > 0 && path[0] == '/' {
-			start = 1
-		}
-		segCount := 0
-		for j := start; j < len(path); j++ {
-			if path[j] != '/' {
-				continue
-			}
-			segCount++
-			ancestor := path[start:j]
-			ancRes := evaluateRules(m.rules, ancestor, pathSegments[:segCount], true)
-			if ancRes.Matched && ancRes.Ignored {
-				m.mu.RUnlock()
-				return ancRes
-			}
+	// As in git, an ignored parent directory decides: no negation can
+	// re-include a path below it.
+	if checkParents {
+		if res, ok := parentIgnored(rules, path, pathSegments); ok {
+			return res
 		}
 	}
+	return evaluateRules(rules, path, pathSegments, isDir)
+}
 
-	m.mu.RUnlock()
-	return result
+// parentIgnored reports the rule that ignores the shallowest parent directory
+// of path, so the outermost ignored parent is reported, as git check-ignore
+// -v does. It slices path at each '/' instead of joining segments, which keeps
+// the walk O(N) and allocation-free on deep paths.
+func parentIgnored(rules []rule, path string, segs []string) (MatchResult, bool) {
+	if len(segs) < 2 {
+		return MatchResult{}, false
+	}
+	// Skip a leading slash so each parent is a name, not a "/" prefix.
+	start := 0
+	if path[0] == '/' {
+		start = 1
+	}
+	n := 0
+	for j := start; j < len(path); j++ {
+		if path[j] != '/' {
+			continue
+		}
+		n++
+		res := evaluateRules(rules, path[start:j], segs[:n], true)
+		if res.Matched && res.Ignored {
+			return res, true
+		}
+	}
+	return MatchResult{}, false
 }
 
 // preparePath normalizes path and splits it into segments, appending to buf.

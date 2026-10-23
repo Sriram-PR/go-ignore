@@ -1301,3 +1301,24 @@ func TestCaseInsensitive_ASCIIOnlyBasePath(t *testing.T) {
 		t.Error("Match(é/y) = true, want false")
 	}
 }
+
+func TestParentIgnored(t *testing.T) {
+	rules, _, _ := parseLines("", []byte("build/\n!build/keep/\nlogs\n"), -1, -1, "")
+	tests := []struct {
+		path     string
+		wantOK   bool
+		wantRule string
+	}{
+		{"build/x/y.o", true, "build/"},
+		{"build/keep/a", true, "build/"}, // outermost ignored parent decides
+		{"src/logs/a", true, "logs"},
+		{"src/a", false, ""},
+		{"build", false, ""}, // the path itself is not a parent
+	}
+	for _, tt := range tests {
+		got, ok := parentIgnored(rules, tt.path, splitPath(tt.path))
+		if ok != tt.wantOK || got.Rule != tt.wantRule {
+			t.Errorf("parentIgnored(%q) = %q, %v; want %q, %v", tt.path, got.Rule, ok, tt.wantRule, tt.wantOK)
+		}
+	}
+}

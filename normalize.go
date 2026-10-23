@@ -101,16 +101,21 @@ func trimTrailingWhitespace(line string) string {
 		return line // No trailing whitespace
 	}
 
-	bs := 0
-	for i := end - 1; i >= 0 && line[i] == '\\'; i-- {
-		bs++
-	}
-
 	// Odd number of backslashes means the last one escapes the first space
-	if bs%2 == 1 && line[end] == ' ' {
+	if trailingBackslashes(line[:end])%2 == 1 && line[end] == ' ' {
 		// Remove the escaping backslash, keep the space
 		return line[:end-1] + " "
 	}
 
 	return line[:end]
+}
+
+// trailingBackslashes counts the backslashes at the end of s. An odd count
+// means the last one escapes whatever follows it.
+func trailingBackslashes(s string) int {
+	n := 0
+	for n < len(s) && s[len(s)-1-n] == '\\' {
+		n++
+	}
+	return n
 }

@@ -259,3 +259,19 @@ func TestPatternContent_LineHandlingMatchesGit(t *testing.T) {
 		})
 	}
 }
+
+func TestTrailingBackslashes(t *testing.T) {
+	for s, want := range map[string]int{
+		"":       0,
+		"a":      0,
+		"a\\":    1,
+		"a\\\\":  2,
+		"\\\\\\": 3,
+		"a\\b":   0,
+		"a\\\\ ": 0,
+	} {
+		if got := trailingBackslashes(s); got != want {
+			t.Errorf("trailingBackslashes(%q) = %d, want %d", s, got, want)
+		}
+	}
+}

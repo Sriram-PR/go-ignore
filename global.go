@@ -241,18 +241,7 @@ func (m *Matcher) AddExcludePatterns(gitDir string) error {
 	if err != nil || !ok {
 		return err
 	}
-	path := filepath.Join(dir, "info", "exclude")
-
-	content, err := readPatternFile(osSource{}, path, true, maxPatternFileSize)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return fmt.Errorf("reading %s: %w", path, err)
-	}
-
-	m.addPatternsFromSource("", content, path)
-	return nil
+	return m.addExcludesFile(filepath.Join(dir, "info", "exclude"), "exclude file")
 }
 
 // resolveExcludeDir returns the directory whose info/exclude applies to the

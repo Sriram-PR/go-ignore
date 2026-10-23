@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -531,6 +532,9 @@ func TestAddExcludePatterns_ReadPermissionError(t *testing.T) {
 	err := m.AddExcludePatterns(tmp)
 	if err == nil {
 		t.Fatal("expected error for unreadable exclude file, got nil")
+	}
+	if !strings.Contains(err.Error(), "reading exclude file ") {
+		t.Errorf("error = %q, want it to name the exclude file", err)
 	}
 }
 

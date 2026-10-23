@@ -147,18 +147,11 @@ func parseLine(line string, lineNum int, basePath, source string) (*rule, *Parse
 	}
 
 	// Trailing backslash is an invalid pattern (per spec, never matches).
-	// Count consecutive trailing backslashes: odd means a lone trailing \.
-	if strings.HasSuffix(line, "\\") {
-		bs := 0
-		for i := len(line) - 1; i >= 0 && line[i] == '\\'; i-- {
-			bs++
-		}
-		if bs%2 == 1 {
-			return nil, &ParseWarning{
-				Line:    lineNum,
-				Pattern: original,
-				Message: "trailing backslash is invalid (pattern never matches)",
-			}
+	if trailingBackslashes(line)%2 == 1 {
+		return nil, &ParseWarning{
+			Line:    lineNum,
+			Pattern: original,
+			Message: "trailing backslash is invalid (pattern never matches)",
 		}
 	}
 

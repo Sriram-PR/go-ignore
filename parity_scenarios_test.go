@@ -204,6 +204,8 @@ func curatedCases() []curatedCase {
 	add(R("a/**/b\n", "a/b", "a/b/", "a/x/b", "a/x/y/b", "x/a/b", "a/x/"))
 	add(R("a/**/**/b\n", "a/b", "a/x/b", "a/x/y/b"))
 	add(R("**/a\n!a/b\n", "a/", "a/b", "x/a/", "x/a/b"))
+	add(R("**/cache/\n", "cache/", "src/cache/", "src/cache/x", "cachex"))
+	add(R("src/**/test/\n", "src/test/", "src/lib/test/", "src/lib/test/a", "test/"))
 	return cs
 }
 

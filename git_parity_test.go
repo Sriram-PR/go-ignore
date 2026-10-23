@@ -1,11 +1,9 @@
 package ignore
 
 import (
-	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -203,11 +201,7 @@ func TestGitParity_EdgeCases(t *testing.T) {
 // compareWithGit creates a temporary git repo and compares our results with git check-ignore
 func compareWithGit(t *testing.T, gitignoreContent string, paths []string, createDirs []string) {
 	// Create temp directory
-	tmpDir, err := os.MkdirTemp("", "go-ignore-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Initialize git repo
 	cmd := exec.Command("git", "init")
@@ -297,130 +291,4 @@ func gitCheckIgnore(t *testing.T, repoDir, path string) bool {
 	// For other errors, log but don't fail (git check-ignore can be finicky)
 	t.Logf("git check-ignore warning for %q: %v", path, err)
 	return false
-}
-
-// TestGitParity_Verbose runs verbose comparison for debugging
-func TestGitParity_Verbose(t *testing.T) {
-	if !gitAvailable() {
-		t.Skip("git not available")
-	}
-
-	if testing.Short() {
-		t.Skip("skipping verbose test in short mode")
-	}
-
-	// Create temp directory
-	tmpDir, err := os.MkdirTemp("", "go-ignore-verbose-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Initialize git repo
-	cmd := exec.Command("git", "init")
-	cmd.Dir = tmpDir
-	//nolint:errcheck // best effort for verbose test
-	cmd.Run()
-
-	gitignoreContent := `
-# Test patterns
-*.log
-!important.log
-build/
-**/cache/
-src/**/test/
-`
-
-	// Create .gitignore
-	if err := os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte(gitignoreContent), 0644); err != nil {
-		t.Fatalf("failed to write .gitignore: %v", err)
-	}
-
-	// Create test structure
-	dirs := []string{"build", "src/lib/test", "cache", "src/cache", "logs"}
-	for _, d := range dirs {
-		if err := os.MkdirAll(filepath.Join(tmpDir, d), 0755); err != nil {
-			t.Fatalf("failed to create directory %s: %v", d, err)
-		}
-	}
-
-	files := []string{
-		"test.log", "important.log", "main.go",
-		"build/output.js", "src/lib/test/spec.go",
-		"cache/data.bin", "src/cache/temp.bin",
-	}
-	for _, f := range files {
-		if err := os.MkdirAll(filepath.Dir(filepath.Join(tmpDir, f)), 0755); err != nil {
-			t.Fatalf("failed to create directory for %s: %v", f, err)
-		}
-		if err := os.WriteFile(filepath.Join(tmpDir, f), []byte("test"), 0644); err != nil {
-			t.Fatalf("failed to write file %s: %v", f, err)
-		}
-	}
-
-	// Create matcher
-	m := New()
-	m.AddPatterns("", []byte(gitignoreContent))
-
-	// Check each file with verbose output
-	for _, f := range files {
-		info, err := os.Stat(filepath.Join(tmpDir, f))
-		if err != nil {
-			t.Fatalf("failed to stat file %s: %v", f, err)
-		}
-		isDir := info.IsDir()
-
-		ourResult := m.MatchWithReason(f, isDir)
-		gitResult := gitCheckIgnoreVerbose(tmpDir, f)
-
-		if ourResult.Ignored != gitResult.ignored {
-			t.Logf("MISMATCH %q: ours=%v (rule=%q), git=%v (rule=%q)",
-				f, ourResult.Ignored, ourResult.Rule, gitResult.ignored, gitResult.rule)
-		} else {
-			t.Logf("MATCH    %q: ignored=%v", f, ourResult.Ignored)
-		}
-	}
-}
-
-type gitCheckResult struct {
-	rule    string
-	ignored bool
-}
-
-func gitCheckIgnoreVerbose(repoDir, path string) gitCheckResult {
-	cmd := exec.Command("git", "check-ignore", "-v", path)
-	cmd.Dir = repoDir
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return gitCheckResult{ignored: false}
-	}
-
-	// Parse output: ".gitignore:1:*.log\ttest.log"
-	output := strings.TrimSpace(stdout.String())
-	if output == "" {
-		return gitCheckResult{ignored: false}
-	}
-
-	parts := strings.SplitN(output, "\t", 2)
-	if len(parts) < 1 {
-		return gitCheckResult{ignored: true}
-	}
-
-	// Extract rule from "source:line:pattern"
-	ruleParts := strings.SplitN(parts[0], ":", 3)
-	rule := ""
-	if len(ruleParts) >= 3 {
-		rule = ruleParts[2]
-	}
-
-	// git check-ignore -v exits 0 whenever *some* rule matches, including
-	// negation rules. Treat a leading '!' as a re-include so the verbose
-	// helper reflects actual ignore semantics, not just "some rule matched".
-	ignored := !strings.HasPrefix(rule, "!")
-	return gitCheckResult{ignored: ignored, rule: rule}
 }

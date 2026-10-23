@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -96,7 +97,7 @@ func TestWalkDir_BasicIgnore(t *testing.T) {
 		"src",
 		"src/main.go",
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -145,7 +146,7 @@ func TestWalkDir_NestedGitignoreDiscovered(t *testing.T) {
 		"sub/keep.txt",
 		"top.tmp",
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -182,7 +183,7 @@ func TestWalkDir_NestedRulesDoNotLeakAcrossSiblings(t *testing.T) {
 		"sub-a/.gitignore",
 		"sub-b/b.tmp", // b.tmp must survive
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -337,7 +338,7 @@ func TestFiles_BasicAndFilesOnly(t *testing.T) {
 		"keep.txt",
 		"sub/inner.txt",
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -462,7 +463,7 @@ func TestFiles_NestedDiscoveryStillApplies(t *testing.T) {
 		"sub/.gitignore",
 		"sub/keep.txt",
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -540,7 +541,7 @@ func TestWalkDirFS_BasicWithMapFS(t *testing.T) {
 		"keep.txt",
 		"sub/file.txt",
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -574,7 +575,7 @@ func TestWalkDirFS_NestedDiscoveryInMapFS(t *testing.T) {
 		"sub/keep.txt",
 		"top.tmp",
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -617,7 +618,7 @@ func TestWalkDir_DotGitFileNotYielded(t *testing.T) {
 
 	got := collectWalk(t, New(), root)
 	want := []string{"keep.txt", "sub", "sub/file.txt"}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("WalkDir = %v, want %v", got, want)
 	}
 }
@@ -693,7 +694,7 @@ func TestWalkDirFS_SubrootWalk(t *testing.T) {
 	sort.Strings(got)
 
 	want := []string{"a/x.txt", "a/y.txt"}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -723,7 +724,7 @@ func TestFilesFS_BasicWithMapFS(t *testing.T) {
 		"keep.txt",
 		"sub/file.txt",
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -751,7 +752,7 @@ func TestFilesFS_NestedDiscoveryInMapFS(t *testing.T) {
 		"sub/keep.txt",
 		"top.tmp",
 	}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -800,18 +801,6 @@ func TestFilesFS_FilesOnly(t *testing.T) {
 	}
 }
 
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // With the allowlist idiom, re-included directories are walked but only the
 // files a rule re-includes are yielded, as git ls-files does.
 func TestWalkDirFS_AllowlistIdiom(t *testing.T) {
@@ -832,7 +821,7 @@ func TestWalkDirFS_AllowlistIdiom(t *testing.T) {
 	}
 	sort.Strings(got)
 	want := []string{".gitignore", "pkg/main.go", "pkg/sub/c.go"}
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
@@ -872,7 +861,7 @@ func TestWalkDirFS_RuleStackScopesMaxPatterns(t *testing.T) {
 	}
 	sort.Strings(got)
 	sort.Strings(want)
-	if !equalStrings(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 	if len(warnings) != 0 {
@@ -931,7 +920,7 @@ func TestWalkDirFS_RefusedGitignoreOneCallback(t *testing.T) {
 				want = []string{"rules"}
 			}
 			sort.Strings(want)
-			if !equalStrings(files, want) {
+			if !slices.Equal(files, want) {
 				t.Errorf("%s, fn returns %v: files %v, want %v", name, ret, files, want)
 			}
 		}

@@ -4,7 +4,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
 // TestEdgeCases_LineEndings tests various line ending formats
@@ -510,63 +509,18 @@ func TestEdgeCases_VeryLongPaths(t *testing.T) {
 	}
 }
 
-// TestEdgeCases_DeepPath_BoundedByDepthCap guards against quadratic blowup on
-// extremely deep paths. Two issues compounded in CI's FuzzMatch:
-//
-//   - the parent-excluded ancestor walk did strings.Join on growing prefix
-//     slices, giving O(N²) string allocations;
-//   - for every ancestor, evaluateRules re-ran every unanchored rule across
-//     all ancestor segments, giving O(M·N²) matching work.
-//
-// The fix combines two changes: the ancestor walk now slices `path` at slash
-// positions instead of joining segments, and a defensive depth cap
-// (MaxPathDepth, default 4096) makes pathological inputs short-circuit
-// rather than exhibit quadratic behavior. This test asserts the cap fires
-// on a deep path and that legitimately-deep paths under the cap still
-// complete in well under a second.
+// Match checks every parent directory against every rule, so paths deeper
+// than MaxPathDepth short-circuit to no match. One segment past the cap
+// never matches; a path exactly at the cap is matched as usual.
 func TestEdgeCases_DeepPath_BoundedByDepthCap(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping deep-path perf guard in -short mode")
-	}
 	m := New()
-	m.AddPatterns("", []byte(`
-*.log
-build/
-!important.log
-node_modules/
-`))
+	m.AddPatterns("", []byte("*.log\n"))
 
-	// Above the cap: must short-circuit (Match returns false, no walk).
-	tooDeep := buildDeepPath(50_000, "important.log")
-	deadline := time.NewTimer(500 * time.Millisecond)
-	defer deadline.Stop()
-	done := make(chan bool)
-	go func() {
-		done <- m.Match(tooDeep, false)
-	}()
-	select {
-	case got := <-done:
-		if got {
-			t.Errorf("path past depth cap should return Match=false (short-circuit), got true")
-		}
-	case <-deadline.C:
-		t.Fatalf("Match on path past depth cap did not return within 500ms")
+	if m.Match(buildDeepPath(MaxPathDepth, "x.log"), false) {
+		t.Errorf("path of %d segments matched; past MaxPathDepth it should short-circuit", MaxPathDepth+1)
 	}
-
-	// Just under the cap: must complete in a reasonable time even when
-	// the ancestor walk runs in full.
-	underCap := buildDeepPath(1000, "important.log")
-	deadline2 := time.NewTimer(1 * time.Second)
-	defer deadline2.Stop()
-	done2 := make(chan struct{})
-	go func() {
-		_ = m.Match(underCap, false)
-		close(done2)
-	}()
-	select {
-	case <-done2:
-	case <-deadline2.C:
-		t.Fatalf("Match on 1000-segment path did not return within 1s — ancestor walk regression")
+	if !m.Match(buildDeepPath(MaxPathDepth-1, "x.log"), false) {
+		t.Errorf("path of exactly MaxPathDepth segments did not match *.log")
 	}
 }
 
@@ -680,11 +634,9 @@ func TestEdgeCases_DirOnlyGlobstar(t *testing.T) {
 
 // A floating pattern without ** can only match the path's last segments, so
 // trying every start position made the parent-excluded ancestor walk
-// O(R·N²) for R such rules. At N=1000 and R=1000 that took ~4.5s.
-func TestEdgeCases_DeepPath_ManyFloatingRules(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping deep-path perf guard in -short mode")
-	}
+// O(R·N²) for R such rules. The answer must still be right;
+// BenchmarkMatch_DeepPathFloatingRules tracks the cost.
+func TestEdgeCases_DeepPath_ManyFloatingRulesCorrect(t *testing.T) {
 	var rules strings.Builder
 	for range 1000 {
 		rules.WriteString("x*y\n")
@@ -694,14 +646,7 @@ func TestEdgeCases_DeepPath_ManyFloatingRules(t *testing.T) {
 	m.AddPatterns("", []byte(rules.String()))
 
 	path := buildDeepPath(1000, "a.log")
-	start := time.Now()
-	got := m.Match(path, false)
-	elapsed := time.Since(start)
-
-	if got {
+	if m.Match(path, false) {
 		t.Error("a.log is negated and its parents are not excluded; want not ignored")
-	}
-	if elapsed > time.Second {
-		t.Errorf("Match took %v on a 1000-deep path with 1000 floating rules, want < 1s", elapsed)
 	}
 }

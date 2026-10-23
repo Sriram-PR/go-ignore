@@ -505,3 +505,20 @@ func BenchmarkTree_CheckCold(b *testing.B) {
 		_, _ = m.TreeFS(fsys, ".").Check("d150/src/main.go")
 	}
 }
+
+// BenchmarkMatch_DeepPathFloatingRules measures the parent walk with many
+// floating rules on a deep path (1000 rules, 1000 segments).
+func BenchmarkMatch_DeepPathFloatingRules(b *testing.B) {
+	var rules strings.Builder
+	for range 1000 {
+		rules.WriteString("x*y\n")
+	}
+	rules.WriteString("*.log\n!a.log\n")
+	m := New()
+	m.AddPatterns("", []byte(rules.String()))
+	path := strings.Repeat("a/", 1000) + "a.log"
+	b.ReportAllocs()
+	for b.Loop() {
+		m.Match(path, false)
+	}
+}

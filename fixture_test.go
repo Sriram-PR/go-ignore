@@ -76,23 +76,24 @@ func TestFixtureMatchCorrectness(t *testing.T) {
 	}
 }
 
-// TestLoadFixtures validates that all testdata fixture files parse without
-// panics and produce the expected number of rules and no unexpected warnings.
+// TestLoadFixtures checks that each fixture file parses into exactly the
+// expected number of rules and warnings.
 func TestLoadFixtures(t *testing.T) {
 	fixtures := []struct {
 		path     string
-		minRules int // minimum expected rules (0 means just check no panic)
+		rules    int
+		warnings int
 	}{
-		{"testdata/simple.gitignore", 7},
-		{"testdata/complex.gitignore", 18},
-		{"testdata/edge-cases.gitignore", 15},
-		{"testdata/realistic/go.gitignore", 1},
-		{"testdata/realistic/node.gitignore", 1},
-		{"testdata/realistic/python.gitignore", 1},
-		{"testdata/crlf.gitignore", 5},
-		{"testdata/with-bom.gitignore", 6},
-		{"testdata/pathological.gitignore", 16},
-		{"testdata/realistic/large.gitignore", 100},
+		{"testdata/simple.gitignore", 8, 0},
+		{"testdata/complex.gitignore", 30, 0},
+		{"testdata/edge-cases.gitignore", 30, 1}, // line 34: a lone "!"
+		{"testdata/realistic/go.gitignore", 25, 0},
+		{"testdata/realistic/node.gitignore", 33, 0},
+		{"testdata/realistic/python.gitignore", 58, 0},
+		{"testdata/crlf.gitignore", 5, 0},
+		{"testdata/with-bom.gitignore", 6, 0},
+		{"testdata/pathological.gitignore", 17, 0},
+		{"testdata/realistic/large.gitignore", 655, 0},
 	}
 
 	for _, f := range fixtures {
@@ -101,19 +102,13 @@ func TestLoadFixtures(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to read fixture %s: %v", f.path, err)
 			}
-
 			m := New()
 			m.AddPatterns("", content)
-
-			if m.RuleCount() < f.minRules {
-				t.Errorf("fixture %s: got %d rules, want at least %d",
-					f.path, m.RuleCount(), f.minRules)
+			if got := m.RuleCount(); got != f.rules {
+				t.Errorf("%d rules, want %d", got, f.rules)
 			}
-
-			// Log warnings for visibility but don't fail on them —
-			// some fixtures intentionally contain edge cases that produce warnings.
-			for _, w := range m.Warnings() {
-				t.Logf("warning line %d: %s (%q)", w.Line, w.Message, w.Pattern)
+			if ws := m.Warnings(); len(ws) != f.warnings {
+				t.Errorf("%d warnings, want %d: %+v", len(ws), f.warnings, ws)
 			}
 		})
 	}

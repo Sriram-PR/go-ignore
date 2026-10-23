@@ -123,7 +123,8 @@ type MatcherOptions struct {
 type Matcher struct {
 	// mu guards rules and warnings. rules is append-only: a rule is never
 	// changed once added, so a reader may take rules[:len:len] under the
-	// read lock and use it after unlocking (match, Tree, the walker).
+	// read lock and use it after unlocking (match, Tree). The walker clones
+	// instead, since it appends nested rules.
 	mu       sync.RWMutex
 	rules    []rule
 	warnings []ParseWarning

@@ -7,32 +7,10 @@ import (
 	"time"
 )
 
-// matchGlob matches a glob pattern against a string (test helper).
-// Moved from match.go — only used by tests and benchmarks.
+// matchGlob matches one pattern segment against s the way the matcher does,
+// so the fast path under test is the one newSegment picks.
 func matchGlob(pattern, s string) bool {
-	hasWild := strings.ContainsAny(pattern, "*?\\[")
-
-	if !hasWild {
-		return pattern == s
-	}
-
-	if pattern == "*" {
-		return true
-	}
-
-	hasBracket := strings.Contains(pattern, "[")
-	hasEscape := strings.Contains(pattern, "\\")
-	hasQuestion := strings.Contains(pattern, "?")
-	if !hasQuestion && !hasEscape && !hasBracket {
-		if strings.Count(pattern, "*") == 1 && strings.HasSuffix(pattern, "*") {
-			return strings.HasPrefix(s, pattern[:len(pattern)-1])
-		}
-		if strings.Count(pattern, "*") == 1 && strings.HasPrefix(pattern, "*") {
-			return strings.HasSuffix(s, pattern[1:])
-		}
-	}
-
-	return matchGlobLoop(pattern, s)
+	return matchSingleSegment(newSegment(pattern), s)
 }
 
 func TestMatchSingleSegment_Literal(t *testing.T) {
@@ -154,38 +132,14 @@ func TestMatchSingleSegment_CaseInsensitive(t *testing.T) {
 	for _, tt := range tests {
 		name := fmt.Sprintf("%s_%s_ci=%v", tt.pattern, tt.input, tt.caseInsensitive)
 		t.Run(name, func(t *testing.T) {
-			wildcard := containsWildcard(tt.pattern)
-			value := tt.pattern
-			if tt.caseInsensitive {
-				// Simulate AddPatterns pre-lowercasing
-				value = strings.ToLower(value)
-			}
-			seg := segment{value: value, wildcard: wildcard}
-			input := tt.input
-			if tt.caseInsensitive {
-				input = strings.ToLower(input)
-			}
-			got := matchSingleSegment(seg, input)
-			if got != tt.want {
-				t.Errorf("matchSingleSegment(%q, %q, caseInsensitive=%v) = %v, want %v",
+			m := NewWithOptions(MatcherOptions{CaseInsensitive: tt.caseInsensitive})
+			m.AddPatterns("", []byte(tt.pattern+"\n"))
+			if got := m.Match(tt.input, false); got != tt.want {
+				t.Errorf("pattern %q, Match(%q) with CaseInsensitive=%v = %v, want %v",
 					tt.pattern, tt.input, tt.caseInsensitive, got, tt.want)
 			}
 		})
 	}
-}
-
-func containsWildcard(s string) bool {
-	return len(s) > 0 && (s[0] == '*' || s[len(s)-1] == '*' ||
-		(len(s) > 1 && s != "**" && indexOf(s, '*') >= 0))
-}
-
-func indexOf(s string, c byte) int {
-	for i := 0; i < len(s); i++ {
-		if s[i] == c {
-			return i
-		}
-	}
-	return -1
 }
 
 func TestMatchGlob(t *testing.T) {
@@ -225,9 +179,8 @@ func TestMatchGlob(t *testing.T) {
 		{"*a*", "bab", true},
 		{"*a*", "b", false},
 
-		// Consecutive stars (treated as single *)
-		{"**", "anything", true},
-		{"***", "anything", true},
+		// Consecutive stars inside a segment act as one *. A segment of
+		// only stars is ** (TestMatchSegments_AllStars).
 		{"f**o", "fo", true},
 		{"f**o", "fxxxo", true},
 
@@ -882,32 +835,10 @@ func TestMatchRule_CaseInsensitive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.pattern+"_"+tt.path, func(t *testing.T) {
-			r, _ := parseLine(tt.pattern, 1, "", "")
-			if r == nil {
-				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
-			}
-			// Simulate AddPatterns pre-lowercasing
-			if tt.caseInsensitive {
-				for i := range r.segments {
-					if !r.segments[i].doubleStar {
-						r.segments[i].value = strings.ToLower(r.segments[i].value)
-					}
-				}
-			}
-			path := normalizePath(tt.path)
-			// Simulate MatchWithReason pre-lowering
-			if tt.caseInsensitive {
-				path = strings.ToLower(path)
-			}
-			pathSegs := splitPath(path)
-			if tt.caseInsensitive {
-				for i, seg := range pathSegs {
-					pathSegs[i] = strings.ToLower(seg)
-				}
-			}
-			got := matchRule(r, path, pathSegs, false)
-			if got != tt.want {
-				t.Errorf("matchRule(%q, %q, caseInsensitive=%v) = %v, want %v",
+			m := NewWithOptions(MatcherOptions{CaseInsensitive: tt.caseInsensitive})
+			m.AddPatterns("", []byte(tt.pattern+"\n"))
+			if got := m.Match(tt.path, false); got != tt.want {
+				t.Errorf("pattern %q, Match(%q) with CaseInsensitive=%v = %v, want %v",
 					tt.pattern, tt.path, tt.caseInsensitive, got, tt.want)
 			}
 		})
@@ -1208,6 +1139,18 @@ func TestMatchSegments_MinOne(t *testing.T) {
 		}
 		if got := matchSegments(segs, splitPath(tt.path)); got != tt.want {
 			t.Errorf("matchSegments(%q, %q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
+		}
+	}
+}
+
+func TestMatchSegments_AllStars(t *testing.T) {
+	for _, pattern := range []string{"**", "***"} {
+		segs, bad := parseSegments(pattern)
+		if bad != "" {
+			t.Fatalf("parseSegments(%q) bad = %q", pattern, bad)
+		}
+		if !matchSegments(segs, []string{"anything"}) {
+			t.Errorf("matchSegments(%q, anything) = false, want true", pattern)
 		}
 	}
 }

@@ -212,6 +212,10 @@ func FuzzGlob(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, pattern, s string) {
+		// A segment of only stars is ** and never reaches the glob matcher.
+		if newSegment(pattern).doubleStar {
+			return
+		}
 		// The live glob matcher, fast paths included, must agree with the
 		// reference wherever the reference finishes within its budget.
 		got := matchGlob(pattern, s)

@@ -9,6 +9,11 @@ import (
 
 const parityBaseline = "../testdata/parity/baseline.txt"
 
+const (
+	resultsFile = "RESULTS.md"
+	readmeFile  = "../README.md"
+)
+
 // requireGit skips without git, unless CONFORMANCE_REQUIRE_GIT=1 (set in CI),
 // which turns the skip into a failure.
 func requireGit(t *testing.T) {
@@ -21,6 +26,9 @@ func requireGit(t *testing.T) {
 	}
 }
 
+// TestConformance runs every scenario through git and each library, and
+// fails when RESULTS.md or the README table differ from what the run
+// renders. CONFORMANCE_UPDATE=1 rewrites them instead.
 func TestConformance(t *testing.T) {
 	requireGit(t)
 	res, err := run(scenarios(), drivers, t.TempDir)
@@ -28,9 +36,39 @@ func TestConformance(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkParityBaseline(t, res)
-	for i, d := range res.Drivers {
-		c := res.Cells[totalRow][i]
-		t.Logf("%s %s: %d/%d agree, %d scenarios skipped", d.Name, d.Version, c.Agree, c.Total, c.Skipped)
+
+	out, err := exec.Command("git", "--version").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultsMD := renderResults(res, strings.TrimSpace(string(out)))
+	readme, err := os.ReadFile(readmeFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newReadme, err := spliceReadme(string(readme), renderTable(res))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if os.Getenv("CONFORMANCE_UPDATE") == "1" {
+		if writeErr := os.WriteFile(resultsFile, []byte(resultsMD), 0o644); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+		if writeErr := os.WriteFile(readmeFile, []byte(newReadme), 0o644); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+		return
+	}
+	committed, err := os.ReadFile(resultsFile)
+	if err != nil {
+		t.Fatalf("%v; run make conformance-update", err)
+	}
+	if stripGitVersion(string(committed)) != stripGitVersion(resultsMD) {
+		t.Error("conformance/RESULTS.md is stale; run make conformance-update and commit it")
+	}
+	if string(readme) != newReadme {
+		t.Error("the README conformance table is stale; run make conformance-update and commit it")
 	}
 }
 

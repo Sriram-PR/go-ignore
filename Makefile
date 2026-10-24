@@ -1,4 +1,4 @@
-.PHONY: all test test-race test-cover bench fuzz fuzz-long lint fmt vet clean help parity parity-update test-git fixtures
+.PHONY: all test test-race test-cover bench fuzz fuzz-long lint fmt vet clean help parity parity-update test-git fixtures conformance conformance-update
 
 # Default target
 all: fmt vet test
@@ -49,6 +49,14 @@ parity:
 parity-update:
 	GOIGNORE_PARITY=1 GOIGNORE_PARITY_UPDATE=1 go test -run '^TestParity$$' -count=1 -v .
 
+# Compare go-ignore and other Go gitignore libraries with git (conformance/ module)
+conformance:
+	cd conformance && go test -run '^TestConformance$$' -count=1 .
+
+# Regenerate conformance/RESULTS.md and the README comparison table
+conformance-update:
+	cd conformance && CONFORMANCE_UPDATE=1 go test -run '^TestConformance$$' -count=1 .
+
 # Run linter (requires golangci-lint)
 lint:
 	golangci-lint run
@@ -84,6 +92,8 @@ help:
 	@echo "  test-git   - Run hand-written git parity cases (TestGitParity_*)"
 	@echo "  parity     - Run git parity harness vs baseline"
 	@echo "  parity-update - Regenerate the parity baseline"
+	@echo "  conformance - Compare with other libraries vs git (conformance/)"
+	@echo "  conformance-update - Regenerate the conformance table"
 	@echo "  bench      - Run benchmarks"
 	@echo "  fuzz       - Run every fuzzer (FUZZTIME each, default 30s)"
 	@echo "  fuzz-long  - Run every fuzzer (30m each, pre-release)"

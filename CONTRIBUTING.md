@@ -74,12 +74,16 @@ Two kinds of test compare go-ignore with git:
 
 ### Parity harness
 
-`make parity` writes curated and seeded scenarios to temporary git repos and compares `Match`, case-insensitive `Match`, and `WalkDir` with `git check-ignore` and `git ls-files`. Divergences git and go-ignore already disagree on are listed in `testdata/parity/baseline.txt`.
+`make parity` writes curated and seeded scenarios (from `internal/paritycases/scenarios.go`) to temporary git repos and compares `Match`, case-insensitive `Match`, and `WalkDir` with `git check-ignore` and `git ls-files`. Divergences git and go-ignore already disagree on are listed in `testdata/parity/baseline.txt`.
 
 - **Regressions (new divergences):** your change made go-ignore disagree with git somewhere new. Fix it.
 - **Resolved:** your change fixed a known divergence. Run `make parity-update` and commit the smaller baseline in the same commit as the fix.
 
 CI runs the harness on every push. To look for new divergence classes, dispatch the workflow with `parity-explore`, which runs a fresh seed and only reports.
+
+### Conformance table
+
+The comparison table in the README and `conformance/RESULTS.md` come from the `conformance/` module, which runs other Go gitignore libraries on the parity scenarios in `internal/paritycases` and compares them with git. Adding or changing a curated case changes the table: run `make conformance-update` and commit `conformance/RESULTS.md` and `README.md` with the change. CI fails when they are stale.
 
 ### Fuzz Testing
 

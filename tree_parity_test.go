@@ -18,15 +18,15 @@ func TestTree_AgreesWithPreloadedMatcherAndWalker(t *testing.T) {
 			want := pre.MatchWithReason(p, f.Mode.IsDir())
 			got, err := tr.Check(p)
 			if err != nil || got != want {
-				t.Errorf("%s: Check(%q) = %+v, %v; preloaded matcher %+v", s.name, p, got, err, want)
+				t.Errorf("%s: Check(%q) = %+v, %v; preloaded matcher %+v", s.Name, p, got, err, want)
 			}
 		}
 		for p, err := range ignore.NewWithOptions(parityOptions(s)).FilesFS(fsys, ".") {
 			if err != nil {
-				t.Fatalf("%s: FilesFS: %v", s.name, err)
+				t.Fatalf("%s: FilesFS: %v", s.Name, err)
 			}
 			if res, err := tr.Check(p); res.Ignored || err != nil {
-				t.Errorf("%s: the walker visits %q, but Check = %+v, %v", s.name, p, res, err)
+				t.Errorf("%s: the walker visits %q, but Check = %+v, %v", s.Name, p, res, err)
 			}
 		}
 	}

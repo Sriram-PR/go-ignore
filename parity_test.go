@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	ignore "github.com/Sriram-PR/go-ignore"
+	"github.com/Sriram-PR/go-ignore/internal/paritycases"
 )
 
 const parityBaselineFile = "testdata/parity/baseline.txt"
@@ -34,18 +35,18 @@ func TestParity(t *testing.T) {
 		return
 	}
 
-	var plain, icase []scenario
-	for _, s := range parityCurated() {
-		if s.icase {
+	var plain, icase []paritycases.Scenario
+	for _, s := range paritycases.Curated() {
+		if s.ICase {
 			icase = append(icase, s)
 		} else {
 			plain = append(plain, s)
 		}
 	}
 	for _, seed := range paritySeeds {
-		plain = append(plain, paritySeeded(seed, parityPerSeed, false)...)
+		plain = append(plain, paritycases.Seeded(seed, parityPerSeed, false)...)
 	}
-	icase = append(icase, paritySeeded(paritySeeds[0], parityPerSeed, true)...)
+	icase = append(icase, paritycases.Seeded(paritySeeds[0], parityPerSeed, true)...)
 
 	var recs []string
 	for _, r := range runMatchMode(t, "match", plain) {
@@ -72,7 +73,7 @@ func exploreParity(t *testing.T, env string) {
 		if err != nil {
 			t.Fatalf("GOIGNORE_PARITY_SEEDS: %v", err)
 		}
-		scens := paritySeeded(seed, parityPerSeed, false)
+		scens := paritycases.Seeded(seed, parityPerSeed, false)
 		for _, r := range append(runMatchMode(t, "match", scens), runWalkMode(t, scens)...) {
 			t.Logf("%s %s", r.scenario, r)
 			n++
@@ -106,7 +107,7 @@ func (r parityRecord) String() string {
 	return fmt.Sprintf("%s files=%s path=%q dir=%v git=%v lib=%v", r.mode, b.String(), r.path, r.isDir, r.git, r.lib)
 }
 
-func runMatchMode(t *testing.T, mode string, scens []scenario) []parityRecord {
+func runMatchMode(t *testing.T, mode string, scens []paritycases.Scenario) []parityRecord {
 	t.Helper()
 	var recs []parityRecord
 	for _, s := range scens {
@@ -122,18 +123,18 @@ func runMatchMode(t *testing.T, mode string, scens []scenario) []parityRecord {
 		for _, p := range paths {
 			gv, ok := g[p]
 			if !ok {
-				t.Logf("%s: git did not report %q", s.name, p)
+				t.Logf("%s: git did not report %q", s.Name, p)
 				continue
 			}
 			if gv != l[p] {
-				recs = append(recs, parityRecord{s.name, mode, s.files, p, isDir[p], gv, l[p]})
+				recs = append(recs, parityRecord{s.Name, mode, s.Files, p, isDir[p], gv, l[p]})
 			}
 		}
 	}
 	return recs
 }
 
-func runWalkMode(t *testing.T, scens []scenario) []parityRecord {
+func runWalkMode(t *testing.T, scens []paritycases.Scenario) []parityRecord {
 	t.Helper()
 	var recs []parityRecord
 	for _, s := range scens {
@@ -144,7 +145,7 @@ func runWalkMode(t *testing.T, scens []scenario) []parityRecord {
 		maps.Copy(all, l)
 		for _, p := range slices.Sorted(maps.Keys(all)) {
 			if g[p] != l[p] {
-				recs = append(recs, parityRecord{s.name, "walk", s.files, p, false, g[p], l[p]})
+				recs = append(recs, parityRecord{s.Name, "walk", s.Files, p, false, g[p], l[p]})
 			}
 		}
 	}
@@ -155,7 +156,7 @@ func runWalkMode(t *testing.T, scens []scenario) []parityRecord {
 // Where both agree whether a path is ignored, a path git reports a pattern
 // for must be matched by the same file and line. Disagreements about Ignored
 // are match mode's records.
-func runCheckMode(t *testing.T, scens []scenario) []string {
+func runCheckMode(t *testing.T, scens []paritycases.Scenario) []string {
 	t.Helper()
 	var bad []string
 	for _, s := range scens {
@@ -175,10 +176,10 @@ func runCheckMode(t *testing.T, scens []scenario) []string {
 			}
 			res, err := tr.Check(p)
 			if err != nil {
-				bad = append(bad, fmt.Sprintf("%s path=%q: %v", s.name, p, err))
+				bad = append(bad, fmt.Sprintf("%s path=%q: %v", s.Name, p, err))
 				continue
 			}
-			if res.Ignored != gv.ignored {
+			if res.Ignored != gv.Ignored {
 				continue
 			}
 			src := ""
@@ -189,8 +190,8 @@ func runCheckMode(t *testing.T, scens []scenario) []string {
 				}
 				src = filepath.ToSlash(rel)
 			}
-			if src != gv.source || res.Line != gv.line {
-				bad = append(bad, fmt.Sprintf("%s path=%q git=%s:%d lib=%s:%d", s.name, p, gv.source, gv.line, src, res.Line))
+			if src != gv.Source || res.Line != gv.Line {
+				bad = append(bad, fmt.Sprintf("%s path=%q git=%s:%d lib=%s:%d", s.Name, p, gv.Source, gv.Line, src, res.Line))
 			}
 		}
 	}
@@ -202,9 +203,9 @@ func runCheckMode(t *testing.T, scens []scenario) []string {
 // descendants' is equivalent: sibling directories' rules never apply to the
 // same path. Each rule's Source is its file's scenario path, as a Tree over
 // the scenario's fs.FS reports it.
-func parityMatcher(s scenario) *ignore.Matcher {
+func parityMatcher(s paritycases.Scenario) *ignore.Matcher {
 	m := ignore.NewWithOptions(parityOptions(s))
-	files := slices.SortedFunc(maps.Keys(s.files), func(a, b string) int {
+	files := slices.SortedFunc(maps.Keys(s.Files), func(a, b string) int {
 		if c := cmp.Compare(strings.Count(a, "/"), strings.Count(b, "/")); c != 0 {
 			return c
 		}
@@ -215,21 +216,21 @@ func parityMatcher(s scenario) *ignore.Matcher {
 		if base == "." {
 			base = ""
 		}
-		m.AddPatternsWithSource(base, f, []byte(s.files[f]))
+		m.AddPatternsWithSource(base, f, []byte(s.Files[f]))
 	}
 	return m
 }
 
-func parityOptions(s scenario) ignore.MatcherOptions {
+func parityOptions(s paritycases.Scenario) ignore.MatcherOptions {
 	return ignore.MatcherOptions{
-		CaseInsensitive: s.icase,
+		CaseInsensitive: s.ICase,
 		MaxPatterns:     -1,
 		WarningHandler:  func(ignore.ParseWarning) {},
 	}
 }
 
 // libMatch reports MatchResult.Ignored for each path.
-func libMatch(s scenario, isDir map[string]bool, paths []string) map[string]bool {
+func libMatch(s paritycases.Scenario, isDir map[string]bool, paths []string) map[string]bool {
 	m := parityMatcher(s)
 	res := make(map[string]bool, len(paths))
 	for _, p := range paths {
@@ -371,24 +372,5 @@ func TestCheckBaselineDiff(t *testing.T) {
 	}
 	if !slices.Equal(resolved, []string{"walk d"}) {
 		t.Errorf("resolved = %q, want [walk d]", resolved)
-	}
-}
-
-func TestParityScenarios_DirsExist(t *testing.T) {
-	scens := append(parityCurated(), paritySeeded(1, 50, false)...)
-	for _, s := range scens {
-		for p := range s.paths {
-			parts := strings.Split(p, "/")
-			for k := 1; k < len(parts); k++ {
-				if prefix := strings.Join(parts[:k], "/"); !s.paths[prefix] {
-					t.Errorf("%s: prefix %q of %q is not a directory", s.name, prefix, p)
-				}
-			}
-		}
-		for f := range s.files {
-			if d := path.Dir(f); d != "." && !s.paths[d] {
-				t.Errorf("%s: %q holds a .gitignore but is not a directory", s.name, d)
-			}
-		}
 	}
 }

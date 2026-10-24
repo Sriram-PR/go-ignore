@@ -1,4 +1,7 @@
-package ignore_test
+// Package paritycases holds the scenarios the git parity harness and the
+// conformance module run, and the git oracle that answers them. It is test
+// support: the library never imports it.
+package paritycases
 
 import (
 	"fmt"
@@ -7,20 +10,40 @@ import (
 	"strings"
 )
 
-// scenario is one parity case: .gitignore files keyed by slash path relative
+// Scenario is one parity case: .gitignore files keyed by slash path relative
 // to the repo root, and every path to check mapped to whether it is a
 // directory.
-type scenario struct {
-	name  string
-	icase bool
-	files map[string]string
-	paths map[string]bool
+type Scenario struct {
+	Name  string
+	Group string // feature group of a curated case; "" for seeded
+	ICase bool
+	Files map[string]string
+	Paths map[string]bool
 }
+
+// Groups lists the curated feature groups in display order. Case-insensitive
+// cases are in GroupICase, which is not listed.
+var Groups = []string{
+	"Whitespace & escapes",
+	"Line endings & BOM",
+	"Comments & `!` prefix",
+	"`*` and `?`",
+	"`**`",
+	"Directories & negation",
+	"Anchoring",
+	"Character classes",
+	"Non-ASCII bytes",
+	"Nested .gitignore files",
+}
+
+// GroupICase is the group of every case-insensitive curated case.
+const GroupICase = "Case-insensitive"
 
 type curatedCase struct {
 	files map[string]string
 	paths []string // trailing "/" = dir
 	icase bool
+	group string
 }
 
 func curatedRoot(c string, paths ...string) curatedCase {
@@ -29,9 +52,10 @@ func curatedRoot(c string, paths ...string) curatedCase {
 
 func curatedCases() []curatedCase {
 	var cs []curatedCase
-	add := func(c curatedCase) { cs = append(cs, c) }
+	group := ""
+	add := func(c curatedCase) { c.group = group; cs = append(cs, c) }
 	R := curatedRoot
-	// trailing whitespace / escapes
+	group = "Whitespace & escapes" // trailing whitespace / escapes
 	add(R("foo\t\n", "foo", "foo\t"))
 	add(R("foo \n", "foo", "foo "))
 	add(R("foo\\ \n", "foo", "foo "))
@@ -47,7 +71,7 @@ func curatedCases() []curatedCase {
 	add(R("a\\ b\n", "a b"))
 	add(R("a b\n", "a b"))
 	add(R("a  \\ \n", "a  ", "a"))
-	// line endings / BOM
+	group = "Line endings & BOM" // line endings / BOM
 	add(R("foo\r\nbar\r\n", "foo", "bar", "foo\r"))
 	add(R("foo\rbar\n", "foo", "bar", "foo\rbar"))
 	add(R("foo\r", "foo", "foo\r"))
@@ -59,7 +83,7 @@ func curatedCases() []curatedCase {
 	add(R("bar\n\xef\xbb\xbffoo\n", "foo", "\xef\xbb\xbffoo", "bar"))
 	add(R("\xef\xbb\xbf#c\nfoo\n", "foo"))
 	add(R("\xef\xbb\xbf!foo\n*\n", "foo", "bar"))
-	// comments / negation prefix
+	group = "Comments & `!` prefix" // comments / negation prefix
 	add(R("#foo\n", "#foo"))
 	add(R("\\#foo\n", "#foo"))
 	add(R(" #foo\n", " #foo", "#foo"))
@@ -79,11 +103,11 @@ func curatedCases() []curatedCase {
 	add(R("//a\n", "a"))
 	add(R("a//\n", "a/"))
 	add(R("a///b\n", "a/", "a/b"))
-	// ** positions
+	group = "`**`" // ** positions
 	for _, p := range []string{"**/foo", "foo/**", "a/**/b", "**", "/**", "**/", "/**/", "a**", "**a", "a/**/**/b", "**/**/b", "a/**/", "a/**b", "a**/b", "**/a/**", "***", "***/b", "a/***/b", "a/***", "a/****/b", "**/**", "a/**/**", "/a/**/b/**", "**/a**", "a/**/b/", "**foo", "**/*.log", "a/**/*.log", "\\**", "**\\/a", "*\\*", "**/\\*"} {
 		add(R(p+"\n", "foo", "foo/", "a/", "a/b", "a/b/", "a/x/b", "a/x/y/b", "a/x/y/b/", "b", "ab", "ab/", "a/x.log", "x.log", "a/x/", "foo/a/", "foo/a/x", "a/x/b/c", "a/b/c/", "*", "a*", "a*/b", "*/", "a/b/c/d", "a/x/y/", "z/a/x/y/"))
 	}
-	// dir-only and negation
+	group = "Directories & negation" // dir-only and negation
 	add(R("build/\n", "build", "build/", "build/x", "x/build/", "x/build/y", "x/build"))
 	add(R("*\n!*/\n", "a/", "a/x", "x", "a/b/", "a/b/y"))
 	add(R("*\n!*/\n!*.go\n", "a/", "a/x.go", "a/x", "x.go", "a/b/", "a/b/y.go", "a/b/y"))
@@ -106,7 +130,7 @@ func curatedCases() []curatedCase {
 	add(R("dir/*\n!dir/sub/\n", "dir/", "dir/sub/", "dir/sub/f", "dir/f", "dir/sub/deep/", "dir/sub/deep/f"))
 	add(R("/a/b/\n", "a/", "a/b/", "a/b/c", "b/"))
 	add(R("a/b/\n", "a/", "a/b/", "a/b/c", "x/a/b/", "x/a/b/c"))
-	// anchoring
+	group = "Anchoring" // anchoring
 	add(R("a/b\n", "a/", "a/b", "x/a/", "x/a/b"))
 	add(R("/a\n", "a", "x/", "x/a"))
 	add(R("a\n", "a", "x/", "x/a", "x/y/", "x/y/a"))
@@ -117,15 +141,15 @@ func curatedCases() []curatedCase {
 	add(R("*\n", "a", ".x", "d/", "d/e"))
 	add(R("?\n", "a", "ab", "é", "\xff"))
 	add(R("??\n", "é", "ab", "a", "\xff\xfe"))
-	// brackets
+	group = "Character classes" // brackets
 	for _, p := range []string{"[a-c]x", "[!a-c]x", "[^a-c]x", "[]]x", "[]a]x", "[!]]x", "[a-]x", "[-a]x", "[a-c-e]x", "[a-a]x", "[b-a]x", "[z-a]x", "[[:alpha:]]x", "[[:digit:]]x", "[[:alpha:][:digit:]]x", "[[:alpha:]x", "[[:foo:]]x", "[[:alpha]]x", "[[:alpha:]-z]x", "[a-[:alpha:]]x", "[\\]]x", "[\\a]x", "[\\-]x", "[a\\-c]x", "[ac\\]x", "[x", "x[", "[]x", "[!]x", "[!x", "[a-", "[[]x", "[[x]x", "[\\\\]x", "[*]x", "[?]x", "[/]x", "a[/]x", "[a-z]", "[A-Z]x", "[[:upper:]]x", "[[:lower:]]x", "[[:punct:]]x", "[[:space:]]x", "[[:blank:]]x", "[[:cntrl:]]x", "[[:graph:]]x", "[[:print:]]x", "[[:xdigit:]]x", "[[:alnum:]]x", "[^]]x", "[\\!a]x", "[!!]x", "[a-\\]]x", "[+--]x", "[--0]x", "[%--]x", "[a-c]*", "*[a-c]", "x[0-9]*y", "[.]x", "[[.a.]]x", "[[=a=]]x", "[\xe9]x", "[\xe0-\xff]x", "?[a]"} {
 		add(R(p+"\n", "ax", "bx", "cx", "dx", "-x", "]x", "[x", "!x", "^x", "\\x", "*x", "?x", "/x", "Ax", "1x", " x", ".x", "x", "[:x", "ex", "zx", "xx", "ax/", "a1y", "x", "\xe9x", "\xffx", "a[x", "a/x", "a/", "a]x", "a-x", "[a]x", "ab", "a", "b", "A", "+x", ",x", "--x", "0x", "!!x"))
 	}
-	// escapes in globs
+	group = "Whitespace & escapes" // escapes in globs
 	for _, p := range []string{"\\*", "\\?", "\\[a]", "\\a", "a\\b", "a\\\\b", "\\\\", "\\\\\\*", "*\\", "*\\*", "\\*\\*", "a\\/b", "a\\/", "\\/a", "a/\\/b", "\\", "\\\\\\", "\\a*", "*\\a", "x\\*y", "\\ ", "\\\t"} {
 		add(R(p+"\n", "*", "?", "[a]", "a", "ab", "a\\b", "\\", "\\\\", "\\*", "a/b", "a/", "/a", "x*y", "xay", "a*", "a?", " ", "\t", "aa"))
 	}
-	// patterns git never matches, and classes holding '/'
+	group = "Character classes" // patterns git never matches, and classes holding '/'
 	add(R("x[\n", "x[", "x"))
 	add(R("[a-\n", "[a-", "a"))
 	add(R("[[:foo:]]x\n", "f]x", "[]x", "o]x", "x"))
@@ -135,21 +159,21 @@ func curatedCases() []curatedCase {
 	add(R("[/]x\n", "[/]x", "x"))
 	add(R("[a/]\n", "a/", "a/x", "b"))
 	add(R("a//\n", "a/", "a/b"))
-	// star runs
+	group = "`*` and `?`" // star runs
 	add(R("***\n", "a", "a/b"))
 	add(R("a/***\n", "a/", "a/x", "a/x/y"))
 	add(R("x/***/y\n", "x/", "x/y", "x/a/", "x/a/y", "x/a/b/y"))
-	// escaped slash
+	group = "Anchoring" // escaped slash
 	add(R("a\\/**\n", "a/", "a/b", "a/x/", "a/x/b"))
 	add(R("a/**\\/b\n", "a/", "a/b", "a/x/", "a/x/b", "a/x/y/b"))
 	add(R("**\\/b\n", "b", "a/", "a/b", "a/x/b"))
 	add(R("***\\/b\n", "b", "a/", "a/b"))
 	add(R("**\\/**\n", "a", "x/", "x/y"))
-	// star matching
+	group = "`*` and `?`" // star matching
 	for _, p := range []string{"a*b", "a*b*c", "*a*", "a*", "*a", "**", "a?b", "*?", "?*", "a*?b", "*.", ".*", "*.*", "a**b", "a***b", "*/*", "*/**", "**/*", "a/*/b"} {
 		add(R(p+"\n", "ab", "axb", "axbxc", "a", "b", ".", ".x", "a.", "x.y", "a/b", "a/x/b", "a/", "a/x/", "a/x/y", "abc", "aab", "a.b", "..", "a/b/", "x/y"))
 	}
-	// non-ASCII / bytes
+	group = "Non-ASCII bytes" // non-ASCII / bytes
 	add(R("é\n", "é", "e"))
 	add(R("?\n", "é"))
 	add(R("\xff\n", "\xff", "\xfe"))
@@ -158,7 +182,7 @@ func curatedCases() []curatedCase {
 	add(R("a??\n", "a\xc3\xa9", "a\xe2\x82\xac"))
 	add(R("日本*\n", "日本語", "日"))
 	add(R("[日]\n", "日", "\xe6"))
-	// icase
+	group = GroupICase // icase
 	ic := func(c curatedCase) curatedCase { c.icase = true; return c }
 	add(ic(R("Foo\n", "foo", "FOO", "Foo", "fOo", "x")))
 	add(ic(R("foo\n", "FOO", "Foo/")))
@@ -182,7 +206,7 @@ func curatedCases() []curatedCase {
 	add(ic(R("A/B\n", "a/b", "A/b", "X/a/b")))
 	add(ic(R("a/\n!A/Keep\n", "a/", "A/keep", "A/other")))
 	add(ic(curatedCase{files: map[string]string{".gitignore": "*.LOG\n", "Sub/.gitignore": "!x.log\n"}, paths: []string{"x.log", "Sub/", "sub/", "Sub/x.log", "SUB/x.log"}}))
-	// nested
+	group = "Nested .gitignore files" // nested
 	add(curatedCase{files: map[string]string{".gitignore": "*.log\n", "sub/.gitignore": "!keep.log\n/only\nb/c\n*.tmp\n"}, paths: []string{"a.log", "sub/", "sub/keep.log", "sub/a.log", "sub/only", "sub/x/", "sub/x/only", "sub/b/", "sub/b/c", "x/b/c", "sub/x/b/c", "sub/x/b/", "sub/a.tmp", "sub/x/a.tmp", "a.tmp", "sub/x/keep.log", "other/", "other/keep.log"}})
 	add(curatedCase{files: map[string]string{".gitignore": "sub/\n", "sub/.gitignore": "!keep\n"}, paths: []string{"sub/", "sub/keep", "sub/other"}})
 	add(curatedCase{files: map[string]string{".gitignore": "sub\n", "sub/.gitignore": "!keep\n"}, paths: []string{"sub/", "sub/keep", "sub/other"}})
@@ -193,10 +217,10 @@ func curatedCases() []curatedCase {
 	add(curatedCase{files: map[string]string{".gitignore": "./foo\n../bar\n.\n..\n./\n"}, paths: []string{"foo", "bar", ".x"}})
 	add(curatedCase{files: map[string]string{"a b/.gitignore": "x\n", "é/.gitignore": "*.o\n"}, paths: []string{"a b/", "a b/x", "é/", "é/y.o", "y.o", "x"}})
 	add(curatedCase{files: map[string]string{".gitignore": "*\n!.gitignore\n!sub/\n!sub/.gitignore\n", "sub/.gitignore": "!*.go\n"}, paths: []string{"sub/", "sub/a.go", "sub/a", "a.go"}})
-	// trailing space/dir interplay
+	group = "Whitespace & escapes" // trailing space/dir interplay
 	add(R("foo/  \n", "foo/", "foo/x"))
 	add(R("foo /\n", "foo /", "foo/"))
-	// pattern-vs-directory
+	group = "Directories & negation" // pattern-vs-directory
 	add(R("a.b/\n", "a.b/", "a.b/x", "a.b"))
 	add(R("*.d/\n", "x.d/", "x.d/f", "y/x.d/f", "x.d"))
 	add(R("a/b/**\n", "a/b/", "a/b/c", "a/b/c/", "a/b/c/d", "a/", "x/a/b/c"))
@@ -246,8 +270,8 @@ func genPattern(r *rand.Rand) string {
 	return sb.String()
 }
 
-func genScenario(r *rand.Rand, icase bool) *scenario {
-	s := &scenario{files: map[string]string{}, paths: map[string]bool{}}
+func genScenario(r *rand.Rand, icase bool) *Scenario {
+	s := &Scenario{Files: map[string]string{}, Paths: map[string]bool{}}
 	dirs := []string{"", "a", "foo", "a/b", "b/a", "foo/bar"}
 	if icase {
 		dirs = []string{"", "a", "foo", "a/b", "b/a", "foo/bar"}
@@ -272,7 +296,7 @@ func genScenario(r *rand.Rand, icase bool) *scenario {
 		if r.Intn(15) == 0 {
 			c = "\xef\xbb\xbf" + c
 		}
-		s.files[path.Join(d, ".gitignore")] = s.files[path.Join(d, ".gitignore")] + c
+		s.Files[path.Join(d, ".gitignore")] = s.Files[path.Join(d, ".gitignore")] + c
 	}
 	for i, np := 0, 3+r.Intn(10); i < np; i++ {
 		depth := 1 + r.Intn(4)
@@ -286,45 +310,45 @@ func genScenario(r *rand.Rand, icase bool) *scenario {
 		}
 		p := strings.Join(segs, "/")
 		isDir := r.Intn(3) == 0
-		s.paths[p] = isDir
+		s.Paths[p] = isDir
 	}
 	// fix up: prefixes must be dirs
-	for p := range s.paths {
+	for p := range s.Paths {
 		parts := strings.Split(p, "/")
 		for k := 1; k < len(parts); k++ {
-			s.paths[strings.Join(parts[:k], "/")] = true
+			s.Paths[strings.Join(parts[:k], "/")] = true
 		}
 	}
 	// ensure dirs holding .gitignore exist
-	for f := range s.files {
+	for f := range s.Files {
 		d := path.Dir(f)
 		if d != "." {
 			parts := strings.Split(d, "/")
 			for k := 1; k <= len(parts); k++ {
-				s.paths[strings.Join(parts[:k], "/")] = true
+				s.Paths[strings.Join(parts[:k], "/")] = true
 			}
 		}
 	}
 	return s
 }
 
-// parityCurated converts the curated cases into scenarios. A trailing "/"
-// marks a directory. Paths starting with "/", containing "//", or with a "."
-// or ".." segment are dropped: they cannot exist on disk inside the repo, and
-// git check-ignore rejects them.
-func parityCurated() []scenario {
+// Curated converts the curated cases into scenarios. A trailing "/" marks a
+// directory. Paths starting with "/", containing "//", or with a "." or ".."
+// segment are dropped: they cannot exist on disk inside the repo, and git
+// check-ignore rejects them.
+func Curated() []Scenario {
 	cases := curatedCases()
-	out := make([]scenario, 0, len(cases))
+	out := make([]Scenario, 0, len(cases))
 	for i, c := range cases {
-		s := scenario{name: fmt.Sprintf("curated-%d", i), icase: c.icase, files: c.files, paths: map[string]bool{}}
+		s := Scenario{Name: fmt.Sprintf("curated-%d", i), Group: c.group, ICase: c.icase, Files: c.files, Paths: map[string]bool{}}
 		for _, p := range c.paths {
 			if strings.HasPrefix(p, "/") || strings.Contains(p, "//") || hasDotSegment(p) {
 				continue
 			}
 			if dir, ok := strings.CutSuffix(p, "/"); ok {
-				s.paths[dir] = true
-			} else if !s.paths[p] {
-				s.paths[p] = false
+				s.Paths[dir] = true
+			} else if !s.Paths[p] {
+				s.Paths[p] = false
 			}
 		}
 		addDirPrefixes(&s)
@@ -333,15 +357,15 @@ func parityCurated() []scenario {
 	return out
 }
 
-// paritySeeded generates n scenarios from seed. It consumes the random source
-// in the same order as the original audit tester, so seeds are comparable.
-func paritySeeded(seed int64, n int, icase bool) []scenario {
+// Seeded generates n scenarios from seed. It consumes the random source in
+// the same order as the original audit tester, so seeds are comparable.
+func Seeded(seed int64, n int, icase bool) []Scenario {
 	r := rand.New(rand.NewSource(seed))
-	out := make([]scenario, 0, n)
+	out := make([]Scenario, 0, n)
 	for i := range n {
 		s := genScenario(r, icase)
-		s.name = fmt.Sprintf("seed%d-%d", seed, i)
-		s.icase = icase
+		s.Name = fmt.Sprintf("seed%d-%d", seed, i)
+		s.ICase = icase
 		out = append(out, *s)
 	}
 	return out
@@ -349,21 +373,21 @@ func paritySeeded(seed int64, n int, icase bool) []scenario {
 
 // addDirPrefixes marks every proper prefix of a path, and every directory
 // holding a .gitignore, as a directory.
-func addDirPrefixes(s *scenario) {
-	for p := range s.paths {
+func addDirPrefixes(s *Scenario) {
+	for p := range s.Paths {
 		parts := strings.Split(p, "/")
 		for k := 1; k < len(parts); k++ {
-			s.paths[strings.Join(parts[:k], "/")] = true
+			s.Paths[strings.Join(parts[:k], "/")] = true
 		}
 	}
-	for f := range s.files {
+	for f := range s.Files {
 		d := path.Dir(f)
 		if d == "." {
 			continue
 		}
 		parts := strings.Split(d, "/")
 		for k := 1; k <= len(parts); k++ {
-			s.paths[strings.Join(parts[:k], "/")] = true
+			s.Paths[strings.Join(parts[:k], "/")] = true
 		}
 	}
 }

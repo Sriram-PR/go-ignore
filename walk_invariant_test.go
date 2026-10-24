@@ -10,6 +10,7 @@ import (
 	"testing/fstest"
 
 	ignore "github.com/Sriram-PR/go-ignore"
+	"github.com/Sriram-PR/go-ignore/internal/paritycases"
 )
 
 // TestWalkAgreesWithMatch checks the walker, which skips Match's
@@ -35,13 +36,13 @@ func TestWalkAgreesWithMatch(t *testing.T) {
 		got := map[string]bool{}
 		for p, err := range ignore.NewWithOptions(parityOptions(s)).FilesFS(fsys, ".") {
 			if err != nil {
-				t.Fatalf("%s: FilesFS: %v", s.name, err)
+				t.Fatalf("%s: FilesFS: %v", s.Name, err)
 			}
 			got[p] = true
 		}
 		if !maps.Equal(got, want) {
-			t.Errorf("%s: FilesFS = %q, want %q\nfiles: %q", s.name,
-				slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)), s.files)
+			t.Errorf("%s: FilesFS = %q, want %q\nfiles: %q", s.Name,
+				slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)), s.Files)
 		}
 
 		for p, f := range fsys {
@@ -49,7 +50,7 @@ func TestWalkAgreesWithMatch(t *testing.T) {
 			for k := 1; k < len(parts); k++ {
 				parent := strings.Join(parts[:k], "/")
 				if m.Match(parent, true) && !m.Match(p, f.Mode.IsDir()) {
-					t.Errorf("%s: %q is ignored but %q under it is not\nfiles: %q", s.name, parent, p, s.files)
+					t.Errorf("%s: %q is ignored but %q under it is not\nfiles: %q", s.Name, parent, p, s.Files)
 					break
 				}
 			}
@@ -59,24 +60,24 @@ func TestWalkAgreesWithMatch(t *testing.T) {
 
 // walkInvariantScenarios is the parity scenario set without the
 // case-insensitive scenarios TestWalkAgreesWithMatch leaves out.
-func walkInvariantScenarios() []scenario {
-	var scens []scenario
-	for _, s := range parityCurated() {
-		if !s.icase {
+func walkInvariantScenarios() []paritycases.Scenario {
+	var scens []paritycases.Scenario
+	for _, s := range paritycases.Curated() {
+		if !s.ICase {
 			scens = append(scens, s)
 		}
 	}
 	for _, seed := range paritySeeds {
-		scens = append(scens, paritySeeded(seed, parityPerSeed, false)...)
+		scens = append(scens, paritycases.Seeded(seed, parityPerSeed, false)...)
 	}
 	return scens
 }
 
 // scenarioFS is s as an fs.FS. On Windows, paths with a backslash in a name
 // are left out.
-func scenarioFS(s scenario) fstest.MapFS {
+func scenarioFS(s paritycases.Scenario) fstest.MapFS {
 	fsys := fstest.MapFS{}
-	for p, dir := range s.paths {
+	for p, dir := range s.Paths {
 		if runtime.GOOS == "windows" && strings.Contains(p, `\`) {
 			continue
 		}
@@ -86,7 +87,7 @@ func scenarioFS(s scenario) fstest.MapFS {
 			fsys[p] = &fstest.MapFile{}
 		}
 	}
-	for f, content := range s.files {
+	for f, content := range s.Files {
 		fsys[f] = &fstest.MapFile{Data: []byte(content)}
 	}
 	return fsys

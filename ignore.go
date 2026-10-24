@@ -21,8 +21,9 @@ type MatchResult struct {
 	// the path of the originating .gitignore when the matcher knows it, set
 	// automatically by AddGlobalPatterns, AddSystemPatterns,
 	// AddExcludePatterns, AddPatternsFromFile, LoadRepo, and the nested
-	// .gitignore discovery inside WalkDir (an OS path, as given) and
-	// WalkDirFS (an fs.FS path). For rules added via AddPatterns or
+	// .gitignore and IgnoreFiles discovery inside WalkDir (an OS path, as
+	// given) and WalkDirFS (an fs.FS path). It is "overrides" for a rule
+	// from MatcherOptions.Overrides. For rules added via AddPatterns or
 	// AddPatternsReader, which carry only an in-memory blob, Source is "".
 	// Empty if Matched == false.
 	Source string
@@ -31,7 +32,8 @@ type MatchResult struct {
 	// Empty string means the root .gitignore.
 	BasePath string
 
-	// Line is the line number (1-indexed) in the .gitignore file.
+	// Line is the line number (1-indexed) in the .gitignore file, or the
+	// 1-based index in MatcherOptions.Overrides.
 	// Zero if Matched == false.
 	Line int
 

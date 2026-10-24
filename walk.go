@@ -78,8 +78,8 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 }
 
 // WalkDirFS is the fs.FS-backed counterpart to WalkDir. It walks the tree at
-// root inside fsys, applying the same nested .gitignore discovery, rule
-// scoping, handling of a .gitignore it cannot read (one call, 100 MB limit)
+// root inside fsys, applying the same nested .gitignore discovery
+// (MatcherOptions.IgnoreFiles included), rule scoping, handling of a .gitignore it cannot read (one call, 100 MB limit)
 // and .git/-pruning behavior. Paths supplied to fn use forward slashes (fs.WalkDir
 // convention), regardless of host OS.
 //
@@ -100,7 +100,9 @@ func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error {
 	return m.walkInternal(fsBackend(fsys), root, "", fn)
 }
 
-// walkInternal is the shared engine behind WalkDir and WalkDirFS.
+// walkInternal is the shared engine behind WalkDir, WalkDirFS and Entries.
+// A non-empty start (already a valid WalkOptions.Start for Entries) walks
+// that directory below root after loading the rules above it.
 func (m *Matcher) walkInternal(b walkBackend, root, start string, fn fs.WalkDirFunc) error {
 	// Snapshot rules and opts under the read lock so the walker is unaffected
 	// by concurrent AddPatterns calls on the receiver.
@@ -291,7 +293,7 @@ func fsBackend(fsys fs.FS) walkBackend {
 
 // WalkRepo is a convenience that combines LoadRepo and WalkDir: it loads
 // core.excludesFile and info/exclude as LoadRepo does, then walks root.
-// The walker reads root's .gitignore itself, once, so a bad one is reported
+// The walker reads root's .gitignore and IgnoreFiles itself, once, so a bad one is reported
 // through fn like any nested .gitignore instead of failing the call. A
 // failure loading the other two sources is returned before the walk.
 //
@@ -308,17 +310,18 @@ func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error {
 // Files returns a range-over-func iterator that yields the OS-native path of
 // every non-ignored, non-directory entry under root (regular files and
 // symlinks, which are not followed), in the same lexical order
-// filepath.WalkDir uses. Directories are not yielded — use WalkDir if you
-// need to observe them.
+// filepath.WalkDir uses. Directories are not yielded; use Entries or WalkDir
+// to observe them.
 //
 // Errors encountered during traversal are yielded as ("", err) and the walk
 // continues with the next entry; return or break out of the range loop to
 // stop at the first error. Breaking out stops iteration cleanly via
 // fs.SkipAll.
 //
-// Files inherits WalkDir's behavior: nested .gitignore files are discovered
-// as descent happens, ignored directories are pruned, .git/ is always pruned,
-// and the receiver matcher is NOT mutated.
+// Files inherits WalkDir's behavior: nested .gitignore files, and the
+// IgnoreFiles named in MatcherOptions, are discovered as descent happens,
+// ignored directories are pruned, .git/ is always pruned, and the receiver
+// matcher is NOT mutated.
 //
 // Usage:
 //

@@ -74,7 +74,7 @@ type walkBackend struct {
 // during a walk is permitted but will NOT affect the in-progress walk
 // (the walker uses a snapshot taken at WalkDir entry).
 func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
-	return m.walkInternal(osBackend, root, fn)
+	return m.walkInternal(osBackend, root, "", fn)
 }
 
 // WalkDirFS is the fs.FS-backed counterpart to WalkDir. It walks the tree at
@@ -97,11 +97,11 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 //
 // Thread-safe: see WalkDir's concurrency notes.
 func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error {
-	return m.walkInternal(fsBackend(fsys), root, fn)
+	return m.walkInternal(fsBackend(fsys), root, "", fn)
 }
 
 // walkInternal is the shared engine behind WalkDir and WalkDirFS.
-func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) error {
+func (m *Matcher) walkInternal(b walkBackend, root, start string, fn fs.WalkDirFunc) error {
 	// Snapshot rules and opts under the read lock so the walker is unaffected
 	// by concurrent AddPatterns calls on the receiver.
 	m.mu.RLock()
@@ -121,8 +121,11 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 		rules int
 	}
 	var frames []frame
+	// preloading is set while the directories above start are read: they
+	// load their rules but reach fn only with an error.
+	preloading := false
 
-	return b.walkDir(root, func(path string, d fs.DirEntry, err error) error {
+	visit := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fn(path, d, err)
 		}
@@ -181,6 +184,9 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 				return fn(path, d, readErr)
 			}
 
+			if preloading {
+				return nil
+			}
 			return fn(path, d, nil)
 		}
 
@@ -189,7 +195,61 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 			return nil
 		}
 		return fn(path, d, nil)
-	})
+	}
+
+	if start == "" {
+		return b.walkDir(root, visit)
+	}
+	if err := checkStart(start); err != nil {
+		_ = fn("", nil, err)
+		return nil
+	}
+
+	// Read root and each directory above start as the walk would on its way
+	// down. A missing step, a symlink (not followed, as in the walk) or a
+	// file ends the walk with an error; an ignored directory, or SkipDir or
+	// SkipAll from fn on a read error, ends it quietly.
+	preloading = true
+	dir := root
+	segs := strings.Split(start, "/")
+	for i := 0; i <= len(segs); i++ {
+		if i > 0 {
+			dir = b.joinPath(dir, segs[i-1])
+		}
+		fi, statErr := b.src.stat(dir, false)
+		switch {
+		case statErr != nil:
+			_ = fn(dir, nil, statErr)
+			return nil
+		case i > 0 && fi.Mode()&fs.ModeSymlink != 0:
+			_ = fn(dir, nil, fmt.Errorf("walk start: %s is a symlink", dir))
+			return nil
+		case i < len(segs) && !fi.IsDir():
+			_ = fn(dir, nil, fmt.Errorf("walk start: %s is not a directory", dir))
+			return nil
+		}
+		if i < len(segs) {
+			if r := visit(dir, fs.FileInfoToDirEntry(fi), nil); r != nil {
+				return nil
+			}
+		}
+	}
+	preloading = false
+	return b.walkDir(dir, visit)
+}
+
+// checkStart rejects a WalkOptions.Start that is not a plain relative slash
+// path below root.
+func checkStart(start string) error {
+	if strings.HasPrefix(start, "/") || strings.Contains(start, `\`) || filepath.VolumeName(filepath.FromSlash(start)) != "" {
+		return fmt.Errorf("walk start %q: not a relative slash path", start)
+	}
+	for seg := range strings.SplitSeq(start, "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return fmt.Errorf("walk start %q: empty, \".\" or \"..\" segment", start)
+		}
+	}
+	return nil
 }
 
 // osBackend is the walkBackend backed by the OS filesystem.
@@ -351,7 +411,18 @@ func RepoFiles(root string, opts MatcherOptions) iter.Seq2[string, error] {
 
 // WalkOptions configures Entries, EntriesFS and RepoEntries. The zero value
 // walks the whole tree.
-type WalkOptions struct{}
+type WalkOptions struct {
+	// Start is a slash path under root to walk instead of root, such as
+	// "src" or "cmd/tool". The ignore files of root and of every directory
+	// down to Start are read first and paths are matched relative to root,
+	// so the result is the part of the whole walk under Start. A Start that
+	// is ignored, or below an ignored directory, yields nothing; a file
+	// yields itself unless ignored. Start must have no empty, "." or ".."
+	// segment and no backslash, and root and the directories on the way
+	// must be real directories, not symlinks; otherwise one error is
+	// yielded and the iteration ends. "" walks root.
+	Start string
+}
 
 // Entry is one non-ignored file or directory that Entries yields.
 type Entry struct {
@@ -372,7 +443,9 @@ type entryState struct {
 }
 
 // SkipDir, called before the loop body returns, prunes a directory's
-// contents. It has no effect on a file or after the loop body has returned.
+// contents. On the error entry of a directory above WalkOptions.Start it
+// ends the iteration instead. It has no effect on a file or after the loop
+// body has returned.
 func (e Entry) SkipDir() {
 	if e.st != nil && e.st.seq == e.seq && e.DirEntry != nil && e.IsDir() {
 		e.st.skip = true
@@ -383,7 +456,8 @@ func (e Entry) SkipDir() {
 // under root, in the lexical order filepath.WalkDir uses, with WalkDir's
 // rules: nested ignore files scoped to their directory, ignored directories
 // pruned, .git skipped, symlinks not followed, the receiver not mutated.
-// root itself is not yielded. Call Entry.SkipDir to prune a directory.
+// The directory walked (root, or WalkOptions.Start) is not yielded. Call
+// Entry.SkipDir to prune a directory.
 //
 // Errors are yielded with the entry they concern and the walk goes on. A
 // directory whose ignore files can't be read is yielded once, with the
@@ -429,9 +503,16 @@ func RepoEntries(root string, opts MatcherOptions, wo WalkOptions) iter.Seq2[Ent
 	}
 }
 
-func (m *Matcher) entries(b walkBackend, root string, _ WalkOptions) iter.Seq2[Entry, error] {
-	return entriesFromWalker(root, func(fn fs.WalkDirFunc) error {
-		return m.walkInternal(b, root, fn)
+func (m *Matcher) entries(b walkBackend, root string, wo WalkOptions) iter.Seq2[Entry, error] {
+	// The same joins walkInternal makes, so the walk root is recognized.
+	walkRoot := root
+	if wo.Start != "" {
+		for seg := range strings.SplitSeq(wo.Start, "/") {
+			walkRoot = b.joinPath(walkRoot, seg)
+		}
+	}
+	return entriesFromWalker(walkRoot, func(fn fs.WalkDirFunc) error {
+		return m.walkInternal(b, root, wo.Start, fn)
 	})
 }
 

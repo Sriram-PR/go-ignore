@@ -9,7 +9,7 @@ Zero-dependency `.gitignore` matching for Go, verified byte-for-byte against `gi
 ## Highlights
 
 - **Correct** — full gitignore syntax (`*`, `?`, `**`, `!`, `/`, `\` escapes, character classes, and all 12 POSIX classes), with an automated parity test suite against the system `git`.
-- **Batteries included** — a filesystem walker with nested `.gitignore` auto-discovery and directory pruning, single-path checks that apply nested `.gitignore` files, plus one-call loading of the standard gitignore sources (`core.excludesFile` as git resolves it, `.git/info/exclude`, and the repo root).
+- **Batteries included** — a filesystem walker with nested `.gitignore` auto-discovery, directory pruning, extra ignore files and overrides, single-path checks that apply nested `.gitignore` files, plus one-call loading of the standard gitignore sources (`core.excludesFile` as git resolves it, `.git/info/exclude`, and the repo root).
 - **Fast and safe** — a zero-allocation match path, safe for concurrent use, fuzz- and race-tested.
 - **Zero dependencies** — the standard library only.
 
@@ -64,6 +64,25 @@ err := ignore.WalkRepo(".", ignore.MatcherOptions{}, func(path string, d fs.DirE
 ```
 
 The iterator form is `for path, err := range ignore.RepoFiles(".", ignore.MatcherOptions{})`, which yields only non-ignored files.
+
+`RepoEntries` yields directories too, so filters such as hidden directories can prune as they go, and `WalkOptions.Start` walks one subdirectory with the rules above it loaded. `MatcherOptions.IgnoreFiles` reads extra files such as `.aiignore` after each `.gitignore`, and `MatcherOptions.Overrides` holds patterns that beat every ignore file:
+
+```go
+opts := ignore.MatcherOptions{
+	IgnoreFiles: []string{".aiignore"},
+	Overrides:   []string{"*.pem"},
+}
+for e, err := range ignore.RepoEntries(".", opts, ignore.WalkOptions{Start: "src"}) {
+	if err != nil {
+		return err
+	}
+	if e.IsDir() && strings.HasPrefix(e.Name(), ".") {
+		e.SkipDir()
+		continue
+	}
+	process(e.Path)
+}
+```
 
 ### Explain a match
 

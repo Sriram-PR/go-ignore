@@ -4,6 +4,29 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.7.0
+
+Walker options for packers and indexers: extra per-directory ignore files, caller overrides, and an iterator that yields directories and can start below the root. Only additions to the exported API; with the new options unset, existing calls behave as before.
+
+**Added**
+
+- **`MatcherOptions.IgnoreFiles`** names extra per-directory ignore files, such as `.ignore` or `.aiignore`. The walkers, `Tree`, and `LoadRepo` (for the root) read them in each directory right after its `.gitignore`, in order, under the same rules: regular files only, no symlinks, 100 MB cap. A later name beats an earlier one in the same directory, and a deeper directory's files beat a shallower one's. A bad or repeated name is dropped with a warning.
+- **`MatcherOptions.Overrides`** holds pattern lines scoped to the root and checked after every other rule, nested ignore files included, so a match there decides. `!` re-includes, but as in git, nothing inside an ignored directory comes back unless the directory is re-included too. `MatchResult.Source` is `"overrides"` and `Line` is the 1-based index. Overrides count toward `MaxPatterns` and are parsed first. A line containing `\n` or `\r` is dropped with a warning, and a line starting with a BOM keeps it as pattern text.
+- **`Entries`, `EntriesFS` and `RepoEntries`** yield every non-ignored file and directory as an `Entry` (an `fs.DirEntry` plus `Path`), in `WalkDir` order and with the walker's rules. Calling `Entry.SkipDir()` in the loop body prunes a directory, so filters like hidden directories or a max depth fit in a range loop. Errors are yielded with their entry and the walk goes on.
+- **`WalkOptions.Start`** walks one subdirectory, such as `src`, after reading the ignore files of the root and of every directory down to it, so the result is that part of the whole walk. Nothing above the root is read. An ignored Start yields nothing; a malformed, missing or symlinked one yields one error.
+
+**Changed**
+
+- `AddExcludePatterns` read errors say `reading exclude file <path>: ...` instead of `reading <path>: ...`. `errors.Is` checks are unaffected.
+
+**Docs**
+
+- The README's comparison with other Go gitignore libraries is measured now: `make conformance` runs each library over the parity scenarios and counts the answers that agree with `git check-ignore`, and CI checks that the table is current.
+
+**Performance**
+
+- `Match` reads a snapshot of the rules and evaluates it outside the lock. Against v1.6.0, measured from a separate module, a path below an ignored directory is about 30% faster to check, other `Match` calls are 4-8% slower, mostly code layout, and walks are unchanged. `Match` still makes no allocations.
+
 ### v1.6.0
 
 Pattern parsing and case folding now match git for every known divergence but two, which are documented in the package docs under "Differences from git". No exported API changes.

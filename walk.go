@@ -348,3 +348,116 @@ func RepoFiles(root string, opts MatcherOptions) iter.Seq2[string, error] {
 		}
 	}
 }
+
+// WalkOptions configures Entries, EntriesFS and RepoEntries. The zero value
+// walks the whole tree.
+type WalkOptions struct{}
+
+// Entry is one non-ignored file or directory that Entries yields.
+type Entry struct {
+	fs.DirEntry
+	// Path is the entry's path as WalkDir passes it: OS-native for Entries
+	// and RepoEntries, slash-separated for EntriesFS.
+	Path string
+
+	st  *entryState
+	seq uint64
+}
+
+// entryState is shared by the entries of one walk; seq tells which Entry is
+// being yielded.
+type entryState struct {
+	seq  uint64
+	skip bool
+}
+
+// SkipDir, called before the loop body returns, prunes a directory's
+// contents. It has no effect on a file or after the loop body has returned.
+func (e Entry) SkipDir() {
+	if e.st != nil && e.st.seq == e.seq && e.DirEntry != nil && e.IsDir() {
+		e.st.skip = true
+	}
+}
+
+// Entries returns an iterator over every non-ignored file and directory
+// under root, in the lexical order filepath.WalkDir uses, with WalkDir's
+// rules: nested ignore files scoped to their directory, ignored directories
+// pruned, .git skipped, symlinks not followed, the receiver not mutated.
+// root itself is not yielded. Call Entry.SkipDir to prune a directory.
+//
+// Errors are yielded with the entry they concern and the walk goes on. A
+// directory whose ignore files can't be read is yielded once, with the
+// error, and then walked with the files that could be read unless SkipDir
+// is called; a directory that can't be listed is yielded a second time with
+// the error. An error the walk returns at the end is yielded with an empty
+// Entry. Breaking out of the loop stops the walk.
+//
+//	for e, err := range m.Entries(root, ignore.WalkOptions{}) {
+//	    if err != nil { return err }
+//	    if e.IsDir() && strings.HasPrefix(e.Name(), ".") {
+//	        e.SkipDir()
+//	    }
+//	}
+//
+// Thread-safe: see WalkDir's concurrency notes.
+func (m *Matcher) Entries(root string, wo WalkOptions) iter.Seq2[Entry, error] {
+	return m.entries(osBackend, root, wo)
+}
+
+// EntriesFS is the fs.FS-backed counterpart to Entries: the same walk over
+// fsys, with forward-slash paths.
+func (m *Matcher) EntriesFS(fsys fs.FS, root string, wo WalkOptions) iter.Seq2[Entry, error] {
+	return m.entries(fsBackend(fsys), root, wo)
+}
+
+// RepoEntries combines LoadRepo's sources and Entries, as WalkRepo does for
+// WalkDir: core.excludesFile and info/exclude are loaded first, and a failure
+// loading them is yielded once and ends the iteration; the walker reads the
+// root's ignore files itself.
+func RepoEntries(root string, opts MatcherOptions, wo WalkOptions) iter.Seq2[Entry, error] {
+	return func(yield func(Entry, error) bool) {
+		m, err := loadRepoConfig(root, opts)
+		if err != nil {
+			yield(Entry{}, err)
+			return
+		}
+		for e, walkErr := range m.Entries(root, wo) {
+			if !yield(e, walkErr) {
+				return
+			}
+		}
+	}
+}
+
+func (m *Matcher) entries(b walkBackend, root string, _ WalkOptions) iter.Seq2[Entry, error] {
+	return entriesFromWalker(root, func(fn fs.WalkDirFunc) error {
+		return m.walkInternal(b, root, fn)
+	})
+}
+
+// entriesFromWalker adapts a WalkDirFunc-driven walk to an Entry iterator.
+// The walk root is left out when it is a directory, as Entries documents.
+func entriesFromWalker(walkRoot string, walker func(fs.WalkDirFunc) error) iter.Seq2[Entry, error] {
+	return func(yield func(Entry, error) bool) {
+		st := &entryState{}
+		err := walker(func(p string, d fs.DirEntry, walkErr error) error {
+			if walkErr == nil && p == walkRoot && d.IsDir() {
+				return nil
+			}
+			st.seq++
+			st.skip = false
+			if !yield(Entry{DirEntry: d, Path: p, st: st, seq: st.seq}, walkErr) {
+				return fs.SkipAll
+			}
+			if st.skip {
+				return fs.SkipDir
+			}
+			return nil
+		})
+		// As in Files: SkipAll is swallowed by the walk, so this is a failure
+		// the callback never saw.
+		if err != nil {
+			yield(Entry{}, err)
+		}
+	}
+}

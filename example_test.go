@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing/fstest"
 
 	ignore "github.com/Sriram-PR/go-ignore"
@@ -220,6 +221,33 @@ func ExampleMatcherOptions_ignoreFiles() {
 	// .aiignore
 	// .gitignore
 	// app.go
+}
+
+func ExampleMatcher_EntriesFS() {
+	fsys := fstest.MapFS{
+		".gitignore":     {Data: []byte("*.log\n")},
+		".venv/lib/x.py": {},
+		"main.go":        {},
+		"pkg/debug.log":  {},
+		"pkg/util.go":    {},
+	}
+	for e, err := range ignore.New().EntriesFS(fsys, ".", ignore.WalkOptions{}) {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+		if e.IsDir() {
+			if strings.HasPrefix(e.Name(), ".") {
+				e.SkipDir()
+			}
+			continue
+		}
+		fmt.Println(e.Path)
+	}
+	// Output:
+	// .gitignore
+	// main.go
+	// pkg/util.go
 }
 
 func ExampleMatcher_TreeFS() {

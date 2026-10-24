@@ -111,6 +111,16 @@ type MatcherOptions struct {
 	// See MaxPatterns for the memory these two limits allow.
 	MaxPatternLength int
 
+	// IgnoreFiles names extra per-directory ignore files, such as .ignore
+	// or .aiignore, read in each directory right after its .gitignore, in
+	// order, under the same rules, wherever .gitignore is read: the
+	// walkers, Tree, and LoadRepo for the root. A later name beats an
+	// earlier one in the same directory; a deeper directory's files beat a
+	// shallower one's. Each must be a plain file name: no "/" or "\", not
+	// "", ".", ".." or ".gitignore". A bad or repeated name is dropped with
+	// a ParseWarning. NewWithOptions copies the list.
+	IgnoreFiles []string
+
 	// Overrides are gitignore pattern lines, scoped to the root, checked
 	// after every other rule, nested ignore files a walker or Tree reads
 	// included, so a match here decides. A "!" line re-includes, within
@@ -172,10 +182,30 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 	}
 	m := &Matcher{opts: opts}
 	m.opts.Overrides = nil // parsed into m.overrides
-	var warnings []ParseWarning
-	m.overrides, warnings = m.parseOverrides(opts.Overrides)
-	m.dispatch(warnings)
+	names, nameWarnings := validIgnoreFiles(opts.IgnoreFiles)
+	m.opts.IgnoreFiles = names
+	overrides, overrideWarnings := m.parseOverrides(opts.Overrides)
+	m.overrides = overrides
+	m.dispatch(slices.Concat(nameWarnings, overrideWarnings))
 	return m
+}
+
+// validIgnoreFiles returns a copy of names without those that are not a
+// plain file name or repeat an earlier one, with a warning for each.
+func validIgnoreFiles(names []string) ([]string, []ParseWarning) {
+	var out []string
+	var warnings []ParseWarning
+	for _, n := range names {
+		switch {
+		case n == "" || n == "." || n == ".." || n == ".gitignore" || strings.ContainsAny(n, `/\`):
+			warnings = append(warnings, ParseWarning{Pattern: n, Message: "IgnoreFiles name is not a plain file name other than .gitignore, skipped"})
+		case slices.Contains(out, n):
+			warnings = append(warnings, ParseWarning{Pattern: n, Message: "IgnoreFiles name repeated, skipped"})
+		default:
+			out = append(out, n)
+		}
+	}
+	return out, warnings
 }
 
 // overridesSource is MatchResult.Source for a rule from Overrides.

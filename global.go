@@ -49,6 +49,9 @@ var gitConfigTimeout = 5 * time.Second
 // .gitignore must not be a symlink (git does not follow one); otherwise the
 // error wraps ErrPatternFileSkipped.
 //
+// With MatcherOptions.IgnoreFiles, the root's extra ignore files are read
+// right after the root .gitignore, under the same rules.
+//
 // Nested .gitignore files under subdirectories are NOT loaded, so Match is
 // wrong for paths they govern. To check single paths with them, use OpenTree;
 // to visit a whole tree, WalkRepo or WalkDir (both read each directory's
@@ -66,15 +69,13 @@ func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 		return nil, err
 	}
 
-	rootIgnore := filepath.Join(repoRoot, ".gitignore")
-	content, err := readPatternFile(osSource{}, rootIgnore, false, maxPatternFileSize)
+	files, err := readIgnoreFiles(osSource{}, filepath.Join, repoRoot, m.opts.IgnoreFiles, nil)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return m, nil
-		}
-		return nil, fmt.Errorf("reading %s: %w", rootIgnore, err)
+		return nil, err
 	}
-	m.addPatternsFromSource("", content, rootIgnore)
+	for _, f := range files {
+		m.addPatternsFromSource("", f.content, f.path)
+	}
 	return m, nil
 }
 

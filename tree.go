@@ -2,7 +2,6 @@ package ignore
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	pathpkg "path"
@@ -24,7 +23,8 @@ import (
 // seen, so make a new Tree to see them. A .gitignore inside an ignored
 // directory is never read, as in git. Reads follow WalkDir's rules: a
 // .gitignore that is a symlink, is not a regular file, or is larger than 100
-// MB is not read.
+// MB is not read. The IgnoreFiles named in MatcherOptions are read with each
+// directory's .gitignore, right after it.
 //
 // A Tree is safe for concurrent use.
 type Tree struct {
@@ -242,15 +242,14 @@ func (t *Tree) read(d *dirRules, dir string, chain int) []ParseWarning {
 			return nil
 		}
 	}
-	name := t.join(t.root, dir, ".gitignore")
-	content, err := readPatternFile(t.src, name, false, maxPatternFileSize)
-	if err != nil {
-		// ENOTDIR: a path below a file, as in Check("file.txt/x"), asks
-		// for file.txt/.gitignore, which can't exist. ENAMETOOLONG: a
-		// missing path past PATH_MAX would otherwise fail every deeper level.
-		if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) && !errors.Is(err, syscall.ENAMETOOLONG) {
-			d.err = fmt.Errorf("reading %s: %w", name, err)
-		}
+	// ENOTDIR: a path below a file, as in Check("file.txt/x"), asks for
+	// file.txt/.gitignore, which can't exist. ENAMETOOLONG: a missing path
+	// past PATH_MAX would otherwise fail every deeper level.
+	files, readErr := readIgnoreFiles(t.src, t.join, t.join(t.root, dir), t.opts.IgnoreFiles, func(e error) bool {
+		return errors.Is(e, syscall.ENOTDIR) || errors.Is(e, syscall.ENAMETOOLONG)
+	})
+	d.err = readErr
+	if len(files) == 0 {
 		return nil
 	}
 
@@ -272,7 +271,9 @@ func (t *Tree) read(d *dirRules, dir string, chain int) []ParseWarning {
 		}
 		s.opts.MaxPatterns = remaining
 	}
-	s.addPatternsFromSource(dir, content, name)
+	for _, f := range files {
+		s.addPatternsFromSource(dir, f.content, f.path)
+	}
 	d.rules = s.rules
 	d.chain += len(d.rules)
 	return warnings

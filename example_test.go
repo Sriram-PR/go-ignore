@@ -200,6 +200,28 @@ func ExampleMatcherOptions_overrides() {
 	// overrides 1
 }
 
+func ExampleMatcherOptions_ignoreFiles() {
+	fsys := fstest.MapFS{
+		".gitignore":  {Data: []byte("*.log\n")},
+		".aiignore":   {Data: []byte("secrets/\n")},
+		"app.go":      {},
+		"debug.log":   {},
+		"secrets/key": {},
+	}
+	m := ignore.NewWithOptions(ignore.MatcherOptions{IgnoreFiles: []string{".aiignore"}})
+	for p, err := range m.FilesFS(fsys, ".") {
+		if err != nil {
+			fmt.Println("error:", err)
+			return
+		}
+		fmt.Println(p)
+	}
+	// Output:
+	// .aiignore
+	// .gitignore
+	// app.go
+}
+
 func ExampleMatcher_TreeFS() {
 	fsys := fstest.MapFS{
 		".gitignore":     {Data: []byte("*.log\n")},

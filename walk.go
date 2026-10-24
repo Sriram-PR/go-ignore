@@ -1,7 +1,6 @@
 package ignore
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"iter"
@@ -49,6 +48,10 @@ type walkBackend struct {
 //     fn(dir, d, err), with err wrapping ErrPatternFileSkipped or the read
 //     error. Returning nil walks the directory without that file's rules, as
 //     git does; returning fs.SkipDir skips the directory instead.
+//   - The IgnoreFiles named in MatcherOptions are read in each directory
+//     right after its .gitignore, under the same rules. When several of a
+//     directory's files can't be read, the one call carries all their
+//     errors, and nil walks the directory with the files that could be read.
 //   - Rules from a discovered .gitignore apply only inside its directory and
 //     are dropped when the walk leaves it, so MaxPatterns counts the
 //     receiver's rules plus those of the current entry's ancestors, not the
@@ -159,23 +162,23 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 				return fs.SkipDir
 			}
 
-			// Discover a .gitignore in this directory and load it into the
-			// per-walk child matcher. Most directories have none, which is not an
-			// error.
-			gitignorePath := b.joinPath(path, ".gitignore")
-			content, readErr := readPatternFile(b.src, gitignorePath, false, maxPatternFileSize)
-			switch {
-			case readErr == nil:
+			// Load this directory's ignore files into the per-walk child
+			// matcher. Most directories have none, which is not an error.
+			files, readErr := readIgnoreFiles(b.src, b.joinPath, path, child.opts.IgnoreFiles, nil)
+			if len(files) > 0 {
 				basePath := rel
 				if basePath == "." {
 					basePath = ""
 				}
 				frames = append(frames, frame{dir: basePath, rules: len(child.rules)})
-				child.addPatternsFromSource(basePath, content, gitignorePath)
-			case !errors.Is(readErr, fs.ErrNotExist):
-				// The only callback for this directory: nil walks it without
-				// these rules, as git does, and SkipDir prunes it.
-				return fn(path, d, fmt.Errorf("reading %s: %w", gitignorePath, readErr))
+				for _, f := range files {
+					child.addPatternsFromSource(basePath, f.content, f.path)
+				}
+			}
+			if readErr != nil {
+				// The only callback for this directory: nil walks it with the
+				// files that could be read, as git does, and SkipDir prunes it.
+				return fn(path, d, readErr)
 			}
 
 			return fn(path, d, nil)

@@ -112,3 +112,32 @@ func errTooLarge(limit int64) error {
 	}
 	return fmt.Errorf("%w: larger than %d bytes", ErrPatternFileSkipped, limit)
 }
+
+// ignoreFile is one per-directory ignore file that was read.
+type ignoreFile struct {
+	path    string
+	content []byte
+}
+
+// readIgnoreFiles reads dir's .gitignore and then each extra name, in order,
+// as readPatternFile does. Missing files, and errors skip accepts, are left
+// out silently; the other errors are joined, each naming its file.
+func readIgnoreFiles(src patternSource, join func(...string) string, dir string, extra []string, skip func(error) bool) ([]ignoreFile, error) {
+	var files []ignoreFile
+	var errs []error
+	read := func(name string) {
+		p := join(dir, name)
+		content, err := readPatternFile(src, p, false, maxPatternFileSize)
+		switch {
+		case err == nil:
+			files = append(files, ignoreFile{p, content})
+		case !errors.Is(err, fs.ErrNotExist) && (skip == nil || !skip(err)):
+			errs = append(errs, fmt.Errorf("reading %s: %w", p, err))
+		}
+	}
+	read(".gitignore")
+	for _, name := range extra {
+		read(name)
+	}
+	return files, errors.Join(errs...)
+}

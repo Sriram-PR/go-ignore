@@ -103,8 +103,9 @@ func (m *Matcher) walkInternal(b walkBackend, root string, fn fs.WalkDirFunc) er
 	// by concurrent AddPatterns calls on the receiver.
 	m.mu.RLock()
 	child := &Matcher{
-		opts:  m.opts,
-		rules: slices.Clone(m.rules),
+		opts:      m.opts,
+		rules:     slices.Clone(m.rules),
+		overrides: m.overrides,
 	}
 	m.mu.RUnlock()
 

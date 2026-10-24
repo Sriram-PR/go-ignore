@@ -185,6 +185,21 @@ func ExampleNewWithOptions() {
 	// true
 }
 
+func ExampleMatcherOptions_overrides() {
+	m := ignore.NewWithOptions(ignore.MatcherOptions{
+		Overrides: []string{"*.pem", "!build/"},
+	})
+	m.AddPatterns("", []byte("build/\n!*.pem\n"))
+	fmt.Println(m.Match("key.pem", false))
+	fmt.Println(m.Match("build/app", false))
+	r := m.MatchWithReason("key.pem", false)
+	fmt.Println(r.Source, r.Line)
+	// Output:
+	// true
+	// false
+	// overrides 1
+}
+
 func ExampleMatcher_TreeFS() {
 	fsys := fstest.MapFS{
 		".gitignore":     {Data: []byte("*.log\n")},

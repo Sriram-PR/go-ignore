@@ -1310,7 +1310,7 @@ func TestParentIgnored(t *testing.T) {
 		{"build", false, ""}, // the path itself is not a parent
 	}
 	for _, tt := range tests {
-		got, ok := parentIgnored(rules, tt.path, splitPath(tt.path))
+		got, ok := parentIgnored(rules, nil, tt.path, splitPath(tt.path))
 		if ok != tt.wantOK || got.Rule != tt.wantRule {
 			t.Errorf("parentIgnored(%q) = %q, %v; want %q, %v", tt.path, got.Rule, ok, tt.wantRule, tt.wantOK)
 		}

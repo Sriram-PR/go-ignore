@@ -110,6 +110,17 @@ type MatcherOptions struct {
 	// Default: DefaultMaxPatternLength (4096). Set to -1 for unlimited.
 	// See MaxPatterns for the memory these two limits allow.
 	MaxPatternLength int
+
+	// Overrides are gitignore pattern lines, scoped to the root, checked
+	// after every other rule, nested ignore files a walker or Tree reads
+	// included, so a match here decides. A "!" line re-includes, within
+	// git's rule that the contents of an ignored directory stay ignored.
+	// MatchResult.Source is "overrides" and Line is the 1-based index in
+	// Overrides. An element containing "\n" or "\r" is dropped with a
+	// ParseWarning. Override rules count toward MaxPatterns and are parsed
+	// first. NewWithOptions reads them once; New and the zero value Matcher
+	// have none.
+	Overrides []string
 }
 
 // Matcher holds compiled gitignore rules.
@@ -128,6 +139,10 @@ type Matcher struct {
 	mu       sync.RWMutex
 	rules    []rule
 	warnings []ParseWarning
+	// overrides is parsed from opts.Overrides by NewWithOptions and never
+	// changed after, so it is read without mu. Every reader evaluates it
+	// after all other rules.
+	overrides []rule
 	// opts is set before the Matcher is shared and never changed after, so
 	// it is read without mu.
 	opts MatcherOptions
@@ -155,8 +170,79 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 	if opts.MaxPatternLength == 0 {
 		opts.MaxPatternLength = DefaultMaxPatternLength
 	}
-	return &Matcher{
-		opts: opts,
+	m := &Matcher{opts: opts}
+	m.opts.Overrides = nil // parsed into m.overrides
+	var warnings []ParseWarning
+	m.overrides, warnings = m.parseOverrides(opts.Overrides)
+	m.dispatch(warnings)
+	return m
+}
+
+// overridesSource is MatchResult.Source for a rule from Overrides.
+const overridesSource = "overrides"
+
+// parseOverrides parses lines as one root-level file whose line N is
+// lines[N-1], so a rule's Line is its index + 1.
+func (m *Matcher) parseOverrides(lines []string) ([]rule, []ParseWarning) {
+	if len(lines) == 0 {
+		return nil, nil
+	}
+	var warnings []ParseWarning
+	kept := make([]string, len(lines))
+	for i, l := range lines {
+		if strings.ContainsAny(l, "\r\n") {
+			warnings = append(warnings, ParseWarning{Pattern: l, Message: "override contains a line break, skipped", Line: i + 1})
+			continue
+		}
+		kept[i] = l
+	}
+	content := strings.Join(kept, "\n")
+	// parseLines drops one BOM at the start of a file; an override is a
+	// line, whose BOM is pattern text.
+	if strings.HasPrefix(content, "\ufeff") {
+		content = "\ufeff" + content
+	}
+	rules, parsed, truncated := parseLines("", []byte(content), m.effectiveMaxPatternLength(), m.effectiveMaxPatterns(), overridesSource)
+	warnings = append(warnings, parsed...)
+	if truncated {
+		warnings = append(warnings, ParseWarning{Message: "maximum pattern count reached, excess patterns truncated"})
+	}
+	if m.opts.CaseInsensitive {
+		lowerRules(rules)
+	}
+	return rules, warnings
+}
+
+// dispatch delivers construction-time warnings: to the handler if set,
+// otherwise to Warnings().
+func (m *Matcher) dispatch(ws []ParseWarning) {
+	if len(ws) == 0 {
+		return
+	}
+	if h := m.opts.WarningHandler; h != nil {
+		for _, w := range ws {
+			h(w)
+		}
+		return
+	}
+	m.mu.Lock()
+	m.retainWarnings(ws, "")
+	m.mu.Unlock()
+}
+
+// lowerRules pre-lowers what case-insensitive matching compares, so Match
+// does not lower per call. git folds ASCII only.
+func lowerRules(rules []rule) {
+	for i := range rules {
+		// Only the scoping key is lowered; basePath keeps the caller's
+		// spelling for MatchResult.BasePath.
+		rules[i].basePathSlash = asciiLower(rules[i].basePathSlash)
+		for j := range rules[i].segments {
+			seg := &rules[i].segments[j]
+			if !seg.doubleStar {
+				seg.value = asciiLower(seg.value)
+			}
+		}
 	}
 }
 
@@ -239,7 +325,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	maxRules := -1
 	if maxPatterns := m.effectiveMaxPatterns(); maxPatterns >= 0 {
 		m.mu.RLock()
-		maxRules = max(maxPatterns-len(m.rules), 0)
+		maxRules = max(maxPatterns-len(m.rules)-len(m.overrides), 0)
 		m.mu.RUnlock()
 	}
 	newRules, parseWarnings, truncated := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), maxRules, source)
@@ -247,23 +333,13 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
 	// This avoids lowering on every match call. git folds ASCII only.
 	if m.opts.CaseInsensitive {
-		for i := range newRules {
-			// Only the scoping key is lowered; basePath keeps the caller's
-			// spelling for MatchResult.BasePath.
-			newRules[i].basePathSlash = asciiLower(newRules[i].basePathSlash)
-			for j := range newRules[i].segments {
-				seg := &newRules[i].segments[j]
-				if !seg.doubleStar {
-					seg.value = asciiLower(seg.value)
-				}
-			}
-		}
+		lowerRules(newRules)
 	}
 
 	m.mu.Lock()
 
 	if maxPatterns := m.effectiveMaxPatterns(); maxPatterns >= 0 {
-		remaining := maxPatterns - len(m.rules)
+		remaining := maxPatterns - len(m.rules) - len(m.overrides)
 		if remaining <= 0 {
 			parseWarnings = append(parseWarnings, ParseWarning{
 				Pattern:  "",
@@ -431,18 +507,18 @@ func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
 	// As in git, an ignored parent directory decides: no negation can
 	// re-include a path below it.
 	if checkParents {
-		if res, ok := parentIgnored(rules, path, pathSegments); ok {
+		if res, ok := parentIgnored(rules, m.overrides, path, pathSegments); ok {
 			return res
 		}
 	}
-	return evaluateRules(rules, path, pathSegments, isDir)
+	return evaluateWithOverrides(rules, m.overrides, path, pathSegments, isDir)
 }
 
 // parentIgnored reports the rule that ignores the shallowest parent directory
 // of path, so the outermost ignored parent is reported, as git check-ignore
 // -v does. It slices path at each '/' instead of joining segments, which keeps
 // the walk O(N) and allocation-free on deep paths.
-func parentIgnored(rules []rule, path string, segs []string) (MatchResult, bool) {
+func parentIgnored(rules, overrides []rule, path string, segs []string) (MatchResult, bool) {
 	if len(segs) < 2 {
 		return MatchResult{}, false
 	}
@@ -457,7 +533,7 @@ func parentIgnored(rules []rule, path string, segs []string) (MatchResult, bool)
 			continue
 		}
 		n++
-		res := evaluateRules(rules, path[start:j], segs[:n], true)
+		res := evaluateWithOverrides(rules, overrides, path[start:j], segs[:n], true)
 		if res.Matched && res.Ignored {
 			return res, true
 		}
@@ -509,12 +585,24 @@ func evaluateRules(rules []rule, path string, pathSegments []string, isDir bool)
 	return result
 }
 
-// RuleCount returns the number of rules currently loaded.
-// Useful for debugging and testing.
+// evaluateWithOverrides is evaluateRules over rules and then overrides, last
+// match winning across both.
+func evaluateWithOverrides(rules, overrides []rule, path string, segs []string, isDir bool) MatchResult {
+	res := evaluateRules(rules, path, segs, isDir)
+	if len(overrides) > 0 {
+		if o := evaluateRules(overrides, path, segs, isDir); o.Matched {
+			res = o
+		}
+	}
+	return res
+}
+
+// RuleCount returns the number of rules currently loaded, Overrides
+// included. Useful for debugging and testing.
 func (m *Matcher) RuleCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return len(m.rules)
+	return len(m.rules) + len(m.overrides)
 }
 
 // asciiLower lowers A-Z only, as git's case folding does. Other bytes,

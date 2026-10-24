@@ -28,12 +28,13 @@ import (
 //
 // A Tree is safe for concurrent use.
 type Tree struct {
-	base  []rule
-	opts  MatcherOptions
-	root  string
-	src   patternSource
-	join  func(elem ...string) string
-	lstat func(name string) (fs.FileInfo, error)
+	base      []rule
+	overrides []rule // evaluated after every directory's rules
+	opts      MatcherOptions
+	root      string
+	src       patternSource
+	join      func(elem ...string) string
+	lstat     func(name string) (fs.FileInfo, error)
 
 	mu   sync.RWMutex
 	dirs map[string]*dirRules
@@ -93,13 +94,14 @@ func (m *Matcher) newTree(root string, src patternSource, join func(...string) s
 	base := m.rules[:len(m.rules):len(m.rules)]
 	m.mu.RUnlock()
 	return &Tree{
-		base:  base,
-		opts:  m.opts,
-		root:  root,
-		src:   src,
-		join:  join,
-		lstat: lstat,
-		dirs:  map[string]*dirRules{},
+		base:      base,
+		overrides: m.overrides,
+		opts:      m.opts,
+		root:      root,
+		src:       src,
+		join:      join,
+		lstat:     lstat,
+		dirs:      map[string]*dirRules{},
 	}
 }
 
@@ -147,7 +149,7 @@ func (t *Tree) check(path string, isDir, stat bool) (MatchResult, error) {
 	var groupBuf [34][]rule
 	groups := append(groupBuf[:0], t.base)
 	var errs []error
-	d := t.load("", len(t.base))
+	d := t.load("", len(t.base)+len(t.overrides))
 	groups = append(groups, d.rules)
 	if d.err != nil {
 		errs = append(errs, d.err)
@@ -164,7 +166,7 @@ func (t *Tree) check(path string, isDir, stat bool) (MatchResult, error) {
 	for k := 1; k < len(segs); k++ {
 		di += strings.IndexByte(disk[di:], '/')
 		mi += strings.IndexByte(match[mi:], '/')
-		if res := evaluateGroups(groups, match[matchStart:mi], segs[:k], true); res.Matched && res.Ignored {
+		if res := evaluateGroups(groups, t.overrides, match[matchStart:mi], segs[:k], true); res.Matched && res.Ignored {
 			return res, errors.Join(errs...)
 		}
 		if !outside {
@@ -182,15 +184,20 @@ func (t *Tree) check(path string, isDir, stat bool) (MatchResult, error) {
 		fi, err := t.lstat(t.join(t.root, disk))
 		isDir = err == nil && fi.IsDir()
 	}
-	return evaluateGroups(groups, match, segs, isDir), errors.Join(errs...)
+	return evaluateGroups(groups, t.overrides, match, segs, isDir), errors.Join(errs...)
 }
 
-// evaluateGroups is evaluateRules over several rule lists in order, last
-// match winning across all of them.
-func evaluateGroups(groups [][]rule, path string, segs []string, isDir bool) MatchResult {
+// evaluateGroups is evaluateRules over several rule lists in order and then
+// overrides, last match winning across all of them.
+func evaluateGroups(groups [][]rule, overrides []rule, path string, segs []string, isDir bool) MatchResult {
 	var res MatchResult
 	for _, g := range groups {
 		if r := evaluateRules(g, path, segs, isDir); r.Matched {
+			res = r
+		}
+	}
+	if len(overrides) > 0 {
+		if r := evaluateRules(overrides, path, segs, isDir); r.Matched {
 			res = r
 		}
 	}

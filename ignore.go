@@ -357,7 +357,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	maxRules := -1
 	if maxPatterns := m.effectiveMaxPatterns(); maxPatterns >= 0 {
 		m.mu.RLock()
-		maxRules = max(maxPatterns-len(m.rules)-len(m.overrides), 0)
+		maxRules = max(maxPatterns-m.ruleTotal(), 0)
 		m.mu.RUnlock()
 	}
 	newRules, parseWarnings, truncated := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), maxRules, source)
@@ -371,7 +371,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	m.mu.Lock()
 
 	if maxPatterns := m.effectiveMaxPatterns(); maxPatterns >= 0 {
-		remaining := maxPatterns - len(m.rules) - len(m.overrides)
+		remaining := maxPatterns - m.ruleTotal()
 		if remaining <= 0 {
 			parseWarnings = append(parseWarnings, ParseWarning{
 				Pattern:  "",
@@ -620,10 +620,15 @@ func evaluateRules(rules []rule, path string, pathSegments []string, isDir bool)
 // evaluateWithOverrides is evaluateRules over rules and then overrides, last
 // match winning across both.
 func evaluateWithOverrides(rules, overrides []rule, path string, segs []string, isDir bool) MatchResult {
-	res := evaluateRules(rules, path, segs, isDir)
+	return withOverrides(evaluateRules(rules, path, segs, isDir), overrides, path, segs, isDir)
+}
+
+// withOverrides returns the last override matching path, or res when none
+// does: an override match decides over every other rule.
+func withOverrides(res MatchResult, overrides []rule, path string, segs []string, isDir bool) MatchResult {
 	if len(overrides) > 0 {
 		if o := evaluateRules(overrides, path, segs, isDir); o.Matched {
-			res = o
+			return o
 		}
 	}
 	return res
@@ -634,6 +639,12 @@ func evaluateWithOverrides(rules, overrides []rule, path string, segs []string, 
 func (m *Matcher) RuleCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	return m.ruleTotal()
+}
+
+// ruleTotal is the rule count MaxPatterns limits, Overrides included. The
+// caller holds mu.
+func (m *Matcher) ruleTotal() int {
 	return len(m.rules) + len(m.overrides)
 }
 

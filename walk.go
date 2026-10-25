@@ -213,12 +213,9 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, fn fs.WalkDirF
 	// file ends the walk with an error; an ignored directory, or SkipDir or
 	// SkipAll from fn on a read error, ends it quietly.
 	preloading = true
-	dir := root
-	segs := strings.Split(start, "/")
-	for i := 0; i <= len(segs); i++ {
-		if i > 0 {
-			dir = b.joinPath(dir, segs[i-1])
-		}
+	dirs := startDirs(b, root, start)
+	last := len(dirs) - 1
+	for i, dir := range dirs {
 		fi, statErr := b.src.stat(dir, false)
 		switch {
 		case statErr != nil:
@@ -227,18 +224,31 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, fn fs.WalkDirF
 		case i > 0 && fi.Mode()&fs.ModeSymlink != 0:
 			_ = fn(dir, nil, fmt.Errorf("walk start: %s is a symlink", dir))
 			return nil
-		case i < len(segs) && !fi.IsDir():
+		case i < last && !fi.IsDir():
 			_ = fn(dir, nil, fmt.Errorf("walk start: %s is not a directory", dir))
 			return nil
 		}
-		if i < len(segs) {
+		if i < last {
 			if r := visit(dir, fs.FileInfoToDirEntry(fi), nil); r != nil {
 				return nil
 			}
 		}
 	}
 	preloading = false
-	return b.walkDir(dir, visit)
+	return b.walkDir(dirs[last], visit)
+}
+
+// startDirs returns root and each directory down to start, joined as the
+// walk joins them; the last is the directory walked.
+func startDirs(b walkBackend, root, start string) []string {
+	dirs := []string{root}
+	if start == "" {
+		return dirs
+	}
+	for seg := range strings.SplitSeq(start, "/") {
+		dirs = append(dirs, b.joinPath(dirs[len(dirs)-1], seg))
+	}
+	return dirs
 }
 
 // checkStart rejects a WalkOptions.Start that is not a plain relative slash
@@ -509,14 +519,8 @@ func RepoEntries(root string, opts MatcherOptions, wo WalkOptions) iter.Seq2[Ent
 }
 
 func (m *Matcher) entries(b walkBackend, root string, wo WalkOptions) iter.Seq2[Entry, error] {
-	// The same joins walkInternal makes, so the walk root is recognized.
-	walkRoot := root
-	if wo.Start != "" {
-		for seg := range strings.SplitSeq(wo.Start, "/") {
-			walkRoot = b.joinPath(walkRoot, seg)
-		}
-	}
-	return entriesFromWalker(walkRoot, func(fn fs.WalkDirFunc) error {
+	dirs := startDirs(b, root, wo.Start)
+	return entriesFromWalker(dirs[len(dirs)-1], func(fn fs.WalkDirFunc) error {
 		return m.walkInternal(b, root, wo.Start, fn)
 	})
 }

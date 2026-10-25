@@ -196,12 +196,7 @@ func evaluateGroups(groups [][]rule, overrides []rule, path string, segs []strin
 			res = r
 		}
 	}
-	if len(overrides) > 0 {
-		if r := evaluateRules(overrides, path, segs, isDir); r.Matched {
-			res = r
-		}
-	}
-	return res
+	return withOverrides(res, overrides, path, segs, isDir)
 }
 
 // load returns dir's entry ("" is the root), reading its .gitignore on first

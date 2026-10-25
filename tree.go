@@ -77,10 +77,10 @@ func (m *Matcher) TreeFS(fsys fs.FS, root string) *Tree {
 
 // OpenTree returns a Tree for the repository work tree at root, loaded like
 // WalkRepo: core.excludesFile and info/exclude as LoadRepo loads them, then
-// every .gitignore and IgnoreFiles file from root down, read on demand. A failure loading the
-// first two is returned; a root .gitignore that can't be read is reported by
-// each check, like any nested one. Use it to check single paths the way git
-// check-ignore does.
+// every .gitignore and IgnoreFiles file from root down, read on demand. A
+// failure loading the first two is returned; a root ignore file that can't be
+// read is reported by each check, like any nested one. Use it to check single
+// paths the way git check-ignore does.
 func OpenTree(root string, opts MatcherOptions) (*Tree, error) {
 	m, err := loadRepoConfig(root, opts)
 	if err != nil {
@@ -230,8 +230,8 @@ func (t *Tree) load(dir string, chain int) *dirRules {
 	return d
 }
 
-// read fills d from dir's .gitignore and returns the parse warnings when a
-// handler wants them.
+// read fills d from dir's .gitignore and IgnoreFiles and returns the parse
+// warnings when a handler wants them.
 func (t *Tree) read(d *dirRules, dir string, chain int) []ParseWarning {
 	d.chain = chain
 	if dir != "" {

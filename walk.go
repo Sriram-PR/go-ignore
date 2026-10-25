@@ -79,9 +79,10 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 
 // WalkDirFS is the fs.FS-backed counterpart to WalkDir. It walks the tree at
 // root inside fsys, applying the same nested .gitignore discovery
-// (MatcherOptions.IgnoreFiles included), rule scoping, handling of a .gitignore it cannot read (one call, 100 MB limit)
-// and .git/-pruning behavior. Paths supplied to fn use forward slashes (fs.WalkDir
-// convention), regardless of host OS.
+// (MatcherOptions.IgnoreFiles included), rule scoping, handling of ignore
+// files it cannot read (one call, 100 MB limit) and .git/-pruning behavior.
+// Paths supplied to fn use forward slashes (fs.WalkDir convention),
+// regardless of host OS.
 //
 // Use cases: in-memory tests via fstest.MapFS, embedded filesystems via
 // embed.FS, in-process indexers backed by a custom fs.FS, and WASM contexts
@@ -293,9 +294,10 @@ func fsBackend(fsys fs.FS) walkBackend {
 
 // WalkRepo is a convenience that combines LoadRepo and WalkDir: it loads
 // core.excludesFile and info/exclude as LoadRepo does, then walks root.
-// The walker reads root's .gitignore and IgnoreFiles itself, once, so a bad one is reported
-// through fn like any nested .gitignore instead of failing the call. A
-// failure loading the other two sources is returned before the walk.
+// The walker reads root's .gitignore and IgnoreFiles itself, once, so a bad
+// one is reported through fn like any nested ignore file instead of failing
+// the call. A failure loading the other two sources is returned before the
+// walk.
 //
 // Use this when you want the standard "walk a working tree, skipping
 // ignored files" behavior without managing the matcher yourself.

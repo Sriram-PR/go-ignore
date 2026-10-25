@@ -58,6 +58,13 @@ go test -v -run TestMatchRule_Basic
 go test -bench=. -benchmem
 ```
 
+### Where tests go
+
+- Tests for code in `foo.go` go in `foo_test.go`. When a test file passes about 1000 lines, split it by topic into `foo_<topic>_test.go`, such as `walk_fs_test.go` or `ignore_limits_test.go`.
+- Tests that aren't about one source file have a file each: all benchmarks in `benchmark_test.go`, fuzzers in `fuzz_test.go` with the reference matcher they compare against in `fuzz_reference_test.go`, `edge_cases_test.go`, `parity_test.go` and `gitcases_test.go` (see below), examples in `example_test.go` or `example_<topic>_test.go`, and test setup in `main_test.go`.
+- A helper used by two or more test files goes in `helpers_test.go` (package `ignore`) or `helpers_ext_test.go` (package `ignore_test`). A helper used by one file stays in it, and so does one that belongs to a harness, like the parity git oracle in `parity_test.go`.
+- Tests that only build on Unix (FIFOs via `syscall`, say) go in `<source>_unix_test.go`, with the same build tag as the existing ones. A test that runs everywhere but skips on Windows, like the permission and some symlink tests, stays in the usual file with a `runtime.GOOS` check.
+
 ### Git Parity
 
 Two kinds of test compare go-ignore with git:

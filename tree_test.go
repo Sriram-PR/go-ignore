@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
@@ -342,5 +345,97 @@ func TestTree_ConcurrentReadsOnce(t *testing.T) {
 		if n := fsys.count(fmt.Sprintf("d%d/.gitignore", i)); n != 1 {
 			t.Errorf("d%d/.gitignore opened %d times, want 1", i, n)
 		}
+	}
+}
+
+// OpenTree loads a repository's sources as WalkRepo does, plus every nested
+// .gitignore on demand, and agrees with git on each.
+func TestOpenTree_LoadsRepoSources(t *testing.T) {
+	home := isolateGitConfig(t)
+	runGit(t, home, "init", "-q", "repo")
+	repo := filepath.Join(home, "repo")
+	writeTree(t, home, map[string]string{
+		"glob.ign":                "*.glob\n",
+		"repo/.git/info/exclude":  "*.excl\n",
+		"repo/.gitignore":         "*.log\n",
+		"repo/src/.gitignore":     "*.tmp\n",
+		"repo/src/deep/keep.file": "",
+	})
+	setExcludes(t, filepath.Join(home, "global.cfg"), filepath.Join(home, "glob.ign"))
+
+	tr, err := OpenTree(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("OpenTree: %v", err)
+	}
+	for _, p := range []string{"a.glob", "a.excl", "a.log", "src/x.tmp", "x.tmp", "src/deep/keep.file"} {
+		res := mustCheck(t, tr, p)
+		if want := gitIgnores(t, repo, p); res.Ignored != want {
+			t.Errorf("Check(%q).Ignored = %v, git says %v", p, res.Ignored, want)
+		}
+	}
+	if res := mustCheck(t, tr, "a.excl"); res.Source != filepath.Join(repo, ".git", "info", "exclude") {
+		t.Errorf("a.excl Source = %q, want the info/exclude path", res.Source)
+	}
+}
+
+// A bad root .gitignore does not fail OpenTree; each check reports it.
+func TestOpenTree_BadRootGitignorePerCheck(t *testing.T) {
+	home := isolateGitConfig(t)
+	runGit(t, home, "init", "-q", "repo")
+	repo := filepath.Join(home, "repo")
+	if err := os.Mkdir(filepath.Join(repo, ".gitignore"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tr, err := OpenTree(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("OpenTree: %v", err)
+	}
+	if _, err := tr.Check("x"); !errors.Is(err, ErrPatternFileSkipped) {
+		t.Errorf("Check(x) err = %v, want ErrPatternFileSkipped", err)
+	}
+}
+
+// On disk, Source is the OS path of the deciding .gitignore, and Check stats
+// the path to tell a directory from a file.
+func TestTree_OS(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		".gitignore":     "build/\n",
+		"src/.gitignore": "*.tmp\n",
+		"build":          "DIR",
+		"src/build":      "",
+	})
+	tr := New().Tree(root)
+	res := mustCheck(t, tr, "src/x.tmp")
+	if want := filepath.Join(root, "src", ".gitignore"); !res.Ignored || res.Source != want {
+		t.Errorf("src/x.tmp: %+v, want ignored with Source %s", res, want)
+	}
+	if !mustCheck(t, tr, "build").Ignored {
+		t.Error("build (a directory) not ignored by build/")
+	}
+	if mustCheck(t, tr, "src/build").Ignored {
+		t.Error("src/build (a file) ignored by build/")
+	}
+}
+
+// A missing path longer than PATH_MAX fails each deep .gitignore read with
+// ENAMETOOLONG, which is no .gitignore, not an error per level.
+func TestTree_OSPathTooLong(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{".gitignore": "*.tmp\n"})
+	res, err := New().Tree(root).Check(strings.Repeat("d/", 4000) + "x.tmp")
+	if err != nil || !res.Ignored {
+		t.Errorf("Check(deep x.tmp) = %+v, error of %d bytes; want ignored by *.tmp, no error", res, len(fmt.Sprint(err)))
+	}
+}
+
+// A path below a file asks for a .gitignore under that file, which is no
+// .gitignore at all, not an error.
+func TestTree_OSPathBelowFile(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{".gitignore": "x\n", "file.txt": ""})
+	res, err := New().Tree(root).Check("file.txt/x")
+	if err != nil || !res.Ignored {
+		t.Errorf("Check(file.txt/x) = %+v, %v; want ignored by x, no error", res, err)
 	}
 }

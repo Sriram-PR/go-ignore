@@ -522,3 +522,47 @@ func BenchmarkMatch_DeepPathFloatingRules(b *testing.B) {
 		m.Match(path, false)
 	}
 }
+
+func BenchmarkMatch_Simple(b *testing.B) {
+	b.ReportAllocs()
+	m := New()
+	m.AddPatterns("", []byte("*.log\n*.tmp\nbuild/\nnode_modules/\n"))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Match("src/main.go", false)
+	}
+}
+
+func BenchmarkMatchGlob_Simple(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		matchGlob("*.log", "test.log")
+	}
+}
+
+func BenchmarkMatchGlob_Complex(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		matchGlob("*test*spec*.go", "my_test_spec_file.go")
+	}
+}
+
+func BenchmarkMatchSegments_Simple(b *testing.B) {
+	b.ReportAllocs()
+	pattern := []segment{{value: "src"}, {value: "*.go", wildcard: true}}
+	path := []string{"src", "main.go"}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		matchSegments(pattern, path)
+	}
+}
+
+func BenchmarkMatchSegments_DoubleStar(b *testing.B) {
+	b.ReportAllocs()
+	pattern := []segment{{doubleStar: true}, {value: "test"}, {doubleStar: true}, {value: "*.go", wildcard: true}}
+	path := []string{"src", "lib", "test", "unit", "foo_test.go"}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		matchSegments(pattern, path)
+	}
+}

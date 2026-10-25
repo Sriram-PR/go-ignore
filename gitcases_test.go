@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// gitAvailable checks if git is installed and accessible
-func gitAvailable() bool {
-	_, err := exec.LookPath("git")
-	return err == nil
-}
-
 // TestGitParity_Basic tests basic patterns against git check-ignore
 func TestGitParity_Basic(t *testing.T) {
 	if !gitAvailable() {

@@ -1,7 +1,6 @@
 package ignore_test
 
 import (
-	"cmp"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -196,37 +195,6 @@ func runCheckMode(t *testing.T, scens []paritycases.Scenario) []string {
 		}
 	}
 	return bad
-}
-
-// parityMatcher loads the scenario's .gitignore files shallowest first, as
-// the walker does. Any order that loads a directory's file before its
-// descendants' is equivalent: sibling directories' rules never apply to the
-// same path. Each rule's Source is its file's scenario path, as a Tree over
-// the scenario's fs.FS reports it.
-func parityMatcher(s paritycases.Scenario) *ignore.Matcher {
-	m := ignore.NewWithOptions(parityOptions(s))
-	files := slices.SortedFunc(maps.Keys(s.Files), func(a, b string) int {
-		if c := cmp.Compare(strings.Count(a, "/"), strings.Count(b, "/")); c != 0 {
-			return c
-		}
-		return cmp.Compare(a, b)
-	})
-	for _, f := range files {
-		base := path.Dir(f)
-		if base == "." {
-			base = ""
-		}
-		m.AddPatternsWithSource(base, f, []byte(s.Files[f]))
-	}
-	return m
-}
-
-func parityOptions(s paritycases.Scenario) ignore.MatcherOptions {
-	return ignore.MatcherOptions{
-		CaseInsensitive: s.ICase,
-		MaxPatterns:     -1,
-		WarningHandler:  func(ignore.ParseWarning) {},
-	}
 }
 
 // libMatch reports MatchResult.Ignored for each path.

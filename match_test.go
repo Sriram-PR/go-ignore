@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-// matchGlob matches one pattern segment against s the way the matcher does,
-// so the fast path under test is the one newSegment picks.
-func matchGlob(pattern, s string) bool {
-	return matchSingleSegment(newSegment(pattern), s)
-}
-
 func TestMatchSingleSegment_Literal(t *testing.T) {
 	tests := []struct {
 		pattern string

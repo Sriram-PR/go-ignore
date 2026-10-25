@@ -3,7 +3,6 @@ package ignore_test
 import (
 	"errors"
 	"io/fs"
-	"iter"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,11 +11,6 @@ import (
 
 	ignore "github.com/Sriram-PR/go-ignore"
 )
-
-type visit struct {
-	path  string
-	isDir bool
-}
 
 // walkVisits is what WalkDirFS passes fn, root left out, returning
 // fs.SkipDir after each directory in skip.
@@ -38,22 +32,6 @@ func walkVisits(t *testing.T, m *ignore.Matcher, fsys fs.FS, skip map[string]boo
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	return got
-}
-
-// entryVisits ranges over seq, calling SkipDir on each entry in skip.
-func entryVisits(t *testing.T, seq iter.Seq2[ignore.Entry, error], skip map[string]bool) []visit {
-	t.Helper()
-	var got []visit
-	for e, err := range seq {
-		if err != nil {
-			t.Fatalf("Entries %s: %v", e.Path, err)
-		}
-		got = append(got, visit{e.Path, e.IsDir()})
-		if skip[e.Path] {
-			e.SkipDir()
-		}
 	}
 	return got
 }

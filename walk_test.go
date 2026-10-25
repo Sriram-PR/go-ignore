@@ -15,28 +15,6 @@ import (
 	"testing/fstest"
 )
 
-// writeTree creates a directory tree from a map of relative path → file
-// contents. Directories are created as needed. Empty contents create empty
-// files; "DIR" creates a directory with no file.
-func writeTree(t *testing.T, root string, files map[string]string) {
-	t.Helper()
-	for rel, content := range files {
-		full := filepath.Join(root, filepath.FromSlash(rel))
-		if content == "DIR" {
-			if err := os.MkdirAll(full, 0o755); err != nil {
-				t.Fatalf("mkdir %s: %v", full, err)
-			}
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatalf("mkdir parent of %s: %v", full, err)
-		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatalf("write %s: %v", full, err)
-		}
-	}
-}
-
 // collectWalk runs m.WalkDir on root and returns the sorted slash-form
 // relative paths fn was called for, excluding the root itself.
 func collectWalk(t *testing.T, m *Matcher, root string) []string {

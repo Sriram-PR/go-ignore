@@ -38,15 +38,6 @@ func file(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 
 var dirEntry = &fstest.MapFile{Mode: fs.ModeDir | 0o755}
 
-func mustCheck(t *testing.T, tr *Tree, path string) MatchResult {
-	t.Helper()
-	res, err := tr.Check(path)
-	if err != nil {
-		t.Fatalf("Check(%q): unexpected error %v", path, err)
-	}
-	return res
-}
-
 // A nested .gitignore applies below its directory and nowhere else, and
 // MatchResult names the file and line that decided.
 func TestTree_NestedRules(t *testing.T) {

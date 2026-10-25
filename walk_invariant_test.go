@@ -1,16 +1,12 @@
 package ignore_test
 
 import (
-	"io/fs"
 	"maps"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	ignore "github.com/Sriram-PR/go-ignore"
-	"github.com/Sriram-PR/go-ignore/internal/paritycases"
 )
 
 // TestWalkAgreesWithMatch checks the walker, which skips Match's
@@ -56,39 +52,4 @@ func TestWalkAgreesWithMatch(t *testing.T) {
 			}
 		}
 	}
-}
-
-// walkInvariantScenarios is the parity scenario set without the
-// case-insensitive scenarios TestWalkAgreesWithMatch leaves out.
-func walkInvariantScenarios() []paritycases.Scenario {
-	var scens []paritycases.Scenario
-	for _, s := range paritycases.Curated() {
-		if !s.ICase {
-			scens = append(scens, s)
-		}
-	}
-	for _, seed := range paritySeeds {
-		scens = append(scens, paritycases.Seeded(seed, parityPerSeed, false)...)
-	}
-	return scens
-}
-
-// scenarioFS is s as an fs.FS. On Windows, paths with a backslash in a name
-// are left out.
-func scenarioFS(s paritycases.Scenario) fstest.MapFS {
-	fsys := fstest.MapFS{}
-	for p, dir := range s.Paths {
-		if runtime.GOOS == "windows" && strings.Contains(p, `\`) {
-			continue
-		}
-		if dir {
-			fsys[p] = &fstest.MapFile{Mode: fs.ModeDir | 0o755}
-		} else {
-			fsys[p] = &fstest.MapFile{}
-		}
-	}
-	for f, content := range s.Files {
-		fsys[f] = &fstest.MapFile{Data: []byte(content)}
-	}
-	return fsys
 }

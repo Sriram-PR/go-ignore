@@ -1,7 +1,6 @@
 package ignore_test
 
 import (
-	"iter"
 	"maps"
 	"slices"
 	"strings"
@@ -11,19 +10,6 @@ import (
 	ignore "github.com/Sriram-PR/go-ignore"
 	"github.com/Sriram-PR/go-ignore/internal/paritycases"
 )
-
-// filesSet collects an iterator's paths, failing on any error.
-func filesSet(t *testing.T, seq iter.Seq2[string, error]) map[string]bool {
-	t.Helper()
-	got := map[string]bool{}
-	for p, err := range seq {
-		if err != nil {
-			t.Fatalf("walk: %v", err)
-		}
-		got[p] = true
-	}
-	return got
-}
 
 // An override decides over every ignore file: it ignores what a nested "!"
 // re-includes, and its own "!" re-includes what .gitignore ignores, but not

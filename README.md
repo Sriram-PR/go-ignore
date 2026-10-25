@@ -84,6 +84,8 @@ for e, err := range ignore.RepoEntries(".", opts, ignore.WalkOptions{Start: "src
 }
 ```
 
+For a context-packing loop with size and binary filters, see the [EntriesFS context-pack example](https://pkg.go.dev/github.com/Sriram-PR/go-ignore#example-Matcher.EntriesFS-ContextPack).
+
 ### Explain a match
 
 `MatchWithReason` reports which rule decided a path, and where it came from:

@@ -4,6 +4,14 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.7.1
+
+Docs only: a runnable example of packing a source tree for an LLM. No library changes.
+
+**Docs**
+
+- A runnable context-packing example (`EntriesFS`) shows IgnoreFiles, Overrides, Start and SkipDir with caller-side size and binary filters. The README's "Walk a repository" section links to it.
+
 ### v1.7.0
 
 Walker options for packers and indexers: extra per-directory ignore files, caller overrides, and an iterator that yields directories and can start below the root. Only additions to the exported API; with the new options unset, existing calls behave as before.

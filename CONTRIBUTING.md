@@ -62,11 +62,11 @@ go test -bench=. -benchmem
 
 Two kinds of test compare go-ignore with git:
 
-- `TestGitParity_*` in `git_parity_test.go` are hand-written cases. For a
+- `TestGitCases_*` in `gitcases_test.go` are hand-written cases. For a
   specific bug where go-ignore and git disagree, add a case there:
 
   ```bash
-  go test -v -run TestGitParity
+  go test -v -run TestGitCases
   ```
 
 - `TestParity` is the generated harness below. Run it for any change to

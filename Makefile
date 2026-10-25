@@ -39,7 +39,7 @@ fuzz-long:
 
 # Run git parity tests
 test-git:
-	go test -v -run TestGitParity ./...
+	go test -v -run TestGitCases ./...
 
 # Run the git parity harness against testdata/parity/baseline.txt
 parity:
@@ -89,7 +89,7 @@ help:
 	@echo "  test       - Run all tests"
 	@echo "  test-race  - Run tests with race detector"
 	@echo "  test-cover - Run tests with coverage report"
-	@echo "  test-git   - Run hand-written git parity cases (TestGitParity_*)"
+	@echo "  test-git   - Run hand-written git parity cases (TestGitCases_*)"
 	@echo "  parity     - Run git parity harness vs baseline"
 	@echo "  parity-update - Regenerate the parity baseline"
 	@echo "  conformance - Compare with other libraries vs git (conformance/)"

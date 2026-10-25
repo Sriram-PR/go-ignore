@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// TestGitParity_Basic tests basic patterns against git check-ignore
-func TestGitParity_Basic(t *testing.T) {
+// TestGitCases_Basic tests basic patterns against git check-ignore
+func TestGitCases_Basic(t *testing.T) {
 	if !gitAvailable() {
 		t.Skip("git not available")
 	}
@@ -119,8 +119,8 @@ func TestGitParity_Basic(t *testing.T) {
 	}
 }
 
-// TestGitParity_EdgeCases tests edge cases against git check-ignore
-func TestGitParity_EdgeCases(t *testing.T) {
+// TestGitCases_EdgeCases tests edge cases against git check-ignore
+func TestGitCases_EdgeCases(t *testing.T) {
 	if !gitAvailable() {
 		t.Skip("git not available")
 	}

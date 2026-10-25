@@ -457,7 +457,7 @@ Use this checklist before tagging a new release.
 #### Test Coverage
 
 - [ ] Edge case tests pass: `go test -run TestEdgeCases`
-- [ ] Git parity tests pass: `go test -run TestGitParity` and `make parity`
+- [ ] Git parity tests pass: `go test -run TestGitCases` and `make parity`
 - [ ] Standard fuzz smoke pass: `make fuzz` (every `Fuzz*` function, 30s each)
 
 #### Documentation

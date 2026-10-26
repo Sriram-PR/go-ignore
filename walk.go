@@ -507,7 +507,9 @@ func (e Entry) SkipDir() {
 // error, and then walked with the files that could be read unless SkipDir
 // is called; a directory that can't be listed is yielded a second time with
 // the error. An error the walk returns at the end is yielded with an empty
-// Entry. Breaking out of the loop stops the walk.
+// Entry. As with filepath.WalkDir, DirEntry may be nil whenever err is not,
+// so check err before calling IsDir or Name. Breaking out of the loop stops
+// the walk.
 //
 //	for e, err := range m.Entries(root, ignore.WalkOptions{}) {
 //	    if err != nil { return err }

@@ -4,6 +4,18 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.8.0
+
+Explain: why a path got its verdict. Only additions to the exported API; existing calls behave as before.
+
+**Added**
+
+- **`Explanation`, `Matcher.Explain` and `Tree.Explain`** return the verdict (`Result`, as `MatchWithReason` or `Tree.CheckIsDir` gives it), the outermost ignored parent directory that decided it (`Parent`), and the path's own verdict with the parent check skipped (`Own`). A negation that matches but can't apply, such as `!build/keep.txt` under `build/`, shows as `e.Parent != "" && e.Own.Negated()`, which is what a .gitignore linter needs. `Tree.Explain` counts only the .gitignore files git reads, never one inside the ignored directory; `Matcher.Explain` counts every rule it holds.
+
+**Performance**
+
+- `Explain` costs as much as `MatchWithReason`, plus one evaluation of the path when a parent is ignored, and makes no allocations. `Match`, `MatchWithReason` and `CheckIsDir` are unchanged, within about 2% measured from a separate module.
+
 ### v1.7.1
 
 Docs only: a runnable example of packing a source tree for an LLM. No library changes.

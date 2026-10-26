@@ -1,7 +1,8 @@
 // Package ignore provides gitignore pattern matching for file paths.
 //
 // It is a minimal, zero-dependency implementation of the gitignore spec,
-// verified against git check-ignore. It supports the full pattern syntax:
+// verified against git check-ignore in case-sensitive mode (see Differences
+// from git for case-insensitive mode). It supports the full pattern syntax:
 // wildcards (*), single character (?), globstar (**), negation (!),
 // directory-only (trailing /), anchoring (leading /), escapes (\), and
 // character classes including all 12 POSIX classes.

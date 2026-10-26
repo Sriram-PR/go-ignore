@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -285,4 +287,71 @@ func gitCheckIgnore(t *testing.T, repoDir, path string) bool {
 	// For other errors, log but don't fail (git check-ignore can be finicky)
 	t.Logf("git check-ignore warning for %q: %v", path, err)
 	return false
+}
+
+// RepoEntries lists nested repositories as git ls-files does (issue #1).
+func TestGitCases_NestedRepos(t *testing.T) {
+	if !gitAvailable() {
+		t.Skip("git not available")
+	}
+	root := t.TempDir()
+	repo := filepath.Join(root, "r")
+	// No empty directories: a directory with nothing yielded under it is
+	// then a nested repository.
+	writeTree(t, root, map[string]string{
+		"r/.gitignore":    "ignored/\n",
+		"r/top.txt":       "x",
+		"r/a/.gitignore":  "inner.txt\n",
+		"r/a/f.txt":       "x",
+		"r/a/inner.txt":   "x",
+		"r/b/.git":        "DIR",
+		"r/b/f.txt":       "x",
+		"r/d/f.txt":       "x",
+		"r/h/k.txt":       "x",
+		"r/h/i/f.txt":     "x",
+		"r/ignored/f.txt": "x",
+	})
+	runGit(t, repo, "init", "-q")
+	runGit(t, filepath.Join(repo, "a"), "init", "-q")
+	runGit(t, filepath.Join(repo, "d"), "init", "-q", "--separate-git-dir", filepath.Join(root, "sep"))
+	runGit(t, filepath.Join(repo, "h", "i"), "init", "-q")
+	runGit(t, filepath.Join(repo, "ignored"), "init", "-q")
+
+	cmd := exec.Command("git", "ls-files", "-co", "--exclude-standard", "-z")
+	cmd.Dir = repo
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git ls-files: %v", err)
+	}
+	var want []string
+	for p := range strings.SplitSeq(string(out), "\x00") {
+		if p != "" {
+			want = append(want, p)
+		}
+	}
+
+	var walked []string
+	for e, err := range RepoEntries(repo, MatcherOptions{}, WalkOptions{}) {
+		if err != nil {
+			t.Fatalf("RepoEntries: %v", err)
+		}
+		rel, _ := filepath.Rel(repo, e.Path)
+		rel = filepath.ToSlash(rel)
+		if e.IsDir() {
+			rel += "/"
+		}
+		walked = append(walked, rel)
+	}
+	var got []string
+	for i, p := range walked {
+		if !strings.HasSuffix(p, "/") || i+1 == len(walked) || !strings.HasPrefix(walked[i+1], p) {
+			got = append(got, p)
+		}
+	}
+
+	slices.Sort(want)
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		t.Errorf("RepoEntries = %q\ngit ls-files = %q", got, want)
+	}
 }

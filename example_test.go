@@ -41,6 +41,20 @@ func ExampleMatcher_MatchWithReason() {
 	// ignored=false negated=true rule="!important.log"
 }
 
+func ExampleMatcher_Explain() {
+	m := ignore.New()
+	m.AddPatterns("", []byte("build/\n!build/keep.txt\n"))
+
+	e := m.Explain("build/keep.txt", false)
+	fmt.Println(e.Result.Ignored, e.Result.Rule)
+	if e.Parent != "" && e.Own.Negated() {
+		fmt.Printf("line %d: %s has no effect, %s/ is excluded\n", e.Own.Line, e.Own.Rule, e.Parent)
+	}
+	// Output:
+	// true build/
+	// line 2: !build/keep.txt has no effect, build/ is excluded
+}
+
 func ExampleMatcherOptions_warningHandler() {
 	m := ignore.NewWithOptions(ignore.MatcherOptions{
 		WarningHandler: func(w ignore.ParseWarning) {

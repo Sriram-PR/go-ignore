@@ -179,7 +179,7 @@ Key entry points:
 - `LoadRepo` — load `core.excludesFile` (resolved as git does) + `.git/info/exclude` + root `.gitignore` in one call.
 - `WalkDir` / `WalkRepo` / `Files` / `RepoFiles` / `WalkDirFS` / `FilesFS` — walk a tree (OS or `fs.FS`), skipping ignored files.
 - `AddPatterns` / `AddPatternsReader` / `AddPatternsFromFile` (plus `…WithSource` variants) — add rules from bytes, a reader, or a file.
-- `Match` / `MatchWithReason` — test a path, optionally with match provenance.
+- `Match` / `MatchWithReason` / `Explain` — test a path, optionally with match provenance or the ignored parent that decided it.
 
 ## Stability Guarantees
 

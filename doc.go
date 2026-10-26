@@ -39,6 +39,12 @@
 // MatchWithReason reports which rule decided a path — including its source file
 // and line — for debugging complex setups.
 //
+// Explain adds why: the ignored parent directory that decided the verdict, if
+// any, and the path's own verdict. A negation such as !build/keep.txt under
+// build/ matches but can't apply, since git never re-includes a path inside an
+// ignored directory; Explain reports it as e.Parent != "" && e.Own.Negated(),
+// which is what a .gitignore linter needs.
+//
 // # Syntax notes
 //
 // ? and character classes operate on raw bytes, not Unicode code points

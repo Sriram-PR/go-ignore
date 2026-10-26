@@ -54,7 +54,7 @@ type segment struct {
 func parseLines(basePath string, content []byte, maxPatternLength, maxRules int, source string) (rules []rule, warnings []ParseWarning, truncated bool) {
 	text := string(normalizeContent(content))
 
-	n := strings.Count(text, "\n") + 1
+	n := ruleLines(text)
 	if maxRules >= 0 {
 		n = min(n, maxRules)
 	}
@@ -88,6 +88,18 @@ func parseLines(basePath string, content []byte, maxPatternLength, maxRules int,
 			return rules, warnings, false
 		}
 	}
+}
+
+// ruleLines counts the lines of text that can be rules, so blank lines and
+// comments cost no rule storage.
+func ruleLines(text string) int {
+	n := 0
+	for line := range strings.Lines(text) {
+		if line[0] != '\n' && line[0] != '#' {
+			n++
+		}
+	}
+	return n
 }
 
 // parseLine parses a single line from a .gitignore file.

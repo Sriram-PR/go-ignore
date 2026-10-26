@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -903,5 +904,21 @@ func TestParseSegments_MinOne(t *testing.T) {
 		if !slices.Equal(got, want) {
 			t.Errorf("parseSegments(%q) minOne = %v, want %v", pattern, got, want)
 		}
+	}
+}
+
+// Storage follows the rules kept, not the lines read: blank lines and
+// comments allocate no rule space, even with no MaxPatterns cap.
+func TestParseLines_BlankLinesAllocateLittle(t *testing.T) {
+	content := []byte(strings.Repeat("\n# comment\n", 1<<14))
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	rules, _, _ := parseLines("", content, -1, -1, "")
+	runtime.ReadMemStats(&after)
+	if len(rules) != 0 {
+		t.Fatalf("parseLines kept %d rules, want 0", len(rules))
+	}
+	if got, limit := after.TotalAlloc-before.TotalAlloc, 4*uint64(len(content)); got > limit {
+		t.Errorf("parseLines allocated %d bytes for %d bytes of blank lines and comments, want at most %d", got, len(content), limit)
 	}
 }

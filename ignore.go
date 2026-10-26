@@ -52,6 +52,26 @@ type MatchResult struct {
 // documents the derivation so callers do not have to compute it themselves.
 func (r MatchResult) Negated() bool { return r.Matched && !r.Ignored }
 
+// Explanation is a verdict plus why it was reached: the ignored parent
+// directory that decided it, if any, and the path's own verdict from its own
+// rules. Matcher.Explain and Tree.Explain return it.
+type Explanation struct {
+	// Result is the verdict, as MatchWithReason or Tree.CheckIsDir gives it.
+	Result MatchResult
+
+	// Parent is the outermost ignored parent directory, the one whose rule is
+	// in Result, or "" when no parent is ignored. It is normalized as Match
+	// normalizes paths, with no leading or trailing slash, in the caller's
+	// case. A path that is itself an ignored directory has Parent "".
+	Parent string
+
+	// Own is the path's verdict from its own rules, with the parent check
+	// skipped. It equals Result when Parent is "". When Parent is set and
+	// Own.Negated() is true, Own is a negation that can't apply: git never
+	// re-includes a path inside an ignored directory.
+	Own MatchResult
+}
+
 // WarningHandler is called for each parse warning if set.
 // The warning includes BasePath; no separate basePath argument is provided.
 type WarningHandler func(warning ParseWarning)
@@ -520,39 +540,74 @@ func (m *Matcher) MatchWithReason(path string, isDir bool) MatchResult {
 	return m.match(path, isDir, true)
 }
 
+// Explain returns MatchWithReason's verdict for path with why it was
+// reached: the ignored parent directory that decided it, if any, and the
+// path's own verdict. isDir must be accurate, as in Match.
+//
+// A negation that matches the path but can't apply, such as !build/keep.txt
+// under build/, shows as e.Parent != "" && e.Own.Negated(). Own counts every
+// rule the Matcher holds, including any from a .gitignore inside the ignored
+// directory, which git never reads; Tree.Explain counts only the files git
+// reads.
+//
+// Explain costs as much as MatchWithReason, plus one evaluation of the path
+// when a parent is ignored.
+// Thread-safe: can be called concurrently.
+func (m *Matcher) Explain(path string, isDir bool) Explanation {
+	var segBuf [32]string
+	disk, match, segs, rules, ok := m.prepare(path, segBuf[:0])
+	if !ok {
+		return Explanation{}
+	}
+	own := evaluateWithOverrides(rules, m.overrides, match, segs, isDir)
+	if res, end, ok := parentIgnored(rules, m.overrides, match, segs); ok {
+		return Explanation{Result: res, Parent: strings.TrimPrefix(disk[:end], "/"), Own: own}
+	}
+	return Explanation{Result: own, Own: own}
+}
+
 // match implements MatchWithReason. The walker passes checkParents=false: it
 // prunes every directory match reports as ignored, so no path it visits has
 // an ignored parent.
 func (m *Matcher) match(path string, isDir, checkParents bool) MatchResult {
-	// opts needs no lock (see Matcher). Lowering happens here, before the
-	// snapshot, so nothing slow runs under mu.
 	var segBuf [32]string
-	_, path, pathSegments, ok := preparePath(path, m.opts.CaseInsensitive, segBuf[:0])
+	_, path, pathSegments, rules, ok := m.prepare(path, segBuf[:0])
 	if !ok {
 		return MatchResult{}
 	}
 
-	m.mu.RLock()
-	rules := m.rules[:len(m.rules):len(m.rules)]
-	m.mu.RUnlock()
-
 	// As in git, an ignored parent directory decides: no negation can
 	// re-include a path below it.
 	if checkParents {
-		if res, ok := parentIgnored(rules, m.overrides, path, pathSegments); ok {
+		if res, _, ok := parentIgnored(rules, m.overrides, path, pathSegments); ok {
 			return res
 		}
 	}
 	return evaluateWithOverrides(rules, m.overrides, path, pathSegments, isDir)
 }
 
+// prepare runs preparePath and takes the rule snapshot, which match and
+// Explain evaluate outside the lock. opts needs no lock (see Matcher).
+// Lowering happens before the snapshot, so nothing slow runs under mu.
+func (m *Matcher) prepare(path string, buf []string) (disk, match string, segs []string, rules []rule, ok bool) {
+	disk, match, segs, ok = preparePath(path, m.opts.CaseInsensitive, buf)
+	if !ok {
+		return "", "", nil, nil, false
+	}
+	m.mu.RLock()
+	rules = m.rules[:len(m.rules):len(m.rules)]
+	m.mu.RUnlock()
+	return disk, match, segs, rules, true
+}
+
 // parentIgnored reports the rule that ignores the shallowest parent directory
 // of path, so the outermost ignored parent is reported, as git check-ignore
-// -v does. It slices path at each '/' instead of joining segments, which keeps
-// the walk O(N) and allocation-free on deep paths.
-func parentIgnored(rules, overrides []rule, path string, segs []string) (MatchResult, bool) {
+// -v does, and the offset in path of the slash that ends that parent. It
+// slices path at each '/' instead of joining segments, which keeps the walk
+// O(N) and allocation-free on deep paths.
+func parentIgnored(rules, overrides []rule, path string, segs []string) (MatchResult, int, bool) {
 	if len(segs) < 2 {
-		return MatchResult{}, false
+		return MatchResult{}, 0, false
 	}
 	// Skip a leading slash so each parent is a name, not a "/" prefix.
 	start := 0
@@ -567,10 +622,10 @@ func parentIgnored(rules, overrides []rule, path string, segs []string) (MatchRe
 		n++
 		res := evaluateWithOverrides(rules, overrides, path[start:j], segs[:n], true)
 		if res.Matched && res.Ignored {
-			return res, true
+			return res, j, true
 		}
 	}
-	return MatchResult{}, false
+	return MatchResult{}, 0, false
 }
 
 // preparePath normalizes path and splits it into segments, appending to buf.

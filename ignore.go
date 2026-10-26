@@ -318,7 +318,10 @@ func (m *Matcher) effectiveMaxPatternLength() int {
 }
 
 // AddPatterns parses gitignore content and adds rules.
-// basePath is the directory containing the .gitignore (empty string for root).
+// basePath is the directory containing the .gitignore (empty string for root),
+// normalized as Match normalizes paths. A basePath that resolves above the
+// root or contains a null byte adds no rules and produces one ParseWarning
+// with that BasePath and Line 0.
 //
 // Input normalization (applied automatically, as git does):
 //   - One leading UTF-8 BOM is stripped
@@ -370,6 +373,10 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 
 	// Normalize basePath once for consistent rule scoping and warning reporting.
 	normalizedBase := normalizePath(basePath)
+	if normalizedBase == "" && baseOutsideRoot(basePath) {
+		m.dispatch([]ParseWarning{{Message: "basePath is outside the root, patterns skipped", BasePath: basePath}})
+		return
+	}
 
 	// Parse no more rules than the matcher can still hold. Parsing itself
 	// runs unlocked; the capacity is checked again under the lock below,

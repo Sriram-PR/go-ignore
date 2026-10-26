@@ -75,6 +75,21 @@ func normalizePath(p string) string {
 	return p
 }
 
+// baseOutsideRoot reports whether basePath, which normalizePath turned into
+// "", names something other than the root: it has a null byte or resolves
+// above the root.
+func baseOutsideRoot(basePath string) bool {
+	if strings.IndexByte(basePath, 0) >= 0 {
+		return true
+	}
+	p := basePath
+	if runtime.GOOS == "windows" {
+		p = strings.ReplaceAll(p, "\\", "/")
+	}
+	p = path.Clean(strings.TrimLeft(p, "/"))
+	return p == ".." || strings.HasPrefix(p, "../")
+}
+
 // normalizeContent prepares .gitignore bytes for parsing the way git's
 // add_patterns does: it strips one leading UTF-8 BOM and drops a CR that
 // precedes LF or ends the content. Any other CR is pattern text.

@@ -140,6 +140,27 @@ func TestAddPatterns_WithWarnings(t *testing.T) {
 	}
 }
 
+// A basePath outside the root drops its rules with one warning instead of
+// widening them to the root; every spelling of the root stays the root.
+func TestAddPatterns_BasePathOutsideRoot(t *testing.T) {
+	for _, base := range []string{"../other", "a/../..", "/..", "./..", "x\x00y"} {
+		m := New()
+		m.AddPatterns(base, []byte("*.log\n"))
+		w := m.Warnings()
+		if m.RuleCount() != 0 || m.Match("top.log", false) || len(w) != 1 || w[0].BasePath != base || w[0].Line != 0 {
+			t.Errorf("basePath %q: RuleCount %d, Match(top.log) %v, Warnings %+v; want no rules and one warning naming the basePath",
+				base, m.RuleCount(), m.Match("top.log", false), w)
+		}
+	}
+	for _, base := range []string{"", ".", "./", "/", "a/.."} {
+		m := New()
+		m.AddPatterns(base, []byte("*.log\n"))
+		if !m.Match("top.log", false) || len(m.Warnings()) != 0 {
+			t.Errorf("basePath %q: Match(top.log) false or warnings %+v; want root scope", base, m.Warnings())
+		}
+	}
+}
+
 func TestWarnings(t *testing.T) {
 	m := New()
 	m.AddPatterns("", []byte("!\n"))

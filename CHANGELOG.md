@@ -4,6 +4,15 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.8.2
+
+Two path-handling fixes, from issues #2 and #3. No exported API changes.
+
+**Fixed**
+
+- **A leading slash names the same path as without it** (#3). `Match`, `Explain` and `Tree` strip leading slashes from paths, and `AddPatterns` from basePaths, so `/sub/x.log` matches the rules added for `sub`, and `/../secret` is out of range like `../secret` instead of matching a root rule. Callers who pass absolute paths and absolute basePaths together still match as before, since both lose the slash.
+- **A basePath outside the root no longer widens its rules to the whole tree** (#2). `AddPatterns("../other", …)`, or a basePath containing a null byte, used to become the root scope without a word. Those rules are now dropped with one `ParseWarning` naming the basePath. `""`, `.`, `./`, `/` and `a/..` still mean the root.
+
 ### v1.8.1
 
 Fixes from an audit of v1.8.0, each where go-ignore disagreed with git or used more memory than it needed. No exported API changes.

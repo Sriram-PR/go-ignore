@@ -241,6 +241,29 @@ func TestMatchWithReason_Basic(t *testing.T) {
 	}
 }
 
+// Rule is the line as git check-ignore -v prints it: an escaped trailing
+// space keeps its backslash, and only the unescaped spaces after it go.
+func TestMatchWithReason_EscapedTrailingSpaceRule(t *testing.T) {
+	m := New()
+	m.AddPatterns("", []byte("foo\\ \nbar\\   \nbaz\\\\\\ \n!keep\\ \n"))
+	tests := []struct{ path, rule string }{
+		{"foo ", `foo\ `},
+		{"bar ", `bar\ `},
+		{`baz\ `, `baz\\\ `},
+		{"keep ", `!keep\ `},
+	}
+	for _, tt := range tests {
+		if r := m.MatchWithReason(tt.path, false); !r.Matched || r.Rule != tt.rule {
+			t.Errorf("MatchWithReason(%q) = %+v, want Rule %q", tt.path, r, tt.rule)
+		}
+	}
+	for _, p := range []string{"foo", "bar", `baz\`} {
+		if r := m.MatchWithReason(p, false); r.Matched {
+			t.Errorf("MatchWithReason(%q) = %+v, want no match", p, r)
+		}
+	}
+}
+
 func TestMatchWithReason_BasePath(t *testing.T) {
 	m := New()
 	m.AddPatterns("", []byte("*.log\n"))

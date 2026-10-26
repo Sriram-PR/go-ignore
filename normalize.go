@@ -84,11 +84,14 @@ func normalizeContent(content []byte) []byte {
 // a line, respecting backslash-escaped spaces per the gitignore spec.
 //
 // Git behavior: "Trailing spaces are ignored unless they are quoted with backslash."
-// A backslash before a trailing space preserves that space:
+// A backslash before a trailing space keeps that space, and the backslash
+// stays too, as in git's trim_trailing_spaces: matching reads "\ " as a
+// literal space, and MatchResult.Rule shows the line as git check-ignore -v
+// does.
 //   - "foo "    → "foo"    (trailing space stripped)
-//   - "foo\ "   → "foo "   (escaped space preserved, backslash removed)
+//   - "foo\ "   → "foo\ "   (escaped space kept)
 //   - "foo\\ "  → "foo\\"  (escaped backslash, unescaped trailing space stripped)
-//   - "foo\\\ " → "foo\\ " (escaped backslash + escaped space preserved)
+//   - "foo\\\ " → "foo\\\ " (escaped backslash + escaped space kept)
 //
 // Note: This does not trim newlines; those are handled during line splitting.
 func trimTrailingWhitespace(line string) string {
@@ -102,9 +105,8 @@ func trimTrailingWhitespace(line string) string {
 	}
 
 	// Odd number of backslashes means the last one escapes the first space
-	if trailingBackslashes(line[:end])%2 == 1 && line[end] == ' ' {
-		// Remove the escaping backslash, keep the space
-		return line[:end-1] + " "
+	if trailingBackslashes(line[:end])%2 == 1 {
+		return line[:end+1]
 	}
 
 	return line[:end]

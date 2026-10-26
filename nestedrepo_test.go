@@ -31,6 +31,14 @@ func TestIsNestedRepo(t *testing.T) {
 			"main/refs":                  "DIR",
 		}, true},
 
+		{"worktree commondir CRLF", map[string]string{
+			"d/.git":                     "gitdir: ../main/worktrees/d\n",
+			"main/worktrees/d/HEAD":      "ref: refs/heads/wt\n",
+			"main/worktrees/d/commondir": "../..\r\n",
+			"main/objects":               "DIR",
+			"main/refs":                  "DIR",
+		}, true},
+
 		{"no .git", map[string]string{"d/f": "x"}, false},
 		{"empty .git dir", map[string]string{"d/.git": "DIR"}, false},
 		{"no HEAD", map[string]string{"d/.git/objects": "DIR", "d/.git/refs": "DIR"}, false},
@@ -42,6 +50,13 @@ func TestIsNestedRepo(t *testing.T) {
 		{"no objects", map[string]string{"d/.git/HEAD": "ref: refs/heads/main\n", "d/.git/refs": "DIR"}, false},
 		{"no refs", map[string]string{"d/.git/HEAD": "ref: refs/heads/main\n", "d/.git/objects": "DIR"}, false},
 		{"objects is a file", merged(gitDirFiles("d/.git"), map[string]string{"d/.git/objects": ""}), false},
+		{"commondir trailing space", map[string]string{
+			"d/.git":                     "gitdir: ../main/worktrees/d\n",
+			"main/worktrees/d/HEAD":      "ref: refs/heads/wt\n",
+			"main/worktrees/d/commondir": "../.. \n",
+			"main/objects":               "DIR",
+			"main/refs":                  "DIR",
+		}, false},
 		{".git file without gitdir", map[string]string{"d/.git": "junk\n"}, false},
 		{"gitdir without space", merged(gitDirFiles("real"), map[string]string{"d/.git": "gitdir:../real\n"}), false},
 		{"gitdir empty path", map[string]string{"d/.git": "gitdir: \n"}, false},

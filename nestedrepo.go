@@ -46,7 +46,11 @@ func isGitDirectory(gitDir string) bool {
 	}
 	common := gitDir
 	if c, err := readPatternFile(osSource{}, filepath.Join(gitDir, "commondir"), true, maxGitFileSize); err == nil && len(c) > 0 {
-		common = resolveRelative(gitDir, strings.TrimSuffix(string(c), "\n"))
+		dir := string(c)
+		if d, ok := strings.CutSuffix(dir, "\n"); ok {
+			dir = strings.TrimSuffix(d, "\r")
+		}
+		common = resolveRelative(gitDir, dir)
 	}
 	return isDirPath(filepath.Join(common, "objects")) && isDirPath(filepath.Join(common, "refs"))
 }

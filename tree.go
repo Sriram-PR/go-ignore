@@ -128,7 +128,9 @@ func (t *Tree) Check(path string) (MatchResult, error) {
 //
 // A parent that is a symlink (or lstat says is not a directory) ends the
 // work tree, as in git, which refuses such paths: no .gitignore at or past
-// it is read, and the rules from above still apply.
+// it is read, and the rules from above still apply. Like every parent, it
+// counts as a directory for them: with "sub/" in a/.gitignore and a/sub a
+// symlink, Check("a/sub") is not ignored but Check("a/sub/q") is.
 //
 // A .gitignore on the way to path that can't be read does not stop the
 // check: the result is git's answer without that file, and the error,

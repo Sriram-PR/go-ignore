@@ -606,17 +606,19 @@ func TestParentIgnored(t *testing.T) {
 		path     string
 		wantOK   bool
 		wantRule string
+		wantEnd  int // offset of the slash ending the ignored parent
 	}{
-		{"build/x/y.o", true, "build/"},
-		{"build/keep/a", true, "build/"}, // outermost ignored parent decides
-		{"src/logs/a", true, "logs"},
-		{"src/a", false, ""},
-		{"build", false, ""}, // the path itself is not a parent
+		{"build/x/y.o", true, "build/", 5},
+		{"build/keep/a", true, "build/", 5}, // outermost ignored parent decides
+		{"src/logs/a", true, "logs", 8},
+		{"/build/x", true, "build/", 6},
+		{"src/a", false, "", 0},
+		{"build", false, "", 0}, // the path itself is not a parent
 	}
 	for _, tt := range tests {
-		got, _, ok := parentIgnored(rules, nil, tt.path, splitPath(tt.path))
-		if ok != tt.wantOK || got.Rule != tt.wantRule {
-			t.Errorf("parentIgnored(%q) = %q, %v; want %q, %v", tt.path, got.Rule, ok, tt.wantRule, tt.wantOK)
+		got, end, ok := parentIgnored(rules, nil, tt.path, splitPath(tt.path))
+		if ok != tt.wantOK || got.Rule != tt.wantRule || end != tt.wantEnd {
+			t.Errorf("parentIgnored(%q) = %q, %d, %v; want %q, %d, %v", tt.path, got.Rule, end, ok, tt.wantRule, tt.wantEnd, tt.wantOK)
 		}
 	}
 }

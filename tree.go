@@ -113,7 +113,7 @@ func (m *Matcher) newTree(root string, src patternSource, join func(...string) s
 // directory count as files. lstat runs only when the answer needs it.
 func (t *Tree) Check(path string) (MatchResult, error) {
 	isDir := strings.HasSuffix(path, "/") || runtime.GOOS == "windows" && strings.HasSuffix(path, `\`)
-	return t.check(path, isDir, !isDir)
+	return t.check(path, isDir, !isDir, nil)
 }
 
 // CheckIsDir reports whether path, relative to the Tree's root, is ignored,
@@ -135,11 +135,27 @@ func (t *Tree) Check(path string) (MatchResult, error) {
 // wrapping ErrPatternFileSkipped or the read error, comes with it on every
 // check that consults that directory. Several are combined with errors.Join.
 func (t *Tree) CheckIsDir(path string, isDir bool) (MatchResult, error) {
-	return t.check(path, isDir, false)
+	return t.check(path, isDir, false, nil)
+}
+
+// Explain returns CheckIsDir's verdict and error for path with why it was
+// reached, as Matcher.Explain does: the ignored parent directory that
+// decided it, if any, and the path's own verdict. isDir must be accurate, as
+// in CheckIsDir; Explain does not lstat.
+//
+// When a parent is ignored, Own counts the rules git reads: the Tree's
+// snapshot, Overrides, and the .gitignore files from the root down to the
+// parent of the ignored directory, never one inside it. A Matcher preloaded
+// with such a file counts it.
+func (t *Tree) Explain(path string, isDir bool) (Explanation, error) {
+	var ex Explanation
+	_, err := t.check(path, isDir, false, &ex)
+	return ex, err
 }
 
 // check is CheckIsDir, with isDir taken from lstat instead when stat is set.
-func (t *Tree) check(path string, isDir, stat bool) (MatchResult, error) {
+// A non-nil ex is filled in as Explain describes.
+func (t *Tree) check(path string, isDir, stat bool, ex *Explanation) (MatchResult, error) {
 	var segBuf [32]string
 	disk, match, segs, ok := preparePath(path, t.opts.CaseInsensitive, segBuf[:0])
 	if !ok {
@@ -167,6 +183,12 @@ func (t *Tree) check(path string, isDir, stat bool) (MatchResult, error) {
 		di += strings.IndexByte(disk[di:], '/')
 		mi += strings.IndexByte(match[mi:], '/')
 		if res := evaluateGroups(groups, t.overrides, match[matchStart:mi], segs[:k], true); res.Matched && res.Ignored {
+			if ex != nil {
+				// groups holds the files git reads: none from the ignored
+				// directory down has been loaded yet.
+				ex.Result, ex.Parent = res, disk[diskStart:di]
+				ex.Own = evaluateGroups(groups, t.overrides, match, segs, isDir)
+			}
 			return res, errors.Join(errs...)
 		}
 		if !outside {
@@ -184,7 +206,11 @@ func (t *Tree) check(path string, isDir, stat bool) (MatchResult, error) {
 		fi, err := t.lstat(t.join(t.root, disk))
 		isDir = err == nil && fi.IsDir()
 	}
-	return evaluateGroups(groups, t.overrides, match, segs, isDir), errors.Join(errs...)
+	res := evaluateGroups(groups, t.overrides, match, segs, isDir)
+	if ex != nil {
+		ex.Result, ex.Own = res, res
+	}
+	return res, errors.Join(errs...)
 }
 
 // evaluateGroups is evaluateRules over several rule lists in order and then

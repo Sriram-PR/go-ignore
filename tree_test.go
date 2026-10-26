@@ -439,3 +439,53 @@ func TestTree_OSPathBelowFile(t *testing.T) {
 		t.Errorf("Check(file.txt/x) = %+v, %v; want ignored by x, no error", res, err)
 	}
 }
+
+// Tree.Explain reports the ignored parent and the path's own verdict from
+// the files git reads: a .gitignore inside the ignored directory is not one,
+// while a Matcher preloaded with it counts it.
+func TestTree_Explain(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore":       file("build/\n!build/keep.txt\n"),
+		"build/.gitignore": file("!keep.log\n"),
+		"build/keep.txt":   file(""),
+		"build/keep.log":   file(""),
+		"src/a.txt":        file(""),
+	}
+	tr := New().TreeFS(fsys, ".")
+	e, err := tr.Explain("build/keep.txt", false)
+	if err != nil || e.Parent != "build" || e.Result.Rule != "build/" || e.Own.Rule != "!build/keep.txt" || e.Own.Line != 2 || !e.Own.Negated() {
+		t.Errorf("build/keep.txt: %+v, %v; want Parent build, Result build/, Own !build/keep.txt line 2", e, err)
+	}
+	e, err = tr.Explain("build/keep.log", false)
+	if err != nil || e.Parent != "build" || e.Own.Matched {
+		t.Errorf("build/keep.log: %+v, %v; want Parent build and no own match (build/.gitignore is never read)", e, err)
+	}
+	m := New()
+	m.AddPatterns("", []byte("build/\n!build/keep.txt\n"))
+	m.AddPatterns("build", []byte("!keep.log\n"))
+	if me := m.Explain("build/keep.log", false); me.Parent != "build" || me.Own.Rule != "!keep.log" {
+		t.Errorf("Matcher.Explain(build/keep.log) = %+v; want Own !keep.log from the preloaded build/.gitignore", me)
+	}
+	e, err = tr.Explain("src/a.txt", false)
+	if err != nil || e.Parent != "" || e.Result.Matched || e.Own != e.Result {
+		t.Errorf("src/a.txt: %+v, %v; want no match, no parent", e, err)
+	}
+	e, err = tr.Explain("..", false)
+	if e != (Explanation{}) || err != nil {
+		t.Errorf("..: %+v, %v; want zero, nil", e, err)
+	}
+}
+
+// Tree.Explain gives CheckIsDir's verdict and error.
+func TestTree_ExplainUnreadableGitignore(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore":   file("build/\n"),
+		"a/.gitignore": dirEntry,
+	}
+	tr := New().TreeFS(fsys, ".")
+	e, err := tr.Explain("a/build/x", false)
+	res, cerr := tr.CheckIsDir("a/build/x", false)
+	if e.Parent != "a/build" || e.Result != res || !errors.Is(err, ErrPatternFileSkipped) || err.Error() != cerr.Error() {
+		t.Errorf("a/build/x: %+v, %v; want Parent a/build with CheckIsDir's %+v, %v", e, err, res, cerr)
+	}
+}

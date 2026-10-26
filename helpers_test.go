@@ -2,6 +2,7 @@ package ignore
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,25 @@ func writeTree(t *testing.T, root string, files map[string]string) {
 		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
 			t.Fatalf("write %s: %v", full, err)
 		}
+	}
+}
+
+// merged combines writeTree layouts; later ones win.
+func merged(layouts ...map[string]string) map[string]string {
+	out := map[string]string{}
+	for _, l := range layouts {
+		maps.Copy(out, l)
+	}
+	return out
+}
+
+// gitDirFiles returns writeTree entries for a minimal git directory at the
+// slash path prefix, one git's is_git_directory accepts.
+func gitDirFiles(prefix string) map[string]string {
+	return map[string]string{
+		prefix + "/HEAD":    "ref: refs/heads/main\n",
+		prefix + "/objects": "DIR",
+		prefix + "/refs":    "DIR",
 	}
 }
 

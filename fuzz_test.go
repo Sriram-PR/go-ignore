@@ -113,6 +113,12 @@ node_modules/
 			t.Errorf("Match(%q, %v) = %v but MatchWithReason.Ignored = %v",
 				path, isDir, matched, result.Ignored)
 		}
+
+		// Explain never changes a verdict.
+		if e := m.Explain(path, isDir); e.Result != result {
+			t.Errorf("Explain(%q, %v).Result = %+v but MatchWithReason = %+v",
+				path, isDir, e.Result, result)
+		}
 	})
 }
 

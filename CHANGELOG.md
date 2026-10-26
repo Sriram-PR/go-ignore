@@ -4,6 +4,18 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.9.0
+
+The repo walkers stop at nested repositories, as git does (#1). No exported API changes.
+
+**Changed**
+
+- **`WalkRepo`, `RepoFiles` and `RepoEntries` no longer go inside a nested repository** (#1). A directory below the root whose `.git` is a repository by git's rules (a git directory, a `gitdir:` file pointing to one, or a `.git` file that can't be read) is passed to `WalkRepo`'s fn and yielded by `RepoEntries` once, with nothing under it, the way `git ls-files -co --exclude-standard` lists it. `RepoFiles` yields nothing for it, and a `WalkOptions.Start` at or below one yields nothing. Its `.gitignore` isn't read. Submodule work trees count too. An empty or broken `.git` doesn't, so those directories are walked as before. `WalkDir`, `Files`, `Entries`, their `FS` forms and `Tree` are unchanged and still go inside.
+
+**Performance**
+
+- The repo walkers stat each directory's `.git`. `WalkRepo` over 2,000 directories with no nested repositories took 14% longer than v1.8.2, with 4 more allocations per directory (measured from a separate module).
+
 ### v1.8.2
 
 Two path-handling fixes, from issues #2 and #3. No exported API changes.

@@ -4,6 +4,20 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.8.1
+
+Fixes from an audit of v1.8.0, each where go-ignore disagreed with git or used more memory than it needed. No exported API changes.
+
+**Fixed**
+
+- **A relative `core.excludesFile` is read from the repo root,** as git reads it from the top of the work tree. `LoadRepo`, `WalkRepo`, `RepoFiles`, `RepoEntries` and `OpenTree` used to open it relative to the process's working directory, so they missed it or read an unrelated file of the same name.
+- **`MatchResult.Rule` keeps the backslash of an escaped trailing space,** so the line `foo\ ` reports as `foo\ `, as `git check-ignore -v` prints it, instead of `"foo "`. Matching is unchanged.
+- **Blank lines and comments no longer cost rule memory.** Parsing reserved room for one rule per line, so 1 MiB of blank lines allocated over 100 MB with `MaxPatterns: -1`. It now sizes by the lines that can be rules. Loading a typical file is up to 6% slower and uses up to 17% less memory.
+
+**Docs**
+
+- The README lists `Entries`/`EntriesFS`/`RepoEntries` and `OpenTree`/`Tree.Check` among the key entry points, and the `WalkOptions.Start` doc says Start itself must not be a symlink.
+
 ### v1.8.0
 
 Explain: why a path got its verdict. Only additions to the exported API; existing calls behave as before.

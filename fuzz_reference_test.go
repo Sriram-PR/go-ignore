@@ -33,7 +33,7 @@ func (b *refBudget) gaveUp(segs []segment) bool {
 func refMatchFloating(segs []segment, path []string, b *refBudget) bool {
 	maxStart := len(path) - len(segs)
 	start := 0
-	if !slices.ContainsFunc(segs, isDoubleStar) {
+	if !slices.ContainsFunc(segs, func(s segment) bool { return s.doubleStar }) {
 		start = max(maxStart, 0)
 	}
 	for i := start; i <= maxStart; i++ {

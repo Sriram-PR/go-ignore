@@ -1,7 +1,6 @@
 package ignore
 
 import (
-	"slices"
 	"strings"
 )
 
@@ -88,19 +87,11 @@ func matchFloating(r *rule, path []string) bool {
 	if len(r.segments) == 1 && !r.segments[0].doubleStar {
 		return len(path) > 0 && matchSingleSegment(r.segments[0], path[len(path)-1])
 	}
-	// A floating pattern with ** always starts with it (see
-	// determineAnchoring), and a leading ** already lets the match start at
-	// any segment.
-	if slices.ContainsFunc(r.segments, isDoubleStar) {
-		return matchSegments(r.segments, path)
-	}
-	// Without **, a match consumes one path segment per pattern segment, so
-	// it can only start at len(path) - len(r.segments).
-	start := len(path) - len(r.segments)
-	return start >= 0 && matchSegments(r.segments, path[start:])
+	// determineAnchoring anchors every other pattern with a '/', so a longer
+	// floating pattern starts with **, which lets the match start at any
+	// segment.
+	return matchSegments(r.segments, path)
 }
-
-func isDoubleStar(s segment) bool { return s.doubleStar }
 
 // matchSegments matches pattern against all of path. ** matches any run of
 // segments, except that a trailing ** needs at least one (abc/** matches

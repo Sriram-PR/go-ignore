@@ -488,7 +488,7 @@ type entryState struct {
 // SkipDir, called before the loop body returns, prunes a directory's
 // contents. On the error entry of a directory above WalkOptions.Start it
 // ends the iteration instead. It has no effect on a file or after the loop
-// body has returned.
+// body has returned. Call it from the loop body, not another goroutine.
 func (e Entry) SkipDir() {
 	if e.st != nil && e.st.seq == e.seq && e.DirEntry != nil && e.IsDir() {
 		e.st.skip = true

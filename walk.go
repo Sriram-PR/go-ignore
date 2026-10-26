@@ -148,7 +148,7 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bo
 		// this entry has been left for good.
 		for len(frames) > 0 {
 			top := frames[len(frames)-1]
-			if top.dir == "" || strings.HasPrefix(rel, top.dir+"/") {
+			if top.dir == "" || strings.HasPrefix(rel, top.dir) && len(rel) > len(top.dir) && rel[len(top.dir)] == '/' {
 				break
 			}
 			child.rules = child.rules[:top.rules]

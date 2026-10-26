@@ -60,6 +60,13 @@ func parseLines(basePath string, content []byte, maxPatternLength, maxRules int,
 	}
 	rules = make([]rule, 0, n)
 
+	var basePathSlash string
+	var baseSegCount int
+	if basePath != "" {
+		basePathSlash = basePath + "/"
+		baseSegCount = len(splitPath(basePath))
+	}
+
 	for lineNum := 1; ; lineNum++ {
 		line, rest, more := strings.Cut(text, "\n")
 		text = rest
@@ -81,6 +88,7 @@ func parseLines(basePath string, content []byte, maxPatternLength, maxRules int,
 				if maxRules >= 0 && len(rules) == maxRules {
 					return rules, warnings, true
 				}
+				r.basePathSlash, r.baseSegCount = basePathSlash, baseSegCount
 				rules = append(rules, *r)
 			}
 		}
@@ -194,10 +202,6 @@ func parseLine(line string, lineNum int, basePath, source string) (*rule, *Parse
 		dirOnly:  dirOnly,
 		anchored: anchored,
 		segments: segments,
-	}
-	if basePath != "" {
-		r.basePathSlash = basePath + "/"
-		r.baseSegCount = len(splitPath(basePath))
 	}
 	return r, nil
 }

@@ -448,13 +448,13 @@ func TestMatchRule_BasePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _ := parseLine(tt.pattern, 1, tt.basePath, "")
-			if r == nil {
-				t.Fatalf("parseLine(%q) returned nil", tt.pattern)
+			rules, _, _ := parseLines(tt.basePath, []byte(tt.pattern), -1, -1, "")
+			if len(rules) != 1 {
+				t.Fatalf("parseLines(%q) = %d rules, want 1", tt.pattern, len(rules))
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)
-			got := matchRule(r, path, pathSegs, false)
+			got := matchRule(&rules[0], path, pathSegs, false)
 			if got != tt.want {
 				t.Errorf("matchRule(%q, basePath=%q, path=%q) = %v, want %v",
 					tt.pattern, tt.basePath, tt.path, got, tt.want)

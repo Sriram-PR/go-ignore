@@ -4,6 +4,26 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.9.1
+
+Fixes and doc corrections from the 2026-10-27 audit. No exported API changes.
+
+**Fixed**
+
+- **No home directory means no default global ignore file,** as in git (#6). With `HOME` (or `USERPROFILE` on Windows) and `XDG_CONFIG_HOME` both unset, `LoadRepo`, `WalkRepo`, `RepoFiles`, `RepoEntries`, `OpenTree` and `AddGlobalPatterns` failed with "determining home directory". That's common in containers, systemd units and stripped CI environments. They now skip `~/.config/git/ignore` and load the rest.
+
+**Performance**
+
+- **`Tree` checks no longer cost quadratic time in path depth** (#11). Directories without a `.gitignore` add no work, so the cost follows the `.gitignore` files on the path. A warm `CheckIsDir` on a 4,000-segment path went from 43.9 ms to 0.54 ms.
+- **Fewer allocations in the walker and parser** (#28). The walker no longer allocates per entry under directory paths of 32 bytes or more, and `AddPatterns` with a basePath no longer allocates three times per rule (100 rules: 504 allocations, now 205).
+
+**Docs**
+
+- `AddPatterns` says to add `.gitignore` files shallow to deep, since the last match wins (#16).
+- `Tree.CheckIsDir` says a symlinked parent still counts as a directory for the rules above it (#18).
+- `Entries` says `DirEntry` may be nil whenever err is set (#20), and `Entry.SkipDir` says to call it from the loop body, not another goroutine (#22).
+- The README and package doc say the git check-ignore verification is in case-sensitive mode and point at Differences from git (#25), and the zero-allocation claim is limited to clean paths up to 32 segments (#27).
+
 ### v1.9.0
 
 The repo walkers stop at nested repositories, as git does (#1). No exported API changes.

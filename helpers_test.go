@@ -81,7 +81,7 @@ func runGit(t *testing.T, dir string, args ...string) {
 // gitIgnores reports whether git check-ignore ignores path in repo.
 func gitIgnores(t *testing.T, repo, path string) bool {
 	t.Helper()
-	cmd := exec.Command("git", "check-ignore", "-q", path)
+	cmd := exec.Command("git", "check-ignore", "-q", "--", path)
 	cmd.Dir = repo
 	err := cmd.Run()
 	var exitErr *exec.ExitError

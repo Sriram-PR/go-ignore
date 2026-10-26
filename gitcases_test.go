@@ -251,7 +251,7 @@ func compareWithGit(t *testing.T, gitignoreContent string, paths []string, creat
 	// isolation when one path mismatches in a multi-path case.
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			gitResult := gitCheckIgnore(t, tmpDir, path)
+			gitResult := gitIgnores(t, tmpDir, path)
 
 			fullPath := filepath.Join(tmpDir, path)
 			info, err := os.Stat(fullPath)
@@ -265,28 +265,6 @@ func compareWithGit(t *testing.T, gitignoreContent string, paths []string, creat
 			}
 		})
 	}
-}
-
-// gitCheckIgnore runs git check-ignore and returns true if path is ignored
-func gitCheckIgnore(t *testing.T, repoDir, path string) bool {
-	cmd := exec.Command("git", "check-ignore", "-q", path)
-	cmd.Dir = repoDir
-
-	err := cmd.Run()
-	if err == nil {
-		return true // Exit 0 = ignored
-	}
-
-	// Exit 1 = not ignored, other = error
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		if exitErr.ExitCode() == 1 {
-			return false
-		}
-	}
-
-	// For other errors, log but don't fail (git check-ignore can be finicky)
-	t.Logf("git check-ignore warning for %q: %v", path, err)
-	return false
 }
 
 // RepoEntries lists nested repositories as git ls-files does (issue #1).

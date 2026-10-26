@@ -507,8 +507,8 @@ func TestAddExcludePatterns_EmptyFile(t *testing.T) {
 }
 
 func TestAddExcludePatterns_ReadPermissionError(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("permission test not reliable on Windows")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions and a non-root user")
 	}
 
 	tmp := t.TempDir()
@@ -539,8 +539,8 @@ func TestAddExcludePatterns_ReadPermissionError(t *testing.T) {
 }
 
 func TestAddGlobalPatterns_ReadPermissionError(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("permission test not reliable on Windows")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions and a non-root user")
 	}
 
 	tmp := t.TempDir()

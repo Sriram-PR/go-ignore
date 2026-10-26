@@ -383,8 +383,8 @@ func TestFiles_BreakDoesNotLeakSkipAll(t *testing.T) {
 func TestFiles_TraversalError(t *testing.T) {
 	// On Unix, a directory with mode 0o000 cannot be read; filepath.WalkDir
 	// surfaces the error to the callback. The iterator must yield it.
-	if runtime.GOOS == "windows" {
-		t.Skip("chmod 0o000 unreliable on Windows")
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX permissions and a non-root user")
 	}
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{

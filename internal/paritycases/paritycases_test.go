@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"maps"
+	"os"
 	"os/exec"
 	"path"
 	"slices"
@@ -117,5 +118,29 @@ func TestGitOracle(t *testing.T) {
 	}
 	if want := map[string]bool{".gitignore": true, "b": true, "keep.log": true}; !maps.Equal(files, want) {
 		t.Errorf("GitLsFiles = %v, want %v", files, want)
+	}
+}
+
+// Git hooks export GIT_DIR and friends; inherited, they would point the
+// oracle and the tests at another repository.
+func TestGitEnvDropsInheritedGitVars(t *testing.T) {
+	t.Setenv("GIT_DIR", "/elsewhere/.git")
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.excludesFile")
+	t.Setenv("git_work_tree", "/elsewhere")
+	for _, kv := range gitEnv() {
+		k, _, _ := strings.Cut(kv, "=")
+		if isGitVar(k) && k != "GIT_CONFIG_GLOBAL" && k != "GIT_CONFIG_SYSTEM" {
+			t.Errorf("gitEnv keeps %s", kv)
+		}
+	}
+
+	if err := UnsetGitEnv(); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"GIT_DIR", "GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "git_work_tree"} {
+		if v, ok := os.LookupEnv(k); ok {
+			t.Errorf("UnsetGitEnv left %s=%s", k, v)
+		}
 	}
 }

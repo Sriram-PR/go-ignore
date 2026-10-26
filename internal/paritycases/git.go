@@ -23,15 +23,42 @@ type Verdict struct {
 
 // gitEnv points every place git reads user or system config and global
 // excludes from at a missing path, so the developer's setup never leaks in.
+// Inherited GIT_* variables are dropped first, as UnsetGitEnv does.
 func gitEnv() []string {
 	missing := filepath.Join(os.TempDir(), "paritycases-no-such-dir")
-	return append(os.Environ(),
+	env := slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		k, _, _ := strings.Cut(kv, "=")
+		return isGitVar(k)
+	})
+	return append(env,
 		"HOME="+missing,
 		"USERPROFILE="+missing,
 		"XDG_CONFIG_HOME="+missing,
 		"GIT_CONFIG_GLOBAL="+missing,
 		"GIT_CONFIG_SYSTEM="+missing,
 	)
+}
+
+// UnsetGitEnv removes every GIT_* variable from the process environment.
+// Git hooks export GIT_DIR, GIT_WORK_TREE and friends, and GIT_CONFIG_COUNT
+// injects config: inherited, they point test git commands at another
+// repository and its config.
+func UnsetGitEnv() error {
+	for _, kv := range os.Environ() {
+		k, _, _ := strings.Cut(kv, "=")
+		if isGitVar(k) {
+			if err := os.Unsetenv(k); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// isGitVar reports whether k is a GIT_* name. Windows names are
+// case-insensitive.
+func isGitVar(k string) bool {
+	return len(k) >= 4 && strings.EqualFold(k[:4], "GIT_")
 }
 
 // runGit runs git in dir. Exit code 1 with empty stderr is not an error:

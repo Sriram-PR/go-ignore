@@ -1,4 +1,4 @@
-.PHONY: all test test-race test-cover bench fuzz fuzz-long lint fmt vet clean help parity parity-update test-git fixtures conformance conformance-update
+.PHONY: all ci test test-race test-cover bench fuzz fuzz-long lint fmt vet clean help parity parity-update test-git fixtures conformance conformance-update
 
 # Default target
 all: fmt vet test
@@ -79,7 +79,7 @@ clean:
 	rm -rf bin/ dist/
 	go clean -testcache
 
-# Full CI check (what CI runs)
+# Local CI gate; CI also runs parity, conformance, fuzz and benchmarks
 ci: fmt vet test test-race lint
 
 # Help

@@ -9,7 +9,7 @@ run:
 
 linters:
   default: standard
-  
+
   enable:
     - errcheck
     - govet
@@ -49,11 +49,6 @@ linters:
     presets:
       - comments
       - std-error-handling
-
-    rules:
-      # Exclude fieldalignment from test files (anonymous structs in tests)
-      - path: _test\.go
-        text: "fieldalignment"
 
 formatters:
   enable:

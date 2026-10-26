@@ -323,6 +323,11 @@ func (m *Matcher) effectiveMaxPatternLength() int {
 // root or contains a null byte adds no rules and produces one ParseWarning
 // with that BasePath and Line 0.
 //
+// Rules are evaluated in the order they were added, the last match winning,
+// and git gives a deeper .gitignore precedence over its parents. Add files
+// shallow to deep: a parent's file added after a child's overrides it. The
+// walkers, LoadRepo and Tree already do.
+//
 // Input normalization (applied automatically, as git does):
 //   - One leading UTF-8 BOM is stripped
 //   - A CR before LF or at the end of content is dropped; any other CR is

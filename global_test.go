@@ -63,6 +63,12 @@ func TestGitConfigGet_GlobalValue(t *testing.T) {
 
 	// Point GIT_CONFIG_GLOBAL at our fake config
 	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
+	if !gitAvailable() {
+		t.Skip("git not available")
+	}
+	if !gitConfigSet(t, "--global", "--get", "core.excludesFile") {
+		t.Skip("git does not respect GIT_CONFIG_GLOBAL on this platform")
+	}
 
 	// Step 1: Verify gitConfigGet reads the path correctly
 	path, found, err := gitConfigGet("", "--global", "--get", "core.excludesFile")
@@ -70,9 +76,7 @@ func TestGitConfigGet_GlobalValue(t *testing.T) {
 		t.Fatalf("gitConfigGet: %v", err)
 	}
 	if !found {
-		// Git didn't return a path — likely GIT_CONFIG_GLOBAL isn't
-		// supported by this git version (e.g., older git on Windows).
-		t.Skip("git does not respect GIT_CONFIG_GLOBAL on this platform")
+		t.Fatal("gitConfigGet found no core.excludesFile, git does")
 	}
 	if filepath.Clean(path) != ignoreFile {
 		t.Errorf("gitConfigGet = %q, want %q", path, ignoreFile)
@@ -103,8 +107,8 @@ func TestGitConfigGet_GlobalValue(t *testing.T) {
 
 // TestAddSystemPatterns_Success points GIT_CONFIG_SYSTEM at a fake system
 // gitconfig and verifies the patterns it references load with Source set to
-// the resolved file path. Skips if git does not respect GIT_CONFIG_SYSTEM on
-// the host platform.
+// the resolved file path. Skips if git itself does not respect
+// GIT_CONFIG_SYSTEM on the host platform.
 func TestAddSystemPatterns_Success(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -123,14 +127,20 @@ func TestAddSystemPatterns_Success(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(tmp, "nonexistent"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "nonexistent-xdg"))
 	t.Setenv("HOME", tmp)
+	if !gitAvailable() {
+		t.Skip("git not available")
+	}
+	if !gitConfigSet(t, "--system", "--get", "core.excludesFile") {
+		t.Skip("git does not respect GIT_CONFIG_SYSTEM on this platform")
+	}
 
 	m := New()
 	if err := m.AddSystemPatterns(); err != nil {
 		t.Fatalf("AddSystemPatterns: %v", err)
 	}
 
-	if m.RuleCount() == 0 {
-		t.Skip("git does not respect GIT_CONFIG_SYSTEM on this platform")
+	if n := m.RuleCount(); n != 1 {
+		t.Errorf("RuleCount = %d, want 1", n)
 	}
 	if !m.Match("foo.sys", false) {
 		t.Error("expected *.sys to match foo.sys")

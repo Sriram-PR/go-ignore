@@ -116,6 +116,24 @@ func gitAvailable() bool {
 	return err == nil
 }
 
+// gitConfigSet reports whether git itself sees a value for `git config args`.
+// It asks git directly, not the library, so a test can skip when git ignores
+// GIT_CONFIG_GLOBAL or GIT_CONFIG_SYSTEM without hiding a library bug.
+func gitConfigSet(t *testing.T, args ...string) bool {
+	t.Helper()
+	err := exec.Command("git", append([]string{"config"}, args...)...).Run()
+	var exitErr *exec.ExitError
+	switch {
+	case err == nil:
+		return true
+	case errors.As(err, &exitErr) && exitErr.ExitCode() == 1:
+		return false
+	default:
+		t.Fatalf("git config %v: %v", args, err)
+		return false
+	}
+}
+
 func mustCheck(t *testing.T, tr *Tree, path string) MatchResult {
 	t.Helper()
 	res, err := tr.Check(path)

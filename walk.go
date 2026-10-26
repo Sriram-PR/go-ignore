@@ -433,9 +433,9 @@ type WalkOptions struct {
 	// so the result is the part of the whole walk under Start. A Start that
 	// is ignored, or below an ignored directory, yields nothing; a file
 	// yields itself unless ignored. Start must have no empty, "." or ".."
-	// segment and no backslash, and root and the directories on the way
-	// must be real directories, not symlinks; otherwise one error is
-	// yielded and the iteration ends. "" walks root.
+	// segment and no backslash; root and the directories on the way must be
+	// real directories, and Start itself must not be a symlink. Otherwise one
+	// error is yielded and the iteration ends. "" walks root.
 	Start string
 }
 

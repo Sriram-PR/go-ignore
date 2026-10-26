@@ -489,12 +489,12 @@ Use this checklist before tagging a new release.
 
 #### Benchmarks
 
-- [ ] Run `make bench` and compare numbers to the README table — update if any operation moved by ≥20%
+- [ ] Run `make bench` against the previous release and note any operation that moved by ≥20% in the Version History entry
 - [ ] Match path remains 0 allocs/op on typical inputs
 
 #### Stability Audit
 
-- [ ] No breaking changes to the API surface listed in README's "Stability Guarantees" section (skip for v0.x where breaking changes are allowed)
+- [ ] No breaking changes to the API surface listed in README's "Stability Guarantees" section
 - [ ] If `MaxPathDepth` changed, ensure it was *raised*, never lowered
 
 #### Tooling

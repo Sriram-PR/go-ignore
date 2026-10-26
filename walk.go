@@ -107,7 +107,8 @@ func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error {
 // walkInternal is the shared engine behind WalkDir, WalkDirFS and Entries.
 // A non-empty start (already a valid WalkOptions.Start for Entries) walks
 // that directory below root after loading the rules above it. stopAtRepos
-// makes it list a nested repository as git does, for the repo walkers.
+// makes it list a nested repository as git does, for the repo walkers; the
+// check reads the OS filesystem, so only osBackend may set it.
 func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bool, fn fs.WalkDirFunc) error {
 	// Snapshot rules and opts under the read lock so the walker is unaffected
 	// by concurrent AddPatterns calls on the receiver.

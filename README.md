@@ -11,7 +11,7 @@ Zero-dependency `.gitignore` matching for Go, verified byte-for-byte against `gi
 
 - **Correct** — full gitignore syntax (`*`, `?`, `**`, `!`, `/`, `\` escapes, character classes, and all 12 POSIX classes), with an automated parity test suite against the system `git`.
 - **Batteries included** — a filesystem walker with nested `.gitignore` auto-discovery, directory pruning, extra ignore files and overrides, single-path checks that apply nested `.gitignore` files, plus one-call loading of the standard gitignore sources (`core.excludesFile` as git resolves it, `.git/info/exclude`, and the repo root).
-- **Fast and safe** — a zero-allocation match path, safe for concurrent use, fuzz- and race-tested.
+- **Fast and safe** — no allocations per match for clean paths up to 32 segments, safe for concurrent use, fuzz- and race-tested.
 - **Zero dependencies** — the standard library only.
 
 ## Install
@@ -165,7 +165,7 @@ Beyond matching, go-ignore has:
 
 - a filesystem walker that reads nested `.gitignore` files as it goes
 - match provenance: the file and line of the deciding pattern
-- a zero-allocation match path
+- no allocations per match for clean paths up to 32 segments (no `.`, `..` or `//`, lower case under `CaseInsensitive`)
 - no dependencies outside the standard library
 
 If you need `.dockerignore`/`.npmignore` (similar but not identical formats), full git repository access, or only trivial glob matching, a different tool may fit better — this library implements git's ignore spec and nothing more.

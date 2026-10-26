@@ -162,11 +162,15 @@ func (t *Tree) check(path string, isDir, stat bool, ex *Explanation) (MatchResul
 		return MatchResult{}, nil
 	}
 
+	// Only directories with rules add a group, so the cost follows the
+	// .gitignore files on the path, not its depth.
 	var groupBuf [34][]rule
 	groups := append(groupBuf[:0], t.base)
 	var errs []error
 	d := t.load("", len(t.base)+len(t.overrides))
-	groups = append(groups, d.rules)
+	if len(d.rules) > 0 {
+		groups = append(groups, d.rules)
+	}
 	if d.err != nil {
 		errs = append(errs, d.err)
 	}
@@ -190,7 +194,9 @@ func (t *Tree) check(path string, isDir, stat bool, ex *Explanation) (MatchResul
 		if !outside {
 			d = t.load(disk[:di], d.chain)
 			outside = d.outside
-			groups = append(groups, d.rules)
+			if len(d.rules) > 0 {
+				groups = append(groups, d.rules)
+			}
 			if d.err != nil {
 				errs = append(errs, d.err)
 			}

@@ -504,3 +504,20 @@ func TestTree_LeadingSlash(t *testing.T) {
 		}
 	}
 }
+
+// Directories without a .gitignore add no rule groups, so a deep path costs
+// no more than in the Matcher.
+func TestTree_DeepPathNoNestedFiles(t *testing.T) {
+	m := New()
+	m.AddPatterns("", []byte("*.log\nbuild/\n"))
+	tr := m.TreeFS(fstest.MapFS{}, ".")
+	p := strings.Repeat("a/", 99) + "f.go"
+	if _, err := tr.CheckIsDir(p, false); err != nil {
+		t.Fatal(err)
+	}
+	base := testing.AllocsPerRun(100, func() { _ = m.MatchWithReason(p, false) })
+	got := testing.AllocsPerRun(100, func() { _, _ = tr.CheckIsDir(p, false) })
+	if got > base {
+		t.Errorf("CheckIsDir allocs = %v, MatchWithReason allocs = %v", got, base)
+	}
+}

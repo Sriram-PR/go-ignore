@@ -561,7 +561,7 @@ func (m *Matcher) Explain(path string, isDir bool) Explanation {
 	}
 	own := evaluateWithOverrides(rules, m.overrides, match, segs, isDir)
 	if res, end, ok := parentIgnored(rules, m.overrides, match, segs); ok {
-		return Explanation{Result: res, Parent: strings.TrimPrefix(disk[:end], "/"), Own: own}
+		return Explanation{Result: res, Parent: disk[:end], Own: own}
 	}
 	return Explanation{Result: own, Own: own}
 }
@@ -609,18 +609,13 @@ func parentIgnored(rules, overrides []rule, path string, segs []string) (MatchRe
 	if len(segs) < 2 {
 		return MatchResult{}, 0, false
 	}
-	// Skip a leading slash so each parent is a name, not a "/" prefix.
-	start := 0
-	if path[0] == '/' {
-		start = 1
-	}
 	n := 0
-	for j := start; j < len(path); j++ {
+	for j := 0; j < len(path); j++ {
 		if path[j] != '/' {
 			continue
 		}
 		n++
-		res := evaluateWithOverrides(rules, overrides, path[start:j], segs[:n], true)
+		res := evaluateWithOverrides(rules, overrides, path[:j], segs[:n], true)
 		if res.Matched && res.Ignored {
 			return res, j, true
 		}

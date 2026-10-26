@@ -639,7 +639,6 @@ func TestParentIgnored(t *testing.T) {
 		{"build/x/y.o", true, "build/", 5},
 		{"build/keep/a", true, "build/", 5}, // outermost ignored parent decides
 		{"src/logs/a", true, "logs", 8},
-		{"/build/x", true, "build/", 6},
 		{"src/a", false, "", 0},
 		{"build", false, "", 0}, // the path itself is not a parent
 	}

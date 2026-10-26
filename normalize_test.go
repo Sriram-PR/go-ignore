@@ -39,7 +39,8 @@ func TestNormalizePath(t *testing.T) {
 		{"double slash", "foo//bar", "foo/bar", false},
 		{"triple slash", "foo///bar", "foo/bar", false},
 		{"multiple double slashes", "foo//bar//baz", "foo/bar/baz", false},
-		{"leading double slash", "//foo", "/foo", false},
+		{"leading slash", "/foo", "foo", false},
+		{"leading double slash", "//foo", "foo", false},
 
 		// Combined cases (Windows only due to backslash conversion)
 		{"windows with trailing", "foo\\bar\\", "foo/bar", true},
@@ -57,6 +58,7 @@ func TestNormalizePath(t *testing.T) {
 		{"dotdot above root", "../secret.txt", "", false},
 		{"dotdot bare", "..", "", false},
 		{"dotdot from root", "/..", "", false},
+		{"dotdot above root after leading slash", "/../secret.txt", "", false},
 		{"dotdot deep above root", "a/../../b", "", false},
 		{"dotdot in filename", "foo..bar", "foo..bar", false},
 		{"dotdot no effect", "a/b/c", "a/b/c", false},

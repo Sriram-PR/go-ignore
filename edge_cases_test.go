@@ -429,7 +429,9 @@ func TestEdgeCases_PathVariations(t *testing.T) {
 		{"windows deep path", "src\\lib\\test.log", false, true},
 		{"windows dir", "build", true, true},
 
-		// Leading ./
+		// Leading / and ./
+		{"leading slash", "/test.log", false, true},
+		{"leading slash above root", "/../test.log", false, false},
 		{"leading dot slash", "./test.log", false, true},
 		{"leading dot slash nested", "./src/test.log", false, true},
 
@@ -585,6 +587,8 @@ func TestEdgeCases_BasePathNormalization(t *testing.T) {
 		{"basePath with trailing slash", "src/", "*.log", "src/test.log", true, false},
 		{"basePath with backslash", "src\\lib", "*.log", "src/lib/test.log", true, true},
 		{"basePath with leading dot-slash", "./src", "*.log", "src/test.log", true, false},
+		{"basePath with leading slash", "/src", "*.log", "src/test.log", true, false},
+		{"path with leading slash under basePath", "src", "*.log", "/src/test.log", true, false},
 		{"empty basePath", "", "*.log", "test.log", true, false},
 	}
 

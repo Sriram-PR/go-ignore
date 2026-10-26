@@ -489,3 +489,18 @@ func TestTree_ExplainUnreadableGitignore(t *testing.T) {
 		t.Errorf("a/build/x: %+v, %v; want Parent a/build with CheckIsDir's %+v, %v", e, err, res, cerr)
 	}
 }
+
+// A leading slash names the same path as without it, so a nested
+// .gitignore applies to /sub/x.log as to sub/x.log.
+func TestTree_LeadingSlash(t *testing.T) {
+	tr := New().TreeFS(fstest.MapFS{
+		"sub/.gitignore": file("*.log\n"),
+		"sub/x.log":      file(""),
+	}, ".")
+	for _, p := range []string{"sub/x.log", "/sub/x.log"} {
+		res, err := tr.CheckIsDir(p, false)
+		if err != nil || !res.Ignored || res.Rule != "*.log" || res.BasePath != "sub" {
+			t.Errorf("CheckIsDir(%q) = %+v, %v; want ignored by sub's *.log", p, res, err)
+		}
+	}
+}

@@ -173,26 +173,22 @@ func (t *Tree) check(path string, isDir, stat bool, ex *Explanation) (MatchResul
 
 	// disk and match have their slashes at the same segment boundaries, so
 	// walk both: disk names the directory to read, match is what rules see.
-	diskStart, matchStart := 0, 0
-	if disk[0] == '/' {
-		diskStart, matchStart = 1, 1
-	}
-	di, mi := diskStart, matchStart
+	di, mi := 0, 0
 	outside := false
 	for k := 1; k < len(segs); k++ {
 		di += strings.IndexByte(disk[di:], '/')
 		mi += strings.IndexByte(match[mi:], '/')
-		if res := evaluateGroups(groups, t.overrides, match[matchStart:mi], segs[:k], true); res.Matched && res.Ignored {
+		if res := evaluateGroups(groups, t.overrides, match[:mi], segs[:k], true); res.Matched && res.Ignored {
 			if ex != nil {
 				// groups holds the files git reads: none from the ignored
 				// directory down has been loaded yet.
-				ex.Result, ex.Parent = res, disk[diskStart:di]
+				ex.Result, ex.Parent = res, disk[:di]
 				ex.Own = evaluateGroups(groups, t.overrides, match, segs, isDir)
 			}
 			return res, errors.Join(errs...)
 		}
 		if !outside {
-			d = t.load(disk[diskStart:di], d.chain)
+			d = t.load(disk[:di], d.chain)
 			outside = d.outside
 			groups = append(groups, d.rules)
 			if d.err != nil {

@@ -49,8 +49,9 @@
 //
 // ? and character classes operate on raw bytes, not Unicode code points
 // (matching git), so a multi-byte character needs multiple ?. Input paths are
-// normalized (slashes, leading "./", trailing "/", and "."/".." resolved so a
-// path cannot bypass a scoped rule); patterns keep their original escapes.
+// normalized (slashes, leading "/" and "./", trailing "/", and "."/".."
+// resolved so a path cannot bypass a scoped rule; "/sub/x" is "sub/x");
+// patterns keep their original escapes.
 //
 // # Differences from git
 //

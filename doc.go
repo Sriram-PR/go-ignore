@@ -26,13 +26,14 @@
 // RepoFiles are their range-over-func form, and WalkDirFS/FilesFS operate
 // over an fs.FS. Entries, EntriesFS and RepoEntries yield files and
 // directories, with Entry.SkipDir to prune, and can start below root with
-// the rules above it loaded (WalkOptions.Start). MatcherOptions.IgnoreFiles
-// names extra per-directory ignore files, such as .ignore or .aiignore, read
-// after each .gitignore, and MatcherOptions.Overrides holds patterns checked
-// after every other rule. To check single paths with nested .gitignore files
-// applied, as git check-ignore does, use a Tree: OpenTree for a repository,
-// or Matcher.Tree and Matcher.TreeFS. See each function's own documentation
-// for details.
+// the rules above it loaded (WalkOptions.Start). WalkRepo, RepoFiles and
+// RepoEntries list a nested repository as git ls-files does, without going
+// inside it. MatcherOptions.IgnoreFiles names extra per-directory ignore
+// files, such as .ignore or .aiignore, read after each .gitignore, and
+// MatcherOptions.Overrides holds patterns checked after every other rule. To
+// check single paths with nested .gitignore files applied, as git
+// check-ignore does, use a Tree: OpenTree for a repository, or Matcher.Tree
+// and Matcher.TreeFS. See each function's own documentation for details.
 //
 // # Match provenance
 //

@@ -593,3 +593,189 @@ func TestWalkRepo_UnreadableRootGitignoreContinues(t *testing.T) {
 		t.Error("a.log not visited; want the walk to continue")
 	}
 }
+
+// nestedRepoTree is issue #1's layout: a nested repository with its own
+// .gitignore next to a plain file, plus a deeper nested repository.
+func nestedRepoTree(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	writeTree(t, root, merged(gitDirFiles("nested/.git"), gitDirFiles("h/i/.git"), map[string]string{
+		"top.txt":           "x",
+		"nested/.gitignore": "inner.txt\n",
+		"nested/keep.txt":   "x",
+		"nested/inner.txt":  "x",
+		"h/k.txt":           "x",
+		"h/i/f.txt":         "x",
+	}))
+	return root
+}
+
+// slashRel is p relative to root in slash form.
+func slashRel(t *testing.T, root, p string) string {
+	t.Helper()
+	rel, err := filepath.Rel(root, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.ToSlash(rel)
+}
+
+// walkRepoVisits is what WalkRepo passes fn, root left out, in walk order.
+func walkRepoVisits(t *testing.T, root string, opts MatcherOptions) []string {
+	t.Helper()
+	var got []string
+	err := WalkRepo(root, opts, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if rel := slashRel(t, root, p); rel != "." {
+			got = append(got, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkRepo: %v", err)
+	}
+	return got
+}
+
+// repoEntryPaths is what RepoEntries yields, as slash paths relative to
+// root, calling SkipDir on each directory named in skip.
+func repoEntryPaths(t *testing.T, root string, wo WalkOptions, skip map[string]bool) []string {
+	t.Helper()
+	got := []string{}
+	for e, err := range RepoEntries(root, MatcherOptions{}, wo) {
+		if err != nil {
+			t.Fatalf("RepoEntries: %v", err)
+		}
+		rel := slashRel(t, root, e.Path)
+		got = append(got, rel)
+		if skip[rel] {
+			e.SkipDir()
+		}
+	}
+	return got
+}
+
+func TestWalkRepo_StopsAtNestedRepo(t *testing.T) {
+	root := nestedRepoTree(t)
+	want := []string{"h", "h/i", "h/k.txt", "nested", "top.txt"}
+	if got := walkRepoVisits(t, root, MatcherOptions{}); !slices.Equal(got, want) {
+		t.Errorf("WalkRepo = %q, want %q", got, want)
+	}
+}
+
+func TestRepoEntries_StopsAtNestedRepo(t *testing.T) {
+	root := nestedRepoTree(t)
+	want := []string{"h", "h/i", "h/k.txt", "nested", "top.txt"}
+	if got := repoEntryPaths(t, root, WalkOptions{}, nil); !slices.Equal(got, want) {
+		t.Errorf("RepoEntries = %q, want %q", got, want)
+	}
+	// SkipDir on a nested repository changes nothing: it is already pruned.
+	if got := repoEntryPaths(t, root, WalkOptions{}, map[string]bool{"nested": true, "h/i": true}); !slices.Equal(got, want) {
+		t.Errorf("RepoEntries with SkipDir = %q, want %q", got, want)
+	}
+}
+
+func TestRepoFiles_SkipsNestedRepo(t *testing.T) {
+	root := nestedRepoTree(t)
+	var got []string
+	for p, err := range RepoFiles(root, MatcherOptions{}) {
+		if err != nil {
+			t.Fatalf("RepoFiles: %v", err)
+		}
+		got = append(got, slashRel(t, root, p))
+	}
+	if want := []string{"h/k.txt", "top.txt"}; !slices.Equal(got, want) {
+		t.Errorf("RepoFiles = %q, want %q", got, want)
+	}
+}
+
+func TestWalkRepo_IgnoredNestedRepoPruned(t *testing.T) {
+	root := nestedRepoTree(t)
+	writeTree(t, root, map[string]string{".gitignore": "nested/\n"})
+	want := []string{".gitignore", "h", "h/i", "h/k.txt", "top.txt"}
+	if got := walkRepoVisits(t, root, MatcherOptions{}); !slices.Equal(got, want) {
+		t.Errorf("WalkRepo = %q, want %q", got, want)
+	}
+}
+
+// fn's SkipAll at a nested repository ends the walk.
+func TestWalkRepo_SkipAllAtNestedRepo(t *testing.T) {
+	root := nestedRepoTree(t)
+	var got []string
+	err := WalkRepo(root, MatcherOptions{}, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel := slashRel(t, root, p)
+		if rel != "." {
+			got = append(got, rel)
+		}
+		if rel == "h/i" {
+			return fs.SkipAll
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkRepo: %v", err)
+	}
+	if want := []string{"h", "h/i"}; !slices.Equal(got, want) {
+		t.Errorf("WalkRepo = %q, want %q", got, want)
+	}
+}
+
+// Git lists nothing for a pathspec inside a nested repository.
+func TestRepoEntries_StartAtOrBelowNestedRepo(t *testing.T) {
+	root := nestedRepoTree(t)
+	writeTree(t, root, map[string]string{"nested/sub/x.txt": "x"})
+	for _, start := range []string{"nested", "nested/sub", "h/i"} {
+		if got := repoEntryPaths(t, root, WalkOptions{Start: start}, nil); len(got) != 0 {
+			t.Errorf("Start %q: RepoEntries = %q, want nothing", start, got)
+		}
+	}
+	if got, want := repoEntryPaths(t, root, WalkOptions{Start: "h"}, nil), []string{"h/i", "h/k.txt"}; !slices.Equal(got, want) {
+		t.Errorf("Start h: RepoEntries = %q, want %q", got, want)
+	}
+}
+
+// A nested repository's .gitignore is never read, so its warnings never fire.
+func TestWalkRepo_NestedRepoGitignoreNotRead(t *testing.T) {
+	root := nestedRepoTree(t)
+	writeTree(t, root, map[string]string{"nested/.gitignore": "[abc\n"})
+	var warnings []ParseWarning
+	opts := MatcherOptions{WarningHandler: func(w ParseWarning) { warnings = append(warnings, w) }}
+	walkRepoVisits(t, root, opts)
+	if len(warnings) != 0 {
+		t.Errorf("warnings = %v, want none", warnings)
+	}
+}
+
+// Plain walkers are not tied to a repository and keep descending.
+func TestWalkDir_DescendsIntoNestedRepo(t *testing.T) {
+	root := nestedRepoTree(t)
+	want := []string{"h", "h/i", "h/i/f.txt", "h/k.txt", "nested", "nested/.gitignore", "nested/keep.txt", "top.txt"}
+	if got := collectWalk(t, New(), root); !slices.Equal(got, want) {
+		t.Errorf("WalkDir = %q, want %q", got, want)
+	}
+	var files []string
+	for p, err := range New().Files(root) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, slashRel(t, root, p))
+	}
+	if !slices.Contains(files, "nested/keep.txt") || !slices.Contains(files, "h/i/f.txt") {
+		t.Errorf("Files = %q, want nested repo contents", files)
+	}
+	var entries []string
+	for e, err := range New().Entries(root, WalkOptions{}) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, slashRel(t, root, e.Path))
+	}
+	if !slices.Contains(entries, "nested/keep.txt") {
+		t.Errorf("Entries = %q, want nested repo contents", entries)
+	}
+}

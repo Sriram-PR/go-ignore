@@ -47,7 +47,7 @@ The second argument to `Match` reports whether the path is a directory. The libr
 
 ### Walk a repository
 
-`WalkRepo` loads the standard gitignore sources for a working tree, then walks it, calling your function only for entries that are **not** ignored and pruning ignored (and `.git/`) directories as it descends:
+`WalkRepo` loads the standard gitignore sources for a working tree, then walks it, calling your function only for entries that are **not** ignored and pruning ignored (and `.git/`) directories as it descends, and not going inside nested repositories, as `git ls-files` does:
 
 ```go
 import "io/fs"

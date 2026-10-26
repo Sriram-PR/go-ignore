@@ -66,15 +66,15 @@ func ExampleMatcherOptions_warningHandler() {
 	// line 2: pattern is empty after processing
 }
 
+// The rules come from the machine's git config, so this example has no
+// fixed output and is compiled but not run.
 func ExampleMatcher_AddGlobalPatterns() {
 	m := ignore.New()
 	if err := m.AddGlobalPatterns(); err != nil {
 		fmt.Println("error:", err)
 		return
 	}
-	fmt.Println("loaded:", m.RuleCount() >= 0)
-	// Output:
-	// loaded: true
+	fmt.Println(m.Match(".DS_Store", false))
 }
 
 func ExampleMatcher_AddExcludePatterns() {

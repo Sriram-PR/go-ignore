@@ -249,15 +249,20 @@ func TestMatchWithReason_EscapedTrailingSpaceRule(t *testing.T) {
 	tests := []struct{ path, rule string }{
 		{"foo ", `foo\ `},
 		{"bar ", `bar\ `},
-		{`baz\ `, `baz\\\ `},
 		{"keep ", `!keep\ `},
+	}
+	misses := []string{"foo", "bar"}
+	// A backslash in a path is a separator on Windows.
+	if runtime.GOOS != "windows" {
+		tests = append(tests, struct{ path, rule string }{`baz\ `, `baz\\\ `})
+		misses = append(misses, `baz\`)
 	}
 	for _, tt := range tests {
 		if r := m.MatchWithReason(tt.path, false); !r.Matched || r.Rule != tt.rule {
 			t.Errorf("MatchWithReason(%q) = %+v, want Rule %q", tt.path, r, tt.rule)
 		}
 	}
-	for _, p := range []string{"foo", "bar", `baz\`} {
+	for _, p := range misses {
 		if r := m.MatchWithReason(p, false); r.Matched {
 			t.Errorf("MatchWithReason(%q) = %+v, want no match", p, r)
 		}

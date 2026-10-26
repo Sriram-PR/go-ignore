@@ -26,7 +26,7 @@ var gitConfigTimeout = 5 * time.Second
 //     repository's own config, -c and GIT_CONFIG_*), with include and
 //     includeIf followed. When no scope sets it, $XDG_CONFIG_HOME/git/ignore
 //     (default ~/.config/git/ignore); a value set to the empty string loads
-//     nothing.
+//     nothing, and a relative value is read from repoRoot.
 //  2. <repoRoot>/.git/info/exclude, following a .git file in linked worktrees
 //     and submodules (see AddExcludePatterns)
 //  3. <repoRoot>/.gitignore (root scope)
@@ -87,6 +87,10 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 	path, err := effectiveExcludesFile(repoRoot)
 	if err != nil {
 		return nil, err
+	}
+	// git reads a relative value from the top of the work tree.
+	if path != "" {
+		path = resolveRelative(repoRoot, path)
 	}
 	if err := m.addExcludesFile(path, "core.excludesFile"); err != nil {
 		return nil, err

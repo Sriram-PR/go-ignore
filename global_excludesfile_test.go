@@ -88,6 +88,11 @@ func TestLoadRepo_ExcludesFileMatchesGit(t *testing.T) {
 		{name: "tilde path", setup: func(t *testing.T, home, repo string) {
 			writeTree(t, home, map[string]string{"global.cfg": "[core]\n\texcludesFile = ~/glob.ign\n"})
 		}, want: "a.glob", src: "glob.ign"},
+		{name: "relative value: from the work tree, not the cwd", setup: func(t *testing.T, home, repo string) {
+			runGit(t, repo, "config", "core.excludesFile", "rel.ign")
+			writeTree(t, home, map[string]string{"repo/rel.ign": "*.local\n", "rel.ign": "*.glob\n"})
+			t.Chdir(home)
+		}, want: "a.local", src: "repo/rel.ign"},
 		{name: "GIT_CONFIG_COUNT override wins", setup: func(t *testing.T, home, repo string) {
 			setExcludes(t, filepath.Join(home, "global.cfg"), filepath.Join(home, "glob.ign"))
 			t.Setenv("GIT_CONFIG_COUNT", "1")

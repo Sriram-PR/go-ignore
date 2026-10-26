@@ -8,7 +8,7 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 The repo walkers stop at nested repositories, as git does (#1). No exported API changes.
 
-**Changed**
+**Behavior changes**
 
 - **`WalkRepo`, `RepoFiles` and `RepoEntries` no longer go inside a nested repository** (#1). A directory below the root whose `.git` is a repository by git's rules (a git directory, a `gitdir:` file pointing to one, or a `.git` file that can't be read) is passed to `WalkRepo`'s fn and yielded by `RepoEntries` once, with nothing under it, the way `git ls-files -co --exclude-standard` lists it. `RepoFiles` yields nothing for it, and a `WalkOptions.Start` at or below one yields nothing. Its `.gitignore` isn't read. Submodule work trees count too. An empty or broken `.git` doesn't, so those directories are walked as before. `WalkDir`, `Files`, `Entries`, their `FS` forms and `Tree` are unchanged and still go inside.
 
@@ -70,17 +70,17 @@ Walker options for packers and indexers: extra per-directory ignore files, calle
 - **`Entries`, `EntriesFS` and `RepoEntries`** yield every non-ignored file and directory as an `Entry` (an `fs.DirEntry` plus `Path`), in `WalkDir` order and with the walker's rules. Calling `Entry.SkipDir()` in the loop body prunes a directory, so filters like hidden directories or a max depth fit in a range loop. Errors are yielded with their entry and the walk goes on.
 - **`WalkOptions.Start`** walks one subdirectory, such as `src`, after reading the ignore files of the root and of every directory down to it, so the result is that part of the whole walk. Nothing above the root is read. An ignored Start yields nothing; a malformed, missing or symlinked one yields one error.
 
-**Changed**
+**Behavior changes**
 
 - `AddExcludePatterns` read errors say `reading exclude file <path>: ...` instead of `reading <path>: ...`. `errors.Is` checks are unaffected.
-
-**Docs**
-
-- The README's comparison with other Go gitignore libraries is measured now: `make conformance` runs each library over the parity scenarios and counts the answers that agree with `git check-ignore`, and CI checks that the table is current.
 
 **Performance**
 
 - `Match` reads a snapshot of the rules and evaluates it outside the lock. Against v1.6.0, measured from a separate module, a path below an ignored directory is about 30% faster to check, other `Match` calls are 4-8% slower, mostly code layout, and walks are unchanged. `Match` still makes no allocations.
+
+**Docs**
+
+- The README's comparison with other Go gitignore libraries is measured now: `make conformance` runs each library over the parity scenarios and counts the answers that agree with `git check-ignore`, and CI checks that the table is current.
 
 ### v1.6.0
 
@@ -148,7 +148,7 @@ Matcher resource limits. Matching no longer runs on a backtrack budget, so a pat
 
 ### v1.3.0
 
-`core.excludesFile` parity. `LoadRepo`, `WalkRepo` and `RepoFiles` now load the one excludes file git itself uses for the repository, instead of both the system and global files, and `AddGlobalPatterns` and `AddSystemPatterns` follow includes. No exported identifiers change, and matching is untouched.
+`core.excludesFile` parity. `LoadRepo`, `WalkRepo` and `RepoFiles` now load the one excludes file git itself uses for the repository, instead of both the system and global files, and `AddGlobalPatterns` and `AddSystemPatterns` follow includes. No exported API changes, and matching is untouched.
 
 **Behavior changes**
 
@@ -183,7 +183,7 @@ Walker hardening. Walks with many nested `.gitignore` files are now linear (a 3,
 
 ### v1.1.0
 
-`Match` now agrees with git for paths under directories, which removes 863 of the 932 known divergences the new parity harness found. Both fixes change results only where go-ignore disagreed with `git check-ignore`, as the Stability Guarantees allow. The exported API is unchanged. The minimum Go version is now 1.26.
+`Match` now agrees with git for paths under directories, which removes 863 of the 932 known divergences the new parity harness found. Both fixes change results only where go-ignore disagreed with `git check-ignore`, as the Stability Guarantees allow. No exported API changes. The minimum Go version is now 1.26.
 
 **Behavior changes**
 
@@ -204,7 +204,7 @@ Walker hardening. Walks with many nested `.gitignore` files are now linear (a 3,
 
 ### v1.0.1
 
-Bug fixes from an audit that diffed matching and walking against `git check-ignore` 2.56. Each one changes results only where go-ignore disagreed with git, which the Stability Guarantees allow in a patch release. The exported API is unchanged.
+Bug fixes from an audit that diffed matching and walking against `git check-ignore` 2.56. Each one changes results only where go-ignore disagreed with git, which the Stability Guarantees allow in a patch release. No exported API changes.
 
 **Fixed**
 
@@ -216,7 +216,7 @@ Bug fixes from an audit that diffed matching and walking against `git check-igno
 - **Deep paths with many wildcard rules.** A floating pattern without `**` was tried at every position in the path, and the negation ancestor walk repeats that for each parent, so cost grew with depth squared. 1000 `x*y` rules against a 1000-deep path took 4.3s and now take 20ms. Results are unchanged.
 - **`git config` timeout.** The 5s timeout didn't hold when `git` left a child process holding stdout, and `LoadRepo` could hang for as long as that child lived. The wait is now bounded.
 
-**Documentation**
+**Docs**
 
 - Restored the README "Stability Guarantees" section, which the CHANGELOG and README pointed to but which had been dropped.
 - `Files` / `FilesFS`: errors are yielded and the walk continues; break to stop. Non-directory entries such as symlinks are yielded too.
@@ -232,21 +232,21 @@ Bug fixes from an audit that diffed matching and walking against `git check-igno
 
 **Note:** a few matching cases diverge from git. They are fixed in v1.0.1, so upgrade.
 
-go-ignore is now stable. This release freezes the exported API for the v1.x line — types, functions, methods, fields, and constants are settled, and future releases add to them rather than break them. The README's "Stability Guarantees" section spells out the full contract.
+go-ignore is now stable. This release freezes the exported API for the v1.x line: types, functions, methods, fields, and constants are settled, and future releases add to them rather than break them. The README's "Stability Guarantees" section spells out the full contract.
 
 Everything since v0.9.1 lands here too.
 
 **Added**
 
-- **`AddPatternsReaderWithSource`** streams patterns from an `io.Reader` and records a source label, surfaced through `MatchResult.Source` — rounding out the `…WithSource` variants across the `AddPatterns*` family.
+- **`AddPatternsReaderWithSource`** streams patterns from an `io.Reader` and records a source label, surfaced through `MatchResult.Source`. It rounds out the `…WithSource` variants across the `AddPatterns*` family.
 
 **Fixed**
 
-- **A zero-value `Matcher` now works.** A `Matcher` created without `New` / `NewWithOptions` (for example `var m Matcher`) used to read its resource limits as a literal `0` and silently drop every pattern. The limits now fall back to their defaults on use. Covered by `TestZeroValueMatcher`.
+- **A zero-value `Matcher` now works.** A `Matcher` created without `New` / `NewWithOptions` (for example `var m Matcher`) used to read its resource limits as a literal `0` and silently drop every pattern. The limits now fall back to their defaults on use.
 
-**Documentation**
+**Docs**
 
-- Trimmed the README to a lean front-door (the full reference lives on pkg.go.dev), dropped the offline Go Report Card badge, and tidied the code comments — cutting step-by-step narration and correcting a few stale doc comments.
+- Trimmed the README (the full reference lives on pkg.go.dev), dropped the offline Go Report Card badge, and tidied the code comments, cutting step-by-step narration and correcting a few stale doc comments.
 
 Matching behavior is unchanged from v0.9.1 and stays verified byte-for-byte against `git check-ignore`.
 

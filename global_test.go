@@ -16,10 +16,7 @@ func TestXdgGlobalIgnorePath(t *testing.T) {
 		tmp := t.TempDir()
 		t.Setenv("XDG_CONFIG_HOME", tmp)
 
-		path, err := xdgGlobalIgnorePath()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		path := xdgGlobalIgnorePath()
 		want := filepath.Join(tmp, "git", "ignore")
 		if path != want {
 			t.Errorf("got %q, want %q", path, want)
@@ -34,10 +31,7 @@ func TestXdgGlobalIgnorePath(t *testing.T) {
 			t.Skipf("cannot get home dir: %v", err)
 		}
 
-		path, err := xdgGlobalIgnorePath()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		path := xdgGlobalIgnorePath()
 		want := filepath.Join(home, ".config", "git", "ignore")
 		if path != want {
 			t.Errorf("got %q, want %q", path, want)
@@ -776,5 +770,33 @@ func TestAddExcludePatterns_SymlinkFollowed(t *testing.T) {
 	}
 	if !m.Match("a.log", false) {
 		t.Error("a.log not ignored; want the symlinked exclude file's rules applied")
+	}
+}
+
+// With no home directory there is no default global ignore file, as in git,
+// so the loaders that fall back to it still work.
+func TestGlobalIgnore_NoHomeDir(t *testing.T) {
+	isolateGitConfig(t)
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	t.Setenv("home", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	if _, err := os.UserHomeDir(); err == nil {
+		t.Skip("os.UserHomeDir finds a home without HOME on this platform")
+	}
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("a.log\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := LoadRepo(root, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if !m.Match("a.log", false) {
+		t.Error("a.log not ignored")
+	}
+	if err := New().AddGlobalPatterns(); err != nil {
+		t.Errorf("AddGlobalPatterns: %v", err)
 	}
 }

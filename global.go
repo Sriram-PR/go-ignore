@@ -25,8 +25,9 @@ var gitConfigTimeout = 5 * time.Second
 //     the last value across every config scope (system, global, the
 //     repository's own config, -c and GIT_CONFIG_*), with include and
 //     includeIf followed. When no scope sets it, $XDG_CONFIG_HOME/git/ignore
-//     (default ~/.config/git/ignore); a value set to the empty string loads
-//     nothing, and a relative value is read from repoRoot.
+//     (default ~/.config/git/ignore, none without a home directory); a value
+//     set to the empty string loads nothing, and a relative value is read
+//     from repoRoot.
 //  2. <repoRoot>/.git/info/exclude, following a .git file in linked worktrees
 //     and submodules (see AddExcludePatterns)
 //  3. <repoRoot>/.gitignore (root scope)
@@ -107,7 +108,8 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 // is unavailable, does not answer within 5 seconds, fails (a malformed global
 // config, say), or the global config does not set it, the path is
 // $XDG_CONFIG_HOME/git/ignore, or ~/.config/git/ignore when XDG_CONFIG_HOME
-// is unset. A global value set to the empty string loads nothing.
+// is unset (none without a home directory). A global value set to the empty
+// string loads nothing.
 //
 // This reads the global scope only; LoadRepo resolves core.excludesFile
 // across every scope, as git does.
@@ -135,9 +137,7 @@ func (m *Matcher) AddGlobalPatterns() error {
 		return fmt.Errorf("resolving global gitignore path: %w", err)
 	}
 	if !found {
-		if path, err = xdgGlobalIgnorePath(); err != nil {
-			return fmt.Errorf("resolving global gitignore path: %w", err)
-		}
+		path = xdgGlobalIgnorePath()
 	}
 	return m.addExcludesFile(path, "global gitignore")
 }
@@ -326,7 +326,7 @@ func effectiveExcludesFile(repoRoot string) (string, error) {
 	if found {
 		return path, nil
 	}
-	return xdgGlobalIgnorePath()
+	return xdgGlobalIgnorePath(), nil
 }
 
 // gitConfigGet runs `git config --path <args...>` in dir ("" for the current
@@ -399,14 +399,15 @@ func withoutEnv(env []string, names ...string) []string {
 
 // xdgGlobalIgnorePath returns the XDG-based global gitignore path.
 // Uses $XDG_CONFIG_HOME/git/ignore if set, otherwise ~/.config/git/ignore.
-func xdgGlobalIgnorePath() (string, error) {
+// With no home directory it returns "", as git then reads no default file.
+func xdgGlobalIgnorePath() string {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "git", "ignore"), nil
+		return filepath.Join(xdg, "git", "ignore")
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("determining home directory: %w", err)
+		return ""
 	}
-	return filepath.Join(home, ".config", "git", "ignore"), nil
+	return filepath.Join(home, ".config", "git", "ignore")
 }

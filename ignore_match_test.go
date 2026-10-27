@@ -629,7 +629,7 @@ func TestCaseInsensitive_ASCIIOnlyBasePath(t *testing.T) {
 }
 
 func TestParentIgnored(t *testing.T) {
-	rules, _, _ := parseLinesAll("", []byte("build/\n!build/keep/\nlogs\n"), -1, -1, "")
+	rules, _ := parseLinesAll("", []byte("build/\n!build/keep/\nlogs\n"))
 	tests := []struct {
 		path     string
 		wantOK   bool

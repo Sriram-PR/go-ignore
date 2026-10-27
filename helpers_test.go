@@ -149,9 +149,10 @@ func matchGlob(pattern, s string) bool {
 	return matchSingleSegment(newSegment(pattern), s)
 }
 
-// parseLinesAll is parseLines with every warning kept and returned.
-func parseLinesAll(basePath string, content []byte, maxPatternLength, maxRules int, source string) ([]rule, []ParseWarning, bool) {
+// parseLinesAll is parseLines without limits or a source, with every warning
+// kept and returned.
+func parseLinesAll(basePath string, content []byte) ([]rule, []ParseWarning) {
 	ws := newWarnList(-1)
-	rules, truncated := parseLines(basePath, content, maxPatternLength, maxRules, source, &ws)
-	return rules, ws.items, truncated
+	rules, _ := parseLines(basePath, content, -1, -1, "", &ws)
+	return rules, ws.items
 }

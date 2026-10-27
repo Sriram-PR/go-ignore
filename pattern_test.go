@@ -569,7 +569,7 @@ src/temp
 **/cache
 `)
 
-	rules, warnings, _ := parseLinesAll("", content, -1, -1, "")
+	rules, warnings := parseLinesAll("", content)
 
 	if len(warnings) != 0 {
 		t.Errorf("parseLines returned %d warnings, want 0", len(warnings))
@@ -622,7 +622,7 @@ func TestParseLines_WithWarnings(t *testing.T) {
 valid.txt
 `)
 
-	rules, warnings, _ := parseLinesAll("", content, -1, -1, "")
+	rules, warnings := parseLinesAll("", content)
 
 	// Should have 2 warnings (! and / become empty)
 	if len(warnings) != 2 {
@@ -642,7 +642,7 @@ func TestParseLines_CRLF(t *testing.T) {
 	// Windows line endings
 	content := []byte("*.log\r\nbuild/\r\n!important.log\r\n")
 
-	rules, warnings, _ := parseLinesAll("", content, -1, -1, "")
+	rules, warnings := parseLinesAll("", content)
 
 	if len(warnings) != 0 {
 		t.Errorf("parseLines returned warnings: %v", warnings)
@@ -656,7 +656,7 @@ func TestParseLines_BOM(t *testing.T) {
 	// UTF-8 BOM
 	content := append([]byte{0xEF, 0xBB, 0xBF}, []byte("*.log\nbuild/\n")...)
 
-	rules, warnings, _ := parseLinesAll("", content, -1, -1, "")
+	rules, warnings := parseLinesAll("", content)
 
 	if len(warnings) != 0 {
 		t.Errorf("parseLines returned warnings: %v", warnings)
@@ -673,7 +673,7 @@ func TestParseLines_BOM(t *testing.T) {
 func TestParseLines_WithBasePath(t *testing.T) {
 	content := []byte("*.log\ntemp/\n")
 
-	rules, _, _ := parseLinesAll("src/lib", content, -1, -1, "")
+	rules, _ := parseLinesAll("src/lib", content)
 
 	for _, r := range rules {
 		if r.basePath != "src/lib" {
@@ -913,7 +913,7 @@ func TestParseLines_BlankLinesAllocateLittle(t *testing.T) {
 	content := []byte(strings.Repeat("\n# comment\n", 1<<14))
 	var before, after runtime.MemStats
 	runtime.ReadMemStats(&before)
-	rules, _, _ := parseLinesAll("", content, -1, -1, "")
+	rules, _ := parseLinesAll("", content)
 	runtime.ReadMemStats(&after)
 	if len(rules) != 0 {
 		t.Fatalf("parseLines kept %d rules, want 0", len(rules))

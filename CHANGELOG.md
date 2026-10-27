@@ -10,7 +10,7 @@ Parse warnings use bounded memory for any input (#4). Only additions to the expo
 
 **Added**
 
-- **`MatcherOptions.MaxWarnings` and `DefaultMaxWarnings`** (#4). One limit for parse warnings: `Warnings()` keeps the first `MaxWarnings` in total, and a `WarningHandler` gets at most `MaxWarnings` per call that parses patterns (one `AddPatterns` call, or one file read by a loader, walker or `Tree`), each followed by one "warning limit reached" entry. 0 means the default of 10,000, -1 means unlimited.
+- **`MatcherOptions.MaxWarnings` and `DefaultMaxWarnings`** (#4). One limit for parse warnings: `Warnings()` keeps the first `MaxWarnings` in total, and a `WarningHandler` gets at most `MaxWarnings` per call that parses patterns (one `AddPatterns` call, or one file read by a loader, walker or `Tree`). Past the limit comes one "warning limit reached" entry and nothing more. 0 means the default of 10,000, -1 means unlimited.
 
 **Behavior changes**
 

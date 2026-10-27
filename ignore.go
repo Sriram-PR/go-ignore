@@ -72,7 +72,8 @@ type Explanation struct {
 	Own MatchResult
 }
 
-// WarningHandler is called for each parse warning if set.
+// WarningHandler is called for each parse warning if set, up to
+// MatcherOptions.MaxWarnings per call.
 // The warning includes BasePath; no separate basePath argument is provided.
 type WarningHandler func(warning ParseWarning)
 
@@ -96,13 +97,13 @@ const (
 
 // MatcherOptions configures Matcher behavior.
 type MatcherOptions struct {
-	// WarningHandler is invoked for each parse warning produced by AddPatterns
-	// (and helpers that call it). If nil, warnings are collected and made
-	// available through Warnings(). The handler is fixed at construction time
-	// and cannot be changed afterward; this prevents the ordering bug where a
-	// handler set after AddPatterns would silently miss earlier warnings.
-	// It receives at most MaxWarnings warnings per call that parses
-	// patterns, then one "warning limit reached" entry.
+	// WarningHandler is invoked for parse warnings produced by AddPatterns
+	// (and helpers that call it): at most MaxWarnings per call that parses
+	// patterns, then one "warning limit reached" entry. If nil, warnings are
+	// collected and made available through Warnings(). The handler is fixed
+	// at construction time and cannot be changed afterward; this prevents the
+	// ordering bug where a handler set after AddPatterns would silently miss
+	// earlier warnings.
 	//
 	// The handler may be invoked concurrently from multiple goroutines if
 	// AddPatterns is called concurrently; callers must make the handler safe

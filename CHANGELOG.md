@@ -4,6 +4,18 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.10.0
+
+Parse warnings use bounded memory for any input (#4). Only additions to the exported API.
+
+**Added**
+
+- **`MatcherOptions.MaxWarnings` and `DefaultMaxWarnings`** (#4). One limit for parse warnings: `Warnings()` keeps the first `MaxWarnings` in total, and a `WarningHandler` gets at most `MaxWarnings` per call that parses patterns (one `AddPatterns` call, or one file read by a loader, walker or `Tree`), each followed by one "warning limit reached" entry. 0 means the default of 10,000, -1 means unlimited.
+
+**Behavior changes**
+
+- **A `WarningHandler` no longer receives every warning** (#4). Past 10,000 warnings in one call it gets the marker and nothing more from that call. Every warning used to be buffered first: 1M lines of `[` took 206 MB, and a 100 MB pattern file could take several GB through `LoadRepo`, the walkers or `Tree`. Set `MaxWarnings: -1` for the old behavior. `Warnings()` without a handler is unchanged.
+
 ### v1.9.2
 
 Two git-parity fixes and conformance table upkeep, from the 2026-10-27 audit. No exported API changes.

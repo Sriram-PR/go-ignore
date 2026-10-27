@@ -76,3 +76,30 @@ func TestWalkDir_SymlinkedGitignoreNotFollowed(t *testing.T) {
 		t.Error("sub/a.log not visited; the symlink's rules must not apply")
 	}
 }
+
+// Files and RepoFiles skip FIFOs, which git ls-files never lists and which
+// block a consumer that opens them.
+func TestFiles_SkipsFIFO(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(filepath.Join(root, "pipe"), 0o644); err != nil {
+		t.Skipf("mkfifo: %v", err)
+	}
+	for name, seq := range map[string]func(func(string, error) bool){
+		"Files":     New().Files(root),
+		"RepoFiles": RepoFiles(root, MatcherOptions{}),
+	} {
+		var got []string
+		for p, err := range seq {
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			got = append(got, filepath.Base(p))
+		}
+		if len(got) != 1 || got[0] != "f.txt" {
+			t.Errorf("%s = %q, want [f.txt]", name, got)
+		}
+	}
+}

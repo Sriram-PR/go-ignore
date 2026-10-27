@@ -46,6 +46,8 @@ type walkBackend struct {
 //     stop there, as git does.
 //   - Symlinks are not followed (filepath.WalkDir Lstat semantics), and a
 //     .gitignore that is a symlink is not read, as in git.
+//   - FIFOs, sockets and devices are passed to fn with their type, though
+//     git never lists them; Files skips them.
 //   - A .gitignore that cannot be read (unreadable, a symlink, not a regular
 //     file, or larger than 100 MB) gets exactly one call for its directory,
 //     fn(dir, d, err), with err wrapping ErrPatternFileSkipped or the read
@@ -345,8 +347,8 @@ func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error {
 // Files returns a range-over-func iterator that yields the OS-native path of
 // every non-ignored, non-directory entry under root (regular files and
 // symlinks, which are not followed), in the same lexical order
-// filepath.WalkDir uses. Directories are not yielded; use Entries or WalkDir
-// to observe them.
+// filepath.WalkDir uses. Directories, FIFOs, sockets and devices are not
+// yielded; use Entries or WalkDir to observe them.
 //
 // Errors encountered during traversal are yielded as ("", err) and the walk
 // continues with the next entry; return or break out of the range loop to
@@ -373,8 +375,8 @@ func (m *Matcher) Files(root string) iter.Seq2[string, error] {
 }
 
 // FilesFS is the fs.FS-backed counterpart to Files. It walks fsys rooted at
-// root and yields the forward-slash path of every non-ignored file (no
-// directories), suitable for in-memory tests with fstest.MapFS, embed.FS
+// root and yields the forward-slash path of every non-ignored regular file
+// and symlink, suitable for in-memory tests with fstest.MapFS, embed.FS
 // content, or any custom fs.FS.
 //
 // Same nested-discovery, pruning, error-yielding, and break-via-fs.SkipAll
@@ -403,7 +405,9 @@ func filesFromWalker(walker func(fs.WalkDirFunc) error) iter.Seq2[string, error]
 				}
 				return nil
 			}
-			if d.IsDir() {
+			// git lists regular files and symlinks only; a FIFO would also
+			// block a caller that opens it.
+			if t := d.Type(); !t.IsRegular() && t != fs.ModeSymlink {
 				return nil
 			}
 			if !yield(path, nil) {
@@ -498,9 +502,10 @@ func (e Entry) SkipDir() {
 // Entries returns an iterator over every non-ignored file and directory
 // under root, in the lexical order filepath.WalkDir uses, with WalkDir's
 // rules: nested ignore files scoped to their directory, ignored directories
-// pruned, .git skipped, symlinks not followed, the receiver not mutated.
-// The directory walked (root, or WalkOptions.Start) is not yielded. Call
-// Entry.SkipDir to prune a directory.
+// pruned, .git skipped, symlinks not followed, FIFOs, sockets and devices
+// yielded with their type, the receiver not mutated. The directory walked
+// (root, or WalkOptions.Start) is not yielded. Call Entry.SkipDir to prune a
+// directory.
 //
 // Errors are yielded with the entry they concern and the walk goes on. A
 // directory whose ignore files can't be read is yielded once, with the

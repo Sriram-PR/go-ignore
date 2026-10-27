@@ -416,3 +416,36 @@ func TestWalkDirFS_RefusedGitignoreOneCallback(t *testing.T) {
 		}
 	}
 }
+
+// FilesFS yields regular files and symlinks only, as git ls-files lists them;
+// EntriesFS passes special files through with their type.
+func TestFilesFS_SkipsSpecialFiles(t *testing.T) {
+	fsys := fstest.MapFS{
+		"f.txt": {Data: []byte("x")},
+		"link":  {Data: []byte("f.txt"), Mode: fs.ModeSymlink},
+		"pipe":  {Mode: fs.ModeNamedPipe},
+		"sock":  {Mode: fs.ModeSocket},
+		"dev":   {Mode: fs.ModeDevice},
+	}
+	var files []string
+	for p, err := range New().FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("FilesFS: %v", err)
+		}
+		files = append(files, p)
+	}
+	if want := []string{"f.txt", "link"}; !slices.Equal(files, want) {
+		t.Errorf("FilesFS = %q, want %q", files, want)
+	}
+
+	var entries []string
+	for e, err := range New().EntriesFS(fsys, ".", WalkOptions{}) {
+		if err != nil {
+			t.Fatalf("EntriesFS: %v", err)
+		}
+		entries = append(entries, e.Path)
+	}
+	if want := []string{"dev", "f.txt", "link", "pipe", "sock"}; !slices.Equal(entries, want) {
+		t.Errorf("EntriesFS = %q, want %q", entries, want)
+	}
+}

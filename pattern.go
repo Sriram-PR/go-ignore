@@ -116,6 +116,11 @@ func ruleLines(text string) int {
 // patterns git never matches (see parseSegments).
 // source is propagated onto the returned rule for provenance reporting.
 func parseLine(line string, lineNum int, basePath, source string) (*rule, *ParseWarning) {
+	// git reads each line as a C string.
+	if i := strings.IndexByte(line, 0); i >= 0 {
+		line = line[:i]
+	}
+
 	// Trim trailing whitespace (Git behavior)
 	line = trimTrailingWhitespace(line)
 

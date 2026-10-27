@@ -230,6 +230,11 @@ func curatedCases() []curatedCase {
 	add(R("**/a\n!a/b\n", "a/", "a/b", "x/a/", "x/a/b"))
 	add(R("**/cache/\n", "cache/", "src/cache/", "src/cache/x", "cachex"))
 	add(R("src/**/test/\n", "src/test/", "src/lib/test/", "src/lib/test/a", "test/"))
+	group = "Whitespace & escapes" // git ends a line at NUL
+	add(R("keep\x00B\n", "keep", "keepB"))
+	add(R("\x00x\nx\x00\n", "x"))
+	add(R("foo \x00\n", "foo", "foo "))
+	add(R("b\\\x00ar\n", "b", "bar", "b\\"))
 	return cs
 }
 

@@ -17,7 +17,7 @@ Git version: git version 2.56.0
 
 | Feature | go-ignore | git-pkgs | go-git v5 | sabhiram |
 |---|--:|--:|--:|--:|
-| Whitespace & escapes | 407/407 | 399/407 | 403/407 | 381/407 |
+| Whitespace & escapes | 415/415 | 404/415 | 408/415 | 386/415 |
 | Line endings & BOM | 22/22 | 20/22 | 20/22 | 20/22 |
 | Comments & `!` prefix | 31/31 | 31/31 | 27/31 | 27/31 |
 | `*` and `?` | 334/334 | 334/334 | 317/334 | 281/334 |
@@ -28,7 +28,7 @@ Git version: git version 2.56.0
 | Non-ASCII bytes | 16/16 | 16/16 | 10/16 | 9/16 |
 | Nested .gitignore files | 68/68 | 68/68 | 67/68 | 3/3 † |
 | Random scenarios (seed 1) | 5486/5486 | 5481/5486 | 5228/5486 | 1172/1265 † |
-| **Total** | 9833/9833 | 9795/9833 | 9126/9833 | 5120/5547 † |
+| **Total** | 9841/9841 | 9800/9841 | 9131/9841 | 5125/5555 † |
 
 † excludes scenarios with nested .gitignore files, which this library can't load.
 
@@ -75,6 +75,9 @@ None.
 | curated-211 | {".gitignore":"\*\*\\\\/b\\n"} | "a/x/b" | false | true | false |
 | curated-212 | {".gitignore":"\*\*\*\\\\/b\\n"} | "a/b" | false | true | false |
 | curated-213 | {".gitignore":"\*\*\\\\/\*\*\\n"} | "x/y" | false | true | false |
+| curated-284 | {".gitignore":"keep\\x00B\\n"} | "keep" | false | true | false |
+| curated-285 | {".gitignore":"\\x00x\\nx\\x00\\n"} | "x" | false | true | false |
+| curated-286 | {".gitignore":"foo \\x00\\n"} | "foo" | false | true | false |
 | seed1-23 | {".gitignore":"/\[a\\\\-c\]/\[\\\\\]\]/??  \\n!a\\\\ /\\n\[\[:punct:\]\] \\na\\\\\\n" "a/.gitignore":"\\ufeffbar\\n" "foo/bar/.gitignore":"\[\\\\a\]/a?/a\*\*\\n\[a-\[:alpha:\]\]/\\\\?/ \\n!\[a\\\\-c\]/\[\[:alpha:\]\[:digit:\]\]/\\n\[-a\] \\n"} | "a/a b/bar" | true | true | false |
 | seed1-23 | {".gitignore":"/\[a\\\\-c\]/\[\\\\\]\]/??  \\n!a\\\\ /\\n\[\[:punct:\]\] \\na\\\\\\n" "a/.gitignore":"\\ufeffbar\\n" "foo/bar/.gitignore":"\[\\\\a\]/a?/a\*\*\\n\[a-\[:alpha:\]\]/\\\\?/ \\n!\[a\\\\-c\]/\[\[:alpha:\]\[:digit:\]\]/\\n\[-a\] \\n"} | "a/a b/bar/ab" | false | true | false |
 | seed1-215 | {".gitignore":"\\ufeff/\[\[:punct:\]\]/\\n!/x\*\*\\n"} | "-" | true | true | false |
@@ -534,6 +537,9 @@ None.
 | curated-272 | {".gitignore":"\*\\n!.gitignore\\n!sub/\\n!sub/.gitignore\\n" "sub/.gitignore":"!\*.go\\n"} | "sub/a" | false | true | false |
 | curated-277 | {".gitignore":"a/b/\*\*\\n"} | "a/b" | true | false | true |
 | curated-281 | {".gitignore":"\*\*/a\\n!a/b\\n"} | "a/b" | false | true | false |
+| curated-284 | {".gitignore":"keep\\x00B\\n"} | "keep" | false | true | false |
+| curated-285 | {".gitignore":"\\x00x\\nx\\x00\\n"} | "x" | false | true | false |
+| curated-286 | {".gitignore":"foo \\x00\\n"} | "foo" | false | true | false |
 | seed1-2 | {".gitignore":"\[\[:punct:\]\]/\\n" "a/.gitignore":"\[!\]a\]/\\n\*a\*/\\n\[\\\\\]\]\\n" "a/b/.gitignore":"a\\\\ b/a\\\\/\[\[:upper:\]\]\\n/bar/?/\*\*a\\n/a\*\*/ab/\[-a\]\\n"} | "a/b" | true | true | false |
 | seed1-10 | {".gitignore":"/a\*\*b/\*\*\\n" "a/.gitignore":"/\[ab\]/\\n/a\\\\ /\*a\* \\n\[\[:upper:\]\]/\[%--\]/a\\na\\\\ /\[\[:alpha:\]\[:digit:\]\]/\*\*\\n" "b/a/.gitignore":"!\\\\a\\n/\*\*a/\[a-c-e\]/\[!a\]/\\n"} | "ab/\]" | true | true | false |
 | seed1-10 | {".gitignore":"/a\*\*b/\*\*\\n" "a/.gitignore":"/\[ab\]/\\n/a\\\\ /\*a\* \\n\[\[:upper:\]\]/\[%--\]/a\\na\\\\ /\[\[:alpha:\]\[:digit:\]\]/\*\*\\n" "b/a/.gitignore":"!\\\\a\\n/\*\*a/\[a-c-e\]/\[!a\]/\\n"} | "ab/\]/foo" | true | true | false |
@@ -1131,6 +1137,9 @@ None.
 | curated-282 | {".gitignore":"\*\*/cache/\\n"} | "src/cache" | true | true | false |
 | curated-283 | {".gitignore":"src/\*\*/test/\\n"} | "src/lib/test" | true | true | false |
 | curated-283 | {".gitignore":"src/\*\*/test/\\n"} | "src/test" | true | true | false |
+| curated-284 | {".gitignore":"keep\\x00B\\n"} | "keep" | false | true | false |
+| curated-285 | {".gitignore":"\\x00x\\nx\\x00\\n"} | "x" | false | true | false |
+| curated-286 | {".gitignore":"foo \\x00\\n"} | "foo" | false | true | false |
 | seed1-21 | {".gitignore":"?\\n\[-a\]/.x/\[a-\[:alpha:\]\]\\n"} | "!a/!a/Foo/a" | false | true | false |
 | seed1-21 | {".gitignore":"?\\n\[-a\]/.x/\[a-\[:alpha:\]\]\\n"} | "-" | true | true | false |
 | seed1-21 | {".gitignore":"?\\n\[-a\]/.x/\[a-\[:alpha:\]\]\\n"} | "-/é" | true | true | false |

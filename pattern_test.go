@@ -922,3 +922,14 @@ func TestParseLines_BlankLinesAllocateLittle(t *testing.T) {
 		t.Errorf("parseLines allocated %d bytes for %d bytes of blank lines and comments, want at most %d", got, len(content), limit)
 	}
 }
+
+// git reads a line as a C string, so a pattern ends at the first NUL.
+func TestParseLine_NULEndsLine(t *testing.T) {
+	m := New()
+	m.AddPatterns("", []byte("keep\x00B\n\x00x\nfoo \x00\n"))
+	for p, want := range map[string]bool{"keep": true, "keepB": false, "x": false, "foo": true} {
+		if got := m.Match(p, false); got != want {
+			t.Errorf("Match(%q) = %v, want %v", p, got, want)
+		}
+	}
+}

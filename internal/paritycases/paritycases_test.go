@@ -28,18 +28,18 @@ func digest(scens []Scenario) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// The move out of the parity tests must not change one scenario: this is the
-// full parity set (curated, seeds 1-3 x 300, icase seed 1 x 300) as computed
-// from parity_scenarios_test.go at fc3bb35.
+// The corpus changes only on purpose: this pins the full parity set (curated,
+// seeds 1-3 x 300, icase seed 1 x 300), first computed from
+// parity_scenarios_test.go at fc3bb35. Update it when adding cases.
 func TestCorpusUnchanged(t *testing.T) {
 	all := Curated()
 	for _, seed := range []int64{1, 2, 3} {
 		all = append(all, Seeded(seed, 300, false)...)
 	}
 	all = append(all, Seeded(1, 300, true)...)
-	const want = "0f99e34f2037e2f589670b3cd93f858d9855fe7dea5ab34c2aa4f6608218e6af"
-	if got := digest(all); len(all) != 1484 || got != want {
-		t.Errorf("%d scenarios, digest %s; want 1484, %s", len(all), got, want)
+	const want = "3e2fe94d88be7bd08acd4962b73f689f3a1cf73bfc3b35af315377e848b13318"
+	if got := digest(all); len(all) != 1488 || got != want {
+		t.Errorf("%d scenarios, digest %s; want 1488, %s", len(all), got, want)
 	}
 }
 

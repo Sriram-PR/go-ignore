@@ -145,7 +145,7 @@ The Go ecosystem has several `.gitignore` libraries. The table counts, by featur
 <!-- conformance:start -->
 | Feature | go-ignore | git-pkgs | go-git v5 | sabhiram |
 |---|--:|--:|--:|--:|
-| Whitespace & escapes | 407/407 | 399/407 | 403/407 | 381/407 |
+| Whitespace & escapes | 415/415 | 404/415 | 408/415 | 386/415 |
 | Line endings & BOM | 22/22 | 20/22 | 20/22 | 20/22 |
 | Comments & `!` prefix | 31/31 | 31/31 | 27/31 | 27/31 |
 | `*` and `?` | 334/334 | 334/334 | 317/334 | 281/334 |
@@ -156,7 +156,7 @@ The Go ecosystem has several `.gitignore` libraries. The table counts, by featur
 | Non-ASCII bytes | 16/16 | 16/16 | 10/16 | 9/16 |
 | Nested .gitignore files | 68/68 | 68/68 | 67/68 | 3/3 † |
 | Random scenarios (seed 1) | 5486/5486 | 5481/5486 | 5228/5486 | 1172/1265 † |
-| **Total** | 9833/9833 | 9795/9833 | 9126/9833 | 5120/5547 † |
+| **Total** | 9841/9841 | 9800/9841 | 9131/9841 | 5125/5555 † |
 
 † excludes scenarios with nested .gitignore files, which this library can't load.
 <!-- conformance:end -->

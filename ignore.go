@@ -88,6 +88,10 @@ const (
 	// Lines exceeding this are skipped and a ParseWarning is emitted.
 	// Set MaxPatternLength to 0 to use this default, or -1 for unlimited.
 	DefaultMaxPatternLength = 4096
+
+	// DefaultMaxWarnings is the number of parse warnings kept or delivered
+	// before the rest are dropped. See MatcherOptions.MaxWarnings.
+	DefaultMaxWarnings = 10_000
 )
 
 // MatcherOptions configures Matcher behavior.
@@ -97,6 +101,8 @@ type MatcherOptions struct {
 	// available through Warnings(). The handler is fixed at construction time
 	// and cannot be changed afterward; this prevents the ordering bug where a
 	// handler set after AddPatterns would silently miss earlier warnings.
+	// It receives at most MaxWarnings warnings per call that parses
+	// patterns, then one "warning limit reached" entry.
 	//
 	// The handler may be invoked concurrently from multiple goroutines if
 	// AddPatterns is called concurrently; callers must make the handler safe
@@ -132,6 +138,16 @@ type MatcherOptions struct {
 	// Default: DefaultMaxPatternLength (4096). Set to -1 for unlimited.
 	// See MaxPatterns for the memory these two limits allow.
 	MaxPatternLength int
+
+	// MaxWarnings bounds parse warnings. Warnings() keeps the first
+	// MaxWarnings in total, then one "warning limit reached, further
+	// warnings dropped" entry. A WarningHandler receives at most MaxWarnings
+	// per call that parses patterns (one AddPatterns call, one file read by
+	// a loader, walker or Tree, or the Overrides at construction), then that
+	// entry.
+	// Default: DefaultMaxWarnings (10000). Set to -1 for unlimited, which
+	// also leaves warning memory unbounded on hostile input.
+	MaxWarnings int
 
 	// IgnoreFiles names extra per-directory ignore files, such as .ignore
 	// or .aiignore, read in each directory right after its .gitignore, in
@@ -187,6 +203,7 @@ func New() *Matcher {
 			MaxBacktrackIterations: DefaultMaxBacktrackIterations,
 			MaxPatterns:            DefaultMaxPatterns,
 			MaxPatternLength:       DefaultMaxPatternLength,
+			MaxWarnings:            DefaultMaxWarnings,
 		},
 	}
 }
@@ -202,13 +219,20 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 	if opts.MaxPatternLength == 0 {
 		opts.MaxPatternLength = DefaultMaxPatternLength
 	}
+	if opts.MaxWarnings == 0 {
+		opts.MaxWarnings = DefaultMaxWarnings
+	}
 	m := &Matcher{opts: opts}
 	m.opts.Overrides = nil // parsed into m.overrides
 	names, nameWarnings := validIgnoreFiles(opts.IgnoreFiles)
 	m.opts.IgnoreFiles = names
 	overrides, overrideWarnings := m.parseOverrides(opts.Overrides)
 	m.overrides = overrides
-	m.dispatch(slices.Concat(nameWarnings, overrideWarnings))
+	ws := newWarnList(-1)
+	for _, w := range slices.Concat(nameWarnings, overrideWarnings) {
+		ws.add(w)
+	}
+	m.dispatch(&ws)
 	return m
 }
 
@@ -254,8 +278,9 @@ func (m *Matcher) parseOverrides(lines []string) ([]rule, []ParseWarning) {
 	if strings.HasPrefix(content, "\ufeff") {
 		content = "\ufeff" + content
 	}
-	rules, parsed, truncated := parseLines("", []byte(content), m.effectiveMaxPatternLength(), m.effectiveMaxPatterns(), overridesSource)
-	warnings = append(warnings, parsed...)
+	parsed := newWarnList(-1)
+	rules, truncated := parseLines("", []byte(content), m.effectiveMaxPatternLength(), m.effectiveMaxPatterns(), overridesSource, &parsed)
+	warnings = append(warnings, parsed.items...)
 	if truncated {
 		warnings = append(warnings, ParseWarning{Message: "maximum pattern count reached, excess patterns truncated"})
 	}
@@ -265,14 +290,13 @@ func (m *Matcher) parseOverrides(lines []string) ([]rule, []ParseWarning) {
 	return rules, warnings
 }
 
-// dispatch delivers construction-time warnings: to the handler if set,
-// otherwise to Warnings().
-func (m *Matcher) dispatch(ws []ParseWarning) {
-	if len(ws) == 0 {
+// dispatch delivers ws: to the handler if set, otherwise to Warnings().
+func (m *Matcher) dispatch(ws *warnList) {
+	if len(ws.items) == 0 {
 		return
 	}
 	if h := m.opts.WarningHandler; h != nil {
-		for _, w := range ws {
+		for _, w := range ws.items {
 			h(w)
 		}
 		return
@@ -315,6 +339,13 @@ func (m *Matcher) effectiveMaxPatternLength() int {
 		return DefaultMaxPatternLength
 	}
 	return m.opts.MaxPatternLength
+}
+
+func (m *Matcher) effectiveMaxWarnings() int {
+	if m.opts.MaxWarnings == 0 {
+		return DefaultMaxWarnings
+	}
+	return m.opts.MaxWarnings
 }
 
 // AddPatterns parses gitignore content and adds rules.
@@ -375,11 +406,13 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	if content == nil {
 		return
 	}
+	ws := newWarnList(m.effectiveMaxWarnings())
 
 	// Normalize basePath once for consistent rule scoping and warning reporting.
 	normalizedBase := normalizePath(basePath)
 	if normalizedBase == "" && baseOutsideRoot(basePath) {
-		m.dispatch([]ParseWarning{{Message: "basePath is outside the root, patterns skipped", BasePath: basePath}})
+		ws.add(ParseWarning{Message: "basePath is outside the root, patterns skipped", BasePath: basePath})
+		m.dispatch(&ws)
 		return
 	}
 
@@ -392,7 +425,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 		maxRules = max(maxPatterns-m.ruleTotal(), 0)
 		m.mu.RUnlock()
 	}
-	newRules, parseWarnings, truncated := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), maxRules, source)
+	newRules, truncated := parseLines(normalizedBase, content, m.effectiveMaxPatternLength(), maxRules, source, &ws)
 
 	// Pre-lowercase pattern segment values for case-insensitive matching.
 	// This avoids lowering on every match call. git folds ASCII only.
@@ -405,14 +438,14 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	if maxPatterns := m.effectiveMaxPatterns(); maxPatterns >= 0 {
 		remaining := maxPatterns - m.ruleTotal()
 		if remaining <= 0 {
-			parseWarnings = append(parseWarnings, ParseWarning{
+			ws.add(ParseWarning{
 				Pattern:  "",
 				Message:  "maximum pattern count reached, new patterns skipped",
 				BasePath: normalizedBase,
 			})
 			newRules = nil
 		} else if truncated || len(newRules) > remaining {
-			parseWarnings = append(parseWarnings, ParseWarning{
+			ws.add(ParseWarning{
 				Pattern:  "",
 				Message:  "maximum pattern count reached, excess patterns truncated",
 				BasePath: normalizedBase,
@@ -424,7 +457,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	m.rules = append(m.rules, newRules...)
 	handler := m.opts.WarningHandler
 	if handler == nil {
-		m.retain(parseWarnings)
+		m.retain(&ws)
 	}
 	m.mu.Unlock()
 
@@ -433,14 +466,11 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	// invoked concurrently from multiple goroutines; callers are responsible
 	// for making it safe for concurrent use.
 	if handler != nil {
-		for _, w := range parseWarnings {
+		for _, w := range ws.items {
 			handler(w)
 		}
 	}
 }
-
-// maxRetainedWarnings bounds the warnings a Matcher collects for Warnings.
-const maxRetainedWarnings = 10_000
 
 const warnLimitMessage = "warning limit reached, further warnings dropped"
 
@@ -482,13 +512,11 @@ func (l *warnList) merge(src *warnList) {
 	}
 }
 
-// retain adds ws to the collected warnings, up to maxRetainedWarnings and
-// then one marker. m.mu must be held.
-func (m *Matcher) retain(ws []ParseWarning) {
-	m.warnings.max = maxRetainedWarnings
-	for _, w := range ws {
-		m.warnings.add(w)
-	}
+// retain merges ws into the collected warnings, which keep MaxWarnings in
+// total. m.mu must be held.
+func (m *Matcher) retain(ws *warnList) {
+	m.warnings.max = m.effectiveMaxWarnings()
+	m.warnings.merge(ws)
 }
 
 // AddPatternsReader reads gitignore content from r and calls AddPatterns.
@@ -535,9 +563,9 @@ func (m *Matcher) addPatternsReader(basePath, source string, r io.Reader, limit 
 	return nil
 }
 
-// Warnings returns the collected parse warnings: the first 10,000, then one
-// "warning limit reached, further warnings dropped" entry. Only populated if
-// no WarningHandler was set; a handler receives every warning.
+// Warnings returns the collected parse warnings: the first MaxWarnings
+// (default 10,000), then one "warning limit reached, further warnings
+// dropped" entry. Only populated if no WarningHandler was set.
 func (m *Matcher) Warnings() []ParseWarning {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

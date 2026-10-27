@@ -521,3 +521,16 @@ func TestTree_DeepPathNoNestedFiles(t *testing.T) {
 		t.Errorf("CheckIsDir allocs = %v, MatchWithReason allocs = %v", got, base)
 	}
 }
+
+// A nested .gitignore's warnings reach the handler capped per file.
+func TestTree_WarningsCappedPerFile(t *testing.T) {
+	var got []ParseWarning
+	m := NewWithOptions(MatcherOptions{MaxWarnings: 3, WarningHandler: func(w ParseWarning) { got = append(got, w) }})
+	tr := m.TreeFS(fstest.MapFS{"sub/.gitignore": file(strings.Repeat("!\n", 8))}, ".")
+	if _, err := tr.CheckIsDir("sub/x", false); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 4 || got[3].Message != warnLimitMessage || got[3].BasePath != "sub" {
+		t.Errorf("handler got %+v, want 3 warnings and the drop marker for sub", got)
+	}
+}

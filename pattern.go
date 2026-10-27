@@ -50,8 +50,8 @@ type segment struct {
 // source is an optional informational label (e.g., the path to the
 // originating .gitignore file) carried on each parsed rule and surfaced via
 // MatchResult.Source. Pass "" if no source label is available.
-// Returns parsed rules and any warnings for malformed patterns.
-func parseLines(basePath string, content []byte, maxPatternLength, maxRules int, source string) (rules []rule, warnings []ParseWarning, truncated bool) {
+// Warnings for malformed patterns are added to ws.
+func parseLines(basePath string, content []byte, maxPatternLength, maxRules int, source string, ws *warnList) (rules []rule, truncated bool) {
 	text := string(normalizeContent(content))
 
 	n := ruleLines(text)
@@ -72,7 +72,7 @@ func parseLines(basePath string, content []byte, maxPatternLength, maxRules int,
 		text = rest
 
 		if maxPatternLength >= 0 && len(line) > maxPatternLength {
-			warnings = append(warnings, ParseWarning{
+			ws.add(ParseWarning{
 				Line:     lineNum,
 				Pattern:  line,
 				Message:  "pattern exceeds maximum length, skipped",
@@ -82,18 +82,18 @@ func parseLines(basePath string, content []byte, maxPatternLength, maxRules int,
 			r, warning := parseLine(line, lineNum, basePath, source)
 			if warning != nil {
 				warning.BasePath = basePath
-				warnings = append(warnings, *warning)
+				ws.add(*warning)
 			}
 			if r != nil {
 				if maxRules >= 0 && len(rules) == maxRules {
-					return rules, warnings, true
+					return rules, true
 				}
 				r.basePathSlash, r.baseSegCount = basePathSlash, baseSegCount
 				rules = append(rules, *r)
 			}
 		}
 		if !more {
-			return rules, warnings, false
+			return rules, false
 		}
 	}
 }

@@ -77,7 +77,8 @@
 //
 // # Resource limits
 //
-// MatcherOptions bounds the pattern count and line length for safe handling
-// of untrusted input; see MatcherOptions and the Default* constants. Matching
-// itself needs no limit: it costs polynomial time for any pattern and path.
+// MatcherOptions bounds the pattern count, line length and parse warnings
+// for safe handling of untrusted input; see MatcherOptions and the Default*
+// constants. Matching itself needs no limit: it costs polynomial time for any
+// pattern and path.
 package ignore

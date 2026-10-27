@@ -148,3 +148,10 @@ func mustCheck(t *testing.T, tr *Tree, path string) MatchResult {
 func matchGlob(pattern, s string) bool {
 	return matchSingleSegment(newSegment(pattern), s)
 }
+
+// parseLinesAll is parseLines with every warning kept and returned.
+func parseLinesAll(basePath string, content []byte, maxPatternLength, maxRules int, source string) ([]rule, []ParseWarning, bool) {
+	ws := newWarnList(-1)
+	rules, truncated := parseLines(basePath, content, maxPatternLength, maxRules, source, &ws)
+	return rules, ws.items, truncated
+}

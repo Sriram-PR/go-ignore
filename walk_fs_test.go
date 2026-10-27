@@ -449,3 +449,19 @@ func TestFilesFS_SkipsSpecialFiles(t *testing.T) {
 		t.Errorf("EntriesFS = %q, want %q", entries, want)
 	}
 }
+
+// A nested .gitignore's warnings reach the handler capped per file.
+func TestWalkDirFS_WarningsCappedPerFile(t *testing.T) {
+	fsys := fstest.MapFS{
+		"sub/.gitignore": {Data: []byte(strings.Repeat("!\n", 8))},
+		"sub/x":          {},
+	}
+	var got []ParseWarning
+	m := NewWithOptions(MatcherOptions{MaxWarnings: 3, WarningHandler: func(w ParseWarning) { got = append(got, w) }})
+	if err := m.WalkDirFS(fsys, ".", func(string, fs.DirEntry, error) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 4 || got[3].Message != warnLimitMessage || got[3].BasePath != "sub" {
+		t.Errorf("handler got %+v, want 3 warnings and the drop marker for sub", got)
+	}
+}

@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 )
 
@@ -263,26 +262,91 @@ func TestAddPatterns_ConcurrentRespectsLimit(t *testing.T) {
 	}
 }
 
-// Collected warnings stop at maxRetainedWarnings plus one marker, across
-// calls; a WarningHandler still receives every warning.
+// Collected warnings stop at DefaultMaxWarnings plus one marker, across
+// calls; a WarningHandler gets the same cap per call.
 func TestWarnings_Capped(t *testing.T) {
-	bad := []byte(strings.Repeat("!\n", maxRetainedWarnings+500))
+	bad := []byte(strings.Repeat("!\n", DefaultMaxWarnings+500))
 	m := New()
 	m.AddPatterns("", bad)
 	m.AddPatterns("sub", bad)
 	w := m.Warnings()
-	if len(w) != maxRetainedWarnings+1 {
-		t.Fatalf("len(Warnings) = %d, want %d", len(w), maxRetainedWarnings+1)
+	if len(w) != DefaultMaxWarnings+1 {
+		t.Fatalf("len(Warnings) = %d, want %d", len(w), DefaultMaxWarnings+1)
 	}
-	if last := w[len(w)-1]; last.Message != "warning limit reached, further warnings dropped" || last.BasePath != "" {
+	if last := w[len(w)-1]; last.Message != warnLimitMessage || last.BasePath != "" {
 		t.Errorf("last warning = %+v, want the drop marker for the first call", last)
 	}
 
-	var n atomic.Int64
-	h := NewWithOptions(MatcherOptions{WarningHandler: func(ParseWarning) { n.Add(1) }})
+	var got []ParseWarning
+	h := NewWithOptions(MatcherOptions{WarningHandler: func(w ParseWarning) { got = append(got, w) }})
 	h.AddPatterns("", bad)
-	if got := n.Load(); got != maxRetainedWarnings+500 {
-		t.Errorf("handler saw %d warnings, want %d", got, maxRetainedWarnings+500)
+	h.AddPatterns("sub", bad)
+	if len(got) != 2*(DefaultMaxWarnings+1) {
+		t.Fatalf("handler saw %d warnings, want %d", len(got), 2*(DefaultMaxWarnings+1))
+	}
+	if last := got[len(got)-1]; last.Message != warnLimitMessage || last.BasePath != "sub" {
+		t.Errorf("last delivered = %+v, want the drop marker for sub", last)
+	}
+}
+
+// MaxWarnings sets both caps: N plus a marker per call for a handler and in
+// total for Warnings(); -1 keeps every warning.
+func TestMaxWarnings(t *testing.T) {
+	bad := []byte(strings.Repeat("!\n", 20))
+	for _, tc := range []struct{ max, perCall, total int }{{5, 6, 6}, {-1, 20, 40}} {
+		var n int
+		h := NewWithOptions(MatcherOptions{MaxWarnings: tc.max, WarningHandler: func(ParseWarning) { n++ }})
+		h.AddPatterns("", bad)
+		if n != tc.perCall {
+			t.Errorf("MaxWarnings %d: handler saw %d, want %d", tc.max, n, tc.perCall)
+		}
+		m := NewWithOptions(MatcherOptions{MaxWarnings: tc.max})
+		m.AddPatterns("", bad)
+		m.AddPatterns("", bad)
+		if got := len(m.Warnings()); got != tc.total {
+			t.Errorf("MaxWarnings %d: len(Warnings) = %d, want %d", tc.max, got, tc.total)
+		}
+	}
+}
+
+// 0 means DefaultMaxWarnings, for New, NewWithOptions and a zero-value
+// Matcher.
+func TestMaxWarnings_Default(t *testing.T) {
+	if got := New().opts.MaxWarnings; got != DefaultMaxWarnings {
+		t.Errorf("New: MaxWarnings = %d, want %d", got, DefaultMaxWarnings)
+	}
+	if got := NewWithOptions(MatcherOptions{}).opts.MaxWarnings; got != DefaultMaxWarnings {
+		t.Errorf("NewWithOptions: MaxWarnings = %d, want %d", got, DefaultMaxWarnings)
+	}
+	var m Matcher
+	m.AddPatterns("", []byte(strings.Repeat("!\n", DefaultMaxWarnings+5)))
+	if got := len(m.Warnings()); got != DefaultMaxWarnings+1 {
+		t.Errorf("zero-value Matcher: len(Warnings) = %d, want %d", got, DefaultMaxWarnings+1)
+	}
+}
+
+// Parsing holds at most MaxWarnings warnings: the live heap when the handler
+// gets the first one (the whole per-call list exists then) stays small.
+// v1.9.2: 13.1 MB for these 200k lines.
+func TestWarnings_MemoryBounded(t *testing.T) {
+	bad := []byte(strings.Repeat("!\n", 200_000))
+	var base runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&base)
+	var live uint64
+	first := true
+	m := NewWithOptions(MatcherOptions{WarningHandler: func(ParseWarning) {
+		if first {
+			first = false
+			var s runtime.MemStats
+			runtime.GC()
+			runtime.ReadMemStats(&s)
+			live = s.HeapAlloc - base.HeapAlloc
+		}
+	}})
+	m.AddPatterns("", bad)
+	if live > 4<<20 {
+		t.Errorf("live heap at first delivery = %d bytes, want under 4 MiB", live)
 	}
 }
 

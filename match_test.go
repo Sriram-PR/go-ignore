@@ -448,9 +448,9 @@ func TestMatchRule_BasePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rules, _, _ := parseLines(tt.basePath, []byte(tt.pattern), -1, -1, "")
+			rules, _, _ := parseLinesAll(tt.basePath, []byte(tt.pattern), -1, -1, "")
 			if len(rules) != 1 {
-				t.Fatalf("parseLines(%q) = %d rules, want 1", tt.pattern, len(rules))
+				t.Fatalf("parseLinesAll(%q) = %d rules, want 1", tt.pattern, len(rules))
 			}
 			path := normalizePath(tt.path)
 			pathSegs := splitPath(path)

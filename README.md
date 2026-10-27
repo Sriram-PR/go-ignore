@@ -148,15 +148,15 @@ The Go ecosystem has several `.gitignore` libraries. The table counts, by featur
 | Whitespace & escapes | 415/415 | 404/415 | 408/415 | 386/415 |
 | Line endings & BOM | 22/22 | 20/22 | 20/22 | 20/22 |
 | Comments & `!` prefix | 31/31 | 31/31 | 27/31 | 27/31 |
-| `*` and `?` | 334/334 | 334/334 | 317/334 | 281/334 |
-| `**` | 736/736 | 731/736 | 600/736 | 629/736 |
-| Directories & negation | 135/135 | 135/135 | 120/135 | 96/135 |
+| `*` and `?` | 334/334 | 334/334 | 317/334 | 279/334 |
+| `**` | 736/736 | 731/736 | 600/736 | 678/736 |
+| Directories & negation | 135/135 | 135/135 | 120/135 | 111/135 |
 | Anchoring | 63/63 | 54/63 | 52/63 | 50/63 |
 | Character classes | 2535/2535 | 2526/2535 | 2282/2535 | 2452/2535 |
 | Non-ASCII bytes | 16/16 | 16/16 | 10/16 | 9/16 |
 | Nested .gitignore files | 68/68 | 68/68 | 67/68 | 3/3 † |
-| Random scenarios (seed 1) | 5486/5486 | 5481/5486 | 5228/5486 | 1172/1265 † |
-| **Total** | 9841/9841 | 9800/9841 | 9131/9841 | 5125/5555 † |
+| Random scenarios (seed 1) | 5486/5486 | 5481/5486 | 5228/5486 | 1184/1265 † |
+| **Total** | 9841/9841 | 9800/9841 | 9131/9841 | 5199/5555 † |
 
 † excludes scenarios with nested .gitignore files, which this library can't load.
 <!-- conformance:end -->

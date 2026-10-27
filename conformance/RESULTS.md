@@ -11,7 +11,7 @@ Git version: git version 2.56.0
 | go-ignore | (this repo) | Matcher.AddPatternsWithSource + MatchWithReason |
 | git-pkgs | v1.3.0 | NewFromDirectory + MatchPath |
 | go-git v5 | v5.19.3 | ReadPatterns + NewMatcher + Match |
-| sabhiram | v0.0.0-20210923224102-525f6e181f06 | CompileIgnoreFile + MatchesPath (takes no isDir) |
+| sabhiram | v0.0.0-20210923224102-525f6e181f06 | CompileIgnoreFile + MatchesPath (no isDir; dirs get a trailing slash) |
 
 ## Agreement
 
@@ -20,15 +20,15 @@ Git version: git version 2.56.0
 | Whitespace & escapes | 415/415 | 404/415 | 408/415 | 386/415 |
 | Line endings & BOM | 22/22 | 20/22 | 20/22 | 20/22 |
 | Comments & `!` prefix | 31/31 | 31/31 | 27/31 | 27/31 |
-| `*` and `?` | 334/334 | 334/334 | 317/334 | 281/334 |
-| `**` | 736/736 | 731/736 | 600/736 | 629/736 |
-| Directories & negation | 135/135 | 135/135 | 120/135 | 96/135 |
+| `*` and `?` | 334/334 | 334/334 | 317/334 | 279/334 |
+| `**` | 736/736 | 731/736 | 600/736 | 678/736 |
+| Directories & negation | 135/135 | 135/135 | 120/135 | 111/135 |
 | Anchoring | 63/63 | 54/63 | 52/63 | 50/63 |
 | Character classes | 2535/2535 | 2526/2535 | 2282/2535 | 2452/2535 |
 | Non-ASCII bytes | 16/16 | 16/16 | 10/16 | 9/16 |
 | Nested .gitignore files | 68/68 | 68/68 | 67/68 | 3/3 † |
-| Random scenarios (seed 1) | 5486/5486 | 5481/5486 | 5228/5486 | 1172/1265 † |
-| **Total** | 9841/9841 | 9800/9841 | 9131/9841 | 5125/5555 † |
+| Random scenarios (seed 1) | 5486/5486 | 5481/5486 | 5228/5486 | 1184/1265 † |
+| **Total** | 9841/9841 | 9800/9841 | 9131/9841 | 5199/5555 † |
 
 † excludes scenarios with nested .gitignore files, which this library can't load.
 
@@ -815,80 +815,31 @@ None.
 | curated-37 | {".gitignore":"/\\n"} | "x" | false | false | true |
 | curated-40 | {".gitignore":"/ \\n"} | "x" | false | false | true |
 | curated-46 | {".gitignore":"foo/\*\*\\n"} | "foo" | true | false | true |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "\*" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "a" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "a\*" | true | true | false |
 | curated-49 | {".gitignore":"/\*\*\\n"} | "a\*/b" | false | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "a/b" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "a/b/c" | true | true | false |
 | curated-49 | {".gitignore":"/\*\*\\n"} | "a/b/c/d" | false | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "a/x" | true | true | false |
 | curated-49 | {".gitignore":"/\*\*\\n"} | "a/x.log" | false | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "a/x/b" | true | true | false |
 | curated-49 | {".gitignore":"/\*\*\\n"} | "a/x/b/c" | false | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "a/x/y" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "a/x/y/b" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "ab" | true | true | false |
 | curated-49 | {".gitignore":"/\*\*\\n"} | "b" | false | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "foo" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "foo/a" | true | true | false |
 | curated-49 | {".gitignore":"/\*\*\\n"} | "foo/a/x" | false | true | false |
 | curated-49 | {".gitignore":"/\*\*\\n"} | "x.log" | false | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "z" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "z/a" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "z/a/x" | true | true | false |
-| curated-49 | {".gitignore":"/\*\*\\n"} | "z/a/x/y" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "\*" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "a" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "a\*" | true | true | false |
 | curated-50 | {".gitignore":"\*\*/\\n"} | "a\*/b" | false | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "a/b" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "a/b/c" | true | true | false |
 | curated-50 | {".gitignore":"\*\*/\\n"} | "a/b/c/d" | false | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "a/x" | true | true | false |
 | curated-50 | {".gitignore":"\*\*/\\n"} | "a/x.log" | false | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "a/x/b" | true | true | false |
 | curated-50 | {".gitignore":"\*\*/\\n"} | "a/x/b/c" | false | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "a/x/y" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "a/x/y/b" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "ab" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "foo" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "foo/a" | true | true | false |
 | curated-50 | {".gitignore":"\*\*/\\n"} | "foo/a/x" | false | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "z" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "z/a" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "z/a/x" | true | true | false |
-| curated-50 | {".gitignore":"\*\*/\\n"} | "z/a/x/y" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "\*" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "a" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "a\*" | true | true | false |
 | curated-51 | {".gitignore":"/\*\*/\\n"} | "a\*/b" | false | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "a/b" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "a/b/c" | true | true | false |
 | curated-51 | {".gitignore":"/\*\*/\\n"} | "a/b/c/d" | false | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "a/x" | true | true | false |
 | curated-51 | {".gitignore":"/\*\*/\\n"} | "a/x.log" | false | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "a/x/b" | true | true | false |
 | curated-51 | {".gitignore":"/\*\*/\\n"} | "a/x/b/c" | false | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "a/x/y" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "a/x/y/b" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "ab" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "foo" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "foo/a" | true | true | false |
 | curated-51 | {".gitignore":"/\*\*/\\n"} | "foo/a/x" | false | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "z" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "z/a" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "z/a/x" | true | true | false |
-| curated-51 | {".gitignore":"/\*\*/\\n"} | "z/a/x/y" | true | true | false |
 | curated-55 | {".gitignore":"\*\*/\*\*/b\\n"} | "b" | false | true | false |
-| curated-56 | {".gitignore":"a/\*\*/\\n"} | "a/b" | true | true | false |
-| curated-56 | {".gitignore":"a/\*\*/\\n"} | "a/b/c" | true | true | false |
+| curated-56 | {".gitignore":"a/\*\*/\\n"} | "a" | true | false | true |
 | curated-56 | {".gitignore":"a/\*\*/\\n"} | "a/b/c/d" | false | true | false |
-| curated-56 | {".gitignore":"a/\*\*/\\n"} | "a/x" | true | true | false |
-| curated-56 | {".gitignore":"a/\*\*/\\n"} | "a/x/b" | true | true | false |
 | curated-56 | {".gitignore":"a/\*\*/\\n"} | "a/x/b/c" | false | true | false |
-| curated-56 | {".gitignore":"a/\*\*/\\n"} | "a/x/y" | true | true | false |
-| curated-56 | {".gitignore":"a/\*\*/\\n"} | "a/x/y/b" | true | true | false |
+| curated-56 | {".gitignore":"a/\*\*/\\n"} | "foo/a" | true | false | true |
+| curated-56 | {".gitignore":"a/\*\*/\\n"} | "z/a" | true | false | true |
+| curated-56 | {".gitignore":"a/\*\*/\\n"} | "z/a/x" | true | false | true |
+| curated-56 | {".gitignore":"a/\*\*/\\n"} | "z/a/x/y" | true | false | true |
 | curated-57 | {".gitignore":"a/\*\*b\\n"} | "a/x/b" | true | false | true |
 | curated-57 | {".gitignore":"a/\*\*b\\n"} | "a/x/b/c" | false | false | true |
 | curated-57 | {".gitignore":"a/\*\*b\\n"} | "a/x/y/b" | true | false | true |
@@ -912,44 +863,36 @@ None.
 | curated-63 | {".gitignore":"a/\*\*\*\\n"} | "z/a/x/y" | true | false | true |
 | curated-64 | {".gitignore":"a/\*\*\*\*/b\\n"} | "a\*/b" | false | false | true |
 | curated-64 | {".gitignore":"a/\*\*\*\*/b\\n"} | "ab" | true | false | true |
+| curated-66 | {".gitignore":"a/\*\*/\*\*\\n"} | "a" | true | false | true |
+| curated-66 | {".gitignore":"a/\*\*/\*\*\\n"} | "foo/a" | true | false | true |
 | curated-66 | {".gitignore":"a/\*\*/\*\*\\n"} | "foo/a/x" | false | false | true |
+| curated-66 | {".gitignore":"a/\*\*/\*\*\\n"} | "z/a" | true | false | true |
 | curated-66 | {".gitignore":"a/\*\*/\*\*\\n"} | "z/a/x" | true | false | true |
 | curated-66 | {".gitignore":"a/\*\*/\*\*\\n"} | "z/a/x/y" | true | false | true |
 | curated-67 | {".gitignore":"/a/\*\*/b/\*\*\\n"} | "a/b" | true | false | true |
 | curated-67 | {".gitignore":"/a/\*\*/b/\*\*\\n"} | "a/x/b" | true | false | true |
 | curated-67 | {".gitignore":"/a/\*\*/b/\*\*\\n"} | "a/x/y/b" | true | false | true |
-| curated-69 | {".gitignore":"a/\*\*/b/\\n"} | "a/b" | true | true | false |
-| curated-69 | {".gitignore":"a/\*\*/b/\\n"} | "a/x/b" | true | true | false |
-| curated-69 | {".gitignore":"a/\*\*/b/\\n"} | "a/x/y/b" | true | true | false |
-| curated-77 | {".gitignore":"build/\\n"} | "build" | true | true | false |
-| curated-77 | {".gitignore":"build/\\n"} | "x/build" | true | true | false |
-| curated-78 | {".gitignore":"\*\\n!\*/\\n"} | "a" | true | false | true |
 | curated-78 | {".gitignore":"\*\\n!\*/\\n"} | "a/b/y" | false | true | false |
 | curated-78 | {".gitignore":"\*\\n!\*/\\n"} | "a/x" | false | true | false |
-| curated-79 | {".gitignore":"\*\\n!\*/\\n!\*.go\\n"} | "a" | true | false | true |
 | curated-79 | {".gitignore":"\*\\n!\*/\\n!\*.go\\n"} | "a/b/y" | false | true | false |
 | curated-79 | {".gitignore":"\*\\n!\*/\\n!\*.go\\n"} | "a/x" | false | true | false |
-| curated-80 | {".gitignore":"\*\\n!build/\\n"} | "build" | true | false | true |
 | curated-80 | {".gitignore":"\*\\n!build/\\n"} | "build/x" | false | true | false |
+| curated-80 | {".gitignore":"\*\\n!build/\\n"} | "d/build" | true | true | false |
 | curated-80 | {".gitignore":"\*\\n!build/\\n"} | "d/build/x" | false | true | false |
-| curated-82 | {".gitignore":"a/\\n!a/b\\n"} | "a" | true | true | false |
+| curated-81 | {".gitignore":"/\*\\n!/foo\\n/foo/\*\\n!/foo/bar\\n"} | "foo" | true | false | true |
 | curated-82 | {".gitignore":"a/\\n!a/b\\n"} | "a/b" | false | true | false |
+| curated-83 | {".gitignore":"a/\*\\n!a/b\\n"} | "a" | true | false | true |
 | curated-84 | {".gitignore":"a/\*\*\\n!a/b\\n"} | "a" | true | false | true |
 | curated-84 | {".gitignore":"a/\*\*\\n!a/b\\n"} | "a/b/c" | false | true | false |
-| curated-85 | {".gitignore":"\*\*/a/\\n!\*\*/a/b\\n"} | "a" | true | true | false |
 | curated-85 | {".gitignore":"\*\*/a/\\n!\*\*/a/b\\n"} | "a/b" | false | true | false |
-| curated-85 | {".gitignore":"\*\*/a/\\n!\*\*/a/b\\n"} | "x/a" | true | true | false |
 | curated-85 | {".gitignore":"\*\*/a/\\n!\*\*/a/b\\n"} | "x/a/b" | false | true | false |
 | curated-86 | {".gitignore":"a\\n!a/b\\n"} | "a/b" | false | true | false |
-| curated-92 | {".gitignore":"a\\n!a/\\n"} | "a" | true | false | true |
-| curated-94 | {".gitignore":"foo/ \\n"} | "foo" | true | true | false |
-| curated-96 | {".gitignore":"dir/\*\\n!dir/sub/\\n"} | "dir/sub" | true | false | true |
-| curated-97 | {".gitignore":"/a/b/\\n"} | "a/b" | true | true | false |
-| curated-98 | {".gitignore":"a/b/\\n"} | "a/b" | true | true | false |
+| curated-96 | {".gitignore":"dir/\*\\n!dir/sub/\\n"} | "dir" | true | false | true |
+| curated-98 | {".gitignore":"a/b/\\n"} | "x/a/b" | true | false | true |
 | curated-98 | {".gitignore":"a/b/\\n"} | "x/a/b/c" | false | false | true |
 | curated-99 | {".gitignore":"a/b\\n"} | "x/a/b" | false | false | true |
 | curated-102 | {".gitignore":"\*/a\\n"} | "x/y/a" | false | false | true |
-| curated-105 | {".gitignore":"\*/\\n"} | "a" | true | true | false |
+| curated-103 | {".gitignore":"a/\*\\n"} | "a" | true | false | true |
 | curated-107 | {".gitignore":"?\\n"} | "a" | false | true | false |
 | curated-107 | {".gitignore":"?\\n"} | "\\xff" | false | true | false |
 | curated-108 | {".gitignore":"??\\n"} | "ab" | false | true | false |
@@ -1038,11 +981,13 @@ None.
 | curated-173 | {".gitignore":"\[\\xe0-\\xff\]x\\n"} | "\\xffx" | false | true | false |
 | curated-176 | {".gitignore":"\\\\?\\n"} | "?" | false | true | false |
 | curated-176 | {".gitignore":"\\\\?\\n"} | "\\\\" | false | false | true |
+| curated-176 | {".gitignore":"\\\\?\\n"} | "a" | true | false | true |
 | curated-178 | {".gitignore":"\\\\a\\n"} | "a" | true | true | false |
 | curated-178 | {".gitignore":"\\\\a\\n"} | "a/b" | false | true | false |
 | curated-179 | {".gitignore":"a\\\\b\\n"} | "a" | true | false | true |
 | curated-179 | {".gitignore":"a\\\\b\\n"} | "a/b" | false | false | true |
 | curated-179 | {".gitignore":"a\\\\b\\n"} | "ab" | false | true | false |
+| curated-187 | {".gitignore":"a\\\\/\\n"} | "a" | true | false | true |
 | curated-187 | {".gitignore":"a\\\\/\\n"} | "a/b" | false | false | true |
 | curated-192 | {".gitignore":"\\\\a\*\\n"} | "a" | true | true | false |
 | curated-192 | {".gitignore":"\\\\a\*\\n"} | "a\*" | false | true | false |
@@ -1103,6 +1048,8 @@ None.
 | curated-223 | {".gitignore":"a\*?b\\n"} | "a.b" | false | true | false |
 | curated-223 | {".gitignore":"a\*?b\\n"} | "aab" | false | true | false |
 | curated-223 | {".gitignore":"a\*?b\\n"} | "axb" | false | true | false |
+| curated-229 | {".gitignore":"\*/\*\\n"} | "a" | true | false | true |
+| curated-229 | {".gitignore":"\*/\*\\n"} | "x" | true | false | true |
 | curated-230 | {".gitignore":"\*/\*\*\\n"} | ".x" | false | false | true |
 | curated-230 | {".gitignore":"\*/\*\*\\n"} | "a" | true | false | true |
 | curated-230 | {".gitignore":"\*/\*\*\\n"} | "a." | false | false | true |
@@ -1122,21 +1069,12 @@ None.
 | curated-238 | {".gitignore":"a??\\n"} | "aé" | false | true | false |
 | curated-240 | {".gitignore":"\[日\]\\n"} | "\\xe6" | false | true | false |
 | curated-240 | {".gitignore":"\[日\]\\n"} | "日" | false | false | true |
-| curated-273 | {".gitignore":"foo/  \\n"} | "foo" | true | true | false |
-| curated-274 | {".gitignore":"foo /\\n"} | "foo " | true | true | false |
-| curated-275 | {".gitignore":"a.b/\\n"} | "a.b" | true | true | false |
-| curated-276 | {".gitignore":"\*.d/\\n"} | "x.d" | true | true | false |
-| curated-276 | {".gitignore":"\*.d/\\n"} | "y/x.d" | true | true | false |
 | curated-277 | {".gitignore":"a/b/\*\*\\n"} | "a/b" | true | false | true |
 | curated-277 | {".gitignore":"a/b/\*\*\\n"} | "x/a/b" | true | false | true |
 | curated-277 | {".gitignore":"a/b/\*\*\\n"} | "x/a/b/c" | false | false | true |
 | curated-279 | {".gitignore":"a/\*\*/b\\n"} | "x/a/b" | false | false | true |
 | curated-281 | {".gitignore":"\*\*/a\\n!a/b\\n"} | "a/b" | false | true | false |
 | curated-281 | {".gitignore":"\*\*/a\\n!a/b\\n"} | "x/a/b" | false | true | false |
-| curated-282 | {".gitignore":"\*\*/cache/\\n"} | "cache" | true | true | false |
-| curated-282 | {".gitignore":"\*\*/cache/\\n"} | "src/cache" | true | true | false |
-| curated-283 | {".gitignore":"src/\*\*/test/\\n"} | "src/lib/test" | true | true | false |
-| curated-283 | {".gitignore":"src/\*\*/test/\\n"} | "src/test" | true | true | false |
 | curated-284 | {".gitignore":"keep\\x00B\\n"} | "keep" | false | true | false |
 | curated-285 | {".gitignore":"\\x00x\\nx\\x00\\n"} | "x" | false | true | false |
 | curated-286 | {".gitignore":"foo \\x00\\n"} | "foo" | false | true | false |
@@ -1148,7 +1086,6 @@ None.
 | seed1-21 | {".gitignore":"?\\n\[-a\]/.x/\[a-\[:alpha:\]\]\\n"} | "\[a\]/a/a b" | false | true | false |
 | seed1-21 | {".gitignore":"?\\n\[-a\]/.x/\[a-\[:alpha:\]\]\\n"} | "a.b/a" | true | true | false |
 | seed1-21 | {".gitignore":"?\\n\[-a\]/.x/\[a-\[:alpha:\]\]\\n"} | "a.b/a/a b" | true | true | false |
-| seed1-26 | {".gitignore":"\\\\?/a.\*/?\\n\[--a\]\\n/\*a\*/\\n/\[^a\]\\n"} | "ab" | true | true | false |
 | seed1-29 | {".gitignore":"a\\\\/x\*\*\\n/\\\\a\\n\*\\\\\*\\n"} | "a" | true | true | false |
 | seed1-29 | {".gitignore":"a\\\\/x\*\*\\n/\\\\a\\n\*\\\\\*\\n"} | "a/#a" | true | true | false |
 | seed1-29 | {".gitignore":"a\\\\/x\*\*\\n/\\\\a\\n\*\\\\\*\\n"} | "a/FOO" | false | true | false |
@@ -1167,7 +1104,6 @@ None.
 | seed1-128 | {".gitignore":"/.x/\\n\[!\]a\]/\\n!foo/??\\n\[a\[:\]\]/\\\\\*/a\\\\ b \\n"} | "FOO/b" | true | true | false |
 | seed1-128 | {".gitignore":"/.x/\\n\[!\]a\]/\\n!foo/??\\n\[a\[:\]\]/\\\\\*/a\\\\ b \\n"} | "FOO/b/foo" | true | true | false |
 | seed1-128 | {".gitignore":"/.x/\\n\[!\]a\]/\\n!foo/??\\n\[a\[:\]\]/\\\\\*/a\\\\ b \\n"} | "FOO/b/foo/a\]" | false | true | false |
-| seed1-146 | {".gitignore":"/\[\[:digit:\]\]/Foo\\r\\n\[!\]a\]\\r\\n!\\\\!a/é\\r\\n/\*.b/\\r\\n"} | "a.b" | true | true | false |
 | seed1-146 | {".gitignore":"/\[\[:digit:\]\]/Foo\\r\\n\[!\]a\]\\r\\n!\\\\!a/é\\r\\n/\*.b/\\r\\n"} | "a\]/x" | false | true | false |
 | seed1-146 | {".gitignore":"/\[\[:digit:\]\]/Foo\\r\\n\[!\]a\]\\r\\n!\\\\!a/é\\r\\n/\*.b/\\r\\n"} | "b" | true | true | false |
 | seed1-146 | {".gitignore":"/\[\[:digit:\]\]/Foo\\r\\n\[!\]a\]\\r\\n!\\\\!a/é\\r\\n/\*.b/\\r\\n"} | "b/a b" | true | true | false |
@@ -1182,13 +1118,6 @@ None.
 | seed1-156 | {".gitignore":"\[\\\\\\\\\]/\[\[:foo:\]\]/\\n? \\n"} | "#a/bar/\]" | true | true | false |
 | seed1-156 | {".gitignore":"\[\\\\\\\\\]/\[\[:foo:\]\]/\\n? \\n"} | "#a/bar/\]/#a" | false | true | false |
 | seed1-156 | {".gitignore":"\[\\\\\\\\\]/\[\[:foo:\]\]/\\n? \\n"} | "bar/bar/a" | true | true | false |
-| seed1-185 | {".gitignore":"\[-a\]\\n!b/ \\n\[\[:alpha:\]\]\\n/\*a\*/ \\n\[\]a\]/\[\[:alpha:\]\[:digit:\]\]/ab\\n"} | "!a" | true | true | false |
-| seed1-185 | {".gitignore":"\[-a\]\\n!b/ \\n\[\[:alpha:\]\]\\n/\*a\*/ \\n\[\]a\]/\[\[:alpha:\]\[:digit:\]\]/ab\\n"} | "#a" | true | true | false |
-| seed1-185 | {".gitignore":"\[-a\]\\n!b/ \\n\[\[:alpha:\]\]\\n/\*a\*/ \\n\[\]a\]/\[\[:alpha:\]\[:digit:\]\]/ab\\n"} | "\[a\]" | true | true | false |
-| seed1-185 | {".gitignore":"\[-a\]\\n!b/ \\n\[\[:alpha:\]\]\\n/\*a\*/ \\n\[\]a\]/\[\[:alpha:\]\[:digit:\]\]/ab\\n"} | "a b" | true | true | false |
-| seed1-185 | {".gitignore":"\[-a\]\\n!b/ \\n\[\[:alpha:\]\]\\n/\*a\*/ \\n\[\]a\]/\[\[:alpha:\]\[:digit:\]\]/ab\\n"} | "a\*" | true | true | false |
-| seed1-185 | {".gitignore":"\[-a\]\\n!b/ \\n\[\[:alpha:\]\]\\n/\*a\*/ \\n\[\]a\]/\[\[:alpha:\]\[:digit:\]\]/ab\\n"} | "a.b" | true | true | false |
-| seed1-185 | {".gitignore":"\[-a\]\\n!b/ \\n\[\[:alpha:\]\]\\n/\*a\*/ \\n\[\]a\]/\[\[:alpha:\]\[:digit:\]\]/ab\\n"} | "a\]" | true | true | false |
 | seed1-187 | {".gitignore":"/é/a b\\n/b\\n/\[!-a\]/\\n\[!a\]  \\n/\*b\\nbar/\\n\[^a\]/\\\\#a/\*\*a  \\nab\\n"} | "Foo/b" | true | true | false |
 | seed1-187 | {".gitignore":"/é/a b\\n/b\\n/\[!-a\]/\\n\[!a\]  \\n/\*b\\nbar/\\n\[^a\]/\\\\#a/\*\*a  \\nab\\n"} | "Foo/b/#a" | false | true | false |
 | seed1-187 | {".gitignore":"/é/a b\\n/b\\n/\[!-a\]/\\n\[!a\]  \\n/\*b\\nbar/\\n\[^a\]/\\\\#a/\*\*a  \\nab\\n"} | "a" | true | false | true |
@@ -1197,7 +1126,6 @@ None.
 | seed1-187 | {".gitignore":"/é/a b\\n/b\\n/\[!-a\]/\\n\[!a\]  \\n/\*b\\nbar/\\n\[^a\]/\\\\#a/\*\*a  \\nab\\n"} | "a/a\]" | true | false | true |
 | seed1-187 | {".gitignore":"/é/a b\\n/b\\n/\[!-a\]/\\n\[!a\]  \\n/\*b\\nbar/\\n\[^a\]/\\\\#a/\*\*a  \\nab\\n"} | "a/a\]/a b" | false | false | true |
 | seed1-187 | {".gitignore":"/é/a b\\n/b\\n/\[!-a\]/\\n\[!a\]  \\n/\*b\\nbar/\\n\[^a\]/\\\\#a/\*\*a  \\nab\\n"} | "x" | true | true | false |
-| seed1-187 | {".gitignore":"/é/a b\\n/b\\n/\[!-a\]/\\n\[!a\]  \\n/\*b\\nbar/\\n\[^a\]/\\\\#a/\*\*a  \\nab\\n"} | "x/bar" | true | true | false |
 | seed1-215 | {".gitignore":"\\ufeff/\[\[:punct:\]\]/\\n!/x\*\*\\n"} | "-" | true | true | false |
 | seed1-215 | {".gitignore":"\\ufeff/\[\[:punct:\]\]/\\n!/x\*\*\\n"} | "-/\[a\]" | true | true | false |
 | seed1-215 | {".gitignore":"\\ufeff/\[\[:punct:\]\]/\\n!/x\*\*\\n"} | "-/a" | true | true | false |
@@ -1228,8 +1156,6 @@ None.
 | seed1-277 | {".gitignore":"\[!a\]\\n\\\\\[a\]/\[a-\[:alpha:\]\]\\na\\\\ \\n"} | "b/#a" | true | true | false |
 | seed1-277 | {".gitignore":"\[!a\]\\n\\\\\[a\]/\[a-\[:alpha:\]\]\\na\\\\ \\n"} | "b/#a/\]" | true | true | false |
 | seed1-277 | {".gitignore":"\[!a\]\\n\\\\\[a\]/\[a-\[:alpha:\]\]\\na\\\\ \\n"} | "b/#a/\]/b" | false | true | false |
-| seed1-288 | {".gitignore":"a?/\[\\\\\\\\\]/a?\\n/a\*/é/\[\[:space:\]\] \\n\[a-b\]/\\n"} | "#a/-/a" | true | true | false |
-| seed1-288 | {".gitignore":"a?/\[\\\\\\\\\]/a?\\n/a\*/é/\[\[:space:\]\] \\n\[a-b\]/\\n"} | "foo/b" | true | true | false |
 | seed1-289 | {".gitignore":"?/a\*\*\\n!\[!a\]/?/a\*\*b\\n/\[!a\]\\n\[a-\]/\*b\\n"} | "-" | true | true | false |
 | seed1-292 | {".gitignore":"!?\\n\\\\a\\n\*.b\\n/\[!-a\]/ \\n"} | "b" | true | true | false |
 | seed1-292 | {".gitignore":"!?\\n\\\\a\\n\*.b\\n/\[!-a\]/ \\n"} | "b/\[a\]" | true | true | false |

@@ -41,7 +41,7 @@ var drivers = []driver{
 	{name: "go-ignore", module: "github.com/Sriram-PR/go-ignore", api: "Matcher.AddPatternsWithSource + MatchWithReason", nested: true, load: loadGoIgnore},
 	{name: "git-pkgs", module: "github.com/git-pkgs/gitignore", api: "NewFromDirectory + MatchPath", nested: true, load: loadGitPkgs},
 	{name: "go-git v5", module: "github.com/go-git/go-git/v5", api: "ReadPatterns + NewMatcher + Match", nested: true, load: loadGoGit},
-	{name: "sabhiram", module: "github.com/sabhiram/go-gitignore", api: "CompileIgnoreFile + MatchesPath (takes no isDir)", nested: false, load: loadSabhiram},
+	{name: "sabhiram", module: "github.com/sabhiram/go-gitignore", api: "CompileIgnoreFile + MatchesPath (no isDir; dirs get a trailing slash)", nested: false, load: loadSabhiram},
 }
 
 // loadGoIgnore adds every .gitignore shallowest first with its directory as
@@ -102,8 +102,8 @@ func loadGoGit(dir string) (matchFunc, error) {
 }
 
 // loadSabhiram reads only the root file: the library has no notion of nested
-// files. Its matcher takes no isDir and documents no trailing-slash
-// convention, so paths are passed as they are.
+// files. Its matcher takes no isDir, so a directory gets a trailing slash, the
+// only way its dir-only patterns match and what its users pass in practice.
 func loadSabhiram(dir string) (matchFunc, error) {
 	gi, err := sabhiram.CompileIgnoreFile(filepath.Join(dir, ".gitignore"))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -111,7 +111,12 @@ func loadSabhiram(dir string) (matchFunc, error) {
 	} else if err != nil {
 		return nil, err
 	}
-	return func(p string, _ bool) bool { return gi.MatchesPath(p) }, nil
+	return func(p string, isDir bool) bool {
+		if isDir {
+			p += "/"
+		}
+		return gi.MatchesPath(p)
+	}, nil
 }
 
 // moduleVersion is the version of module that this binary was built with.

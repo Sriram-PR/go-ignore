@@ -170,7 +170,7 @@ type Matcher struct {
 	// instead, since it appends nested rules.
 	mu       sync.RWMutex
 	rules    []rule
-	warnings []ParseWarning
+	warnings warnList
 	// overrides is parsed from opts.Overrides by NewWithOptions and never
 	// changed after, so it is read without mu. Every reader evaluates it
 	// after all other rules.
@@ -278,7 +278,7 @@ func (m *Matcher) dispatch(ws []ParseWarning) {
 		return
 	}
 	m.mu.Lock()
-	m.retainWarnings(ws, "")
+	m.retain(ws)
 	m.mu.Unlock()
 }
 
@@ -424,7 +424,7 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 	m.rules = append(m.rules, newRules...)
 	handler := m.opts.WarningHandler
 	if handler == nil {
-		m.retainWarnings(parseWarnings, normalizedBase)
+		m.retain(parseWarnings)
 	}
 	m.mu.Unlock()
 
@@ -442,23 +442,52 @@ func (m *Matcher) addPatternsFromSource(basePath string, content []byte, source 
 // maxRetainedWarnings bounds the warnings a Matcher collects for Warnings.
 const maxRetainedWarnings = 10_000
 
-// retainWarnings appends ws to the collected warnings, up to
-// maxRetainedWarnings and then one marker, and drops the rest. m.mu must be
-// held.
-func (m *Matcher) retainWarnings(ws []ParseWarning, basePath string) {
+const warnLimitMessage = "warning limit reached, further warnings dropped"
+
+// warnList keeps parse warnings up to max (negative: no limit), then one
+// marker; later warnings are dropped.
+type warnList struct {
+	max   int
+	items []ParseWarning
+	full  bool // the marker has been appended
+}
+
+func newWarnList(max int) warnList { return warnList{max: max} }
+
+func (l *warnList) add(w ParseWarning) {
+	switch {
+	case l.full:
+	case l.max < 0 || len(l.items) < l.max:
+		l.items = append(l.items, w)
+	default:
+		l.items = append(l.items, ParseWarning{Message: warnLimitMessage, BasePath: w.BasePath})
+		l.full = true
+	}
+}
+
+// merge adds src's warnings to l. A src that overflowed held more than its
+// max, and l has at most that much room, so l gets its marker even when the
+// kept warnings fit exactly.
+func (l *warnList) merge(src *warnList) {
+	kept := src.items
+	if src.full {
+		kept = kept[:len(kept)-1]
+	}
+	for _, w := range kept {
+		l.add(w)
+	}
+	if src.full && !l.full {
+		l.items = append(l.items, src.items[len(src.items)-1])
+		l.full = true
+	}
+}
+
+// retain adds ws to the collected warnings, up to maxRetainedWarnings and
+// then one marker. m.mu must be held.
+func (m *Matcher) retain(ws []ParseWarning) {
+	m.warnings.max = maxRetainedWarnings
 	for _, w := range ws {
-		switch {
-		case len(m.warnings) < maxRetainedWarnings:
-			m.warnings = append(m.warnings, w)
-		case len(m.warnings) == maxRetainedWarnings:
-			m.warnings = append(m.warnings, ParseWarning{
-				Message:  "warning limit reached, further warnings dropped",
-				BasePath: basePath,
-			})
-			return
-		default:
-			return
-		}
+		m.warnings.add(w)
 	}
 }
 
@@ -513,7 +542,7 @@ func (m *Matcher) Warnings() []ParseWarning {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return slices.Clone(m.warnings)
+	return slices.Clone(m.warnings.items)
 }
 
 // Match returns true if the path should be ignored.

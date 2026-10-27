@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -282,5 +283,56 @@ func TestWarnings_Capped(t *testing.T) {
 	h.AddPatterns("", bad)
 	if got := n.Load(); got != maxRetainedWarnings+500 {
 		t.Errorf("handler saw %d warnings, want %d", got, maxRetainedWarnings+500)
+	}
+}
+
+// warnList keeps max warnings, then one marker carrying the overflowing
+// warning's BasePath, and drops the rest; a negative max keeps everything.
+func TestWarnList_Add(t *testing.T) {
+	w := func(i int) ParseWarning { return ParseWarning{Line: i, BasePath: "b"} }
+	l := newWarnList(2)
+	for i := 1; i <= 5; i++ {
+		l.add(w(i))
+	}
+	want := []ParseWarning{w(1), w(2), {Message: warnLimitMessage, BasePath: "b"}}
+	if !slices.Equal(l.items, want) {
+		t.Errorf("items = %+v, want %+v", l.items, want)
+	}
+
+	u := newWarnList(-1)
+	for i := 1; i <= 5; i++ {
+		u.add(w(i))
+	}
+	if len(u.items) != 5 || u.full {
+		t.Errorf("unlimited: %d items, full=%v; want 5, false", len(u.items), u.full)
+	}
+}
+
+// merge keeps one total cap, and an overflowed source gives the target its
+// marker even when the kept warnings fit exactly.
+func TestWarnList_Merge(t *testing.T) {
+	w := func(i int) ParseWarning { return ParseWarning{Line: i} }
+	marker := ParseWarning{Message: warnLimitMessage}
+
+	src := newWarnList(3)
+	for i := 1; i <= 5; i++ {
+		src.add(w(i))
+	}
+	dst := newWarnList(3)
+	dst.merge(&src)
+	if want := []ParseWarning{w(1), w(2), w(3), marker}; !slices.Equal(dst.items, want) {
+		t.Errorf("overflowed source: items = %+v, want %+v", dst.items, want)
+	}
+
+	a, b := newWarnList(3), newWarnList(3)
+	a.add(w(1))
+	a.add(w(2))
+	b.add(w(3))
+	b.add(w(4))
+	dst = newWarnList(3)
+	dst.merge(&a)
+	dst.merge(&b)
+	if want := []ParseWarning{w(1), w(2), w(3), marker}; !slices.Equal(dst.items, want) {
+		t.Errorf("two sources: items = %+v, want %+v", dst.items, want)
 	}
 }

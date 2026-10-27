@@ -224,14 +224,13 @@ func NewWithOptions(opts MatcherOptions) *Matcher {
 	}
 	m := &Matcher{opts: opts}
 	m.opts.Overrides = nil // parsed into m.overrides
+	ws := newWarnList(m.effectiveMaxWarnings())
 	names, nameWarnings := validIgnoreFiles(opts.IgnoreFiles)
-	m.opts.IgnoreFiles = names
-	overrides, overrideWarnings := m.parseOverrides(opts.Overrides)
-	m.overrides = overrides
-	ws := newWarnList(-1)
-	for _, w := range slices.Concat(nameWarnings, overrideWarnings) {
+	for _, w := range nameWarnings {
 		ws.add(w)
 	}
+	m.opts.IgnoreFiles = names
+	m.overrides = m.parseOverrides(opts.Overrides, &ws)
 	m.dispatch(&ws)
 	return m
 }
@@ -259,15 +258,14 @@ const overridesSource = "overrides"
 
 // parseOverrides parses lines as one root-level file whose line N is
 // lines[N-1], so a rule's Line is its index + 1.
-func (m *Matcher) parseOverrides(lines []string) ([]rule, []ParseWarning) {
+func (m *Matcher) parseOverrides(lines []string, ws *warnList) []rule {
 	if len(lines) == 0 {
-		return nil, nil
+		return nil
 	}
-	var warnings []ParseWarning
 	kept := make([]string, len(lines))
 	for i, l := range lines {
 		if strings.ContainsAny(l, "\r\n") {
-			warnings = append(warnings, ParseWarning{Pattern: l, Message: "override contains a line break, skipped", Line: i + 1})
+			ws.add(ParseWarning{Pattern: l, Message: "override contains a line break, skipped", Line: i + 1})
 			continue
 		}
 		kept[i] = l
@@ -278,16 +276,14 @@ func (m *Matcher) parseOverrides(lines []string) ([]rule, []ParseWarning) {
 	if strings.HasPrefix(content, "\ufeff") {
 		content = "\ufeff" + content
 	}
-	parsed := newWarnList(-1)
-	rules, truncated := parseLines("", []byte(content), m.effectiveMaxPatternLength(), m.effectiveMaxPatterns(), overridesSource, &parsed)
-	warnings = append(warnings, parsed.items...)
+	rules, truncated := parseLines("", []byte(content), m.effectiveMaxPatternLength(), m.effectiveMaxPatterns(), overridesSource, ws)
 	if truncated {
-		warnings = append(warnings, ParseWarning{Message: "maximum pattern count reached, excess patterns truncated"})
+		ws.add(ParseWarning{Message: "maximum pattern count reached, excess patterns truncated"})
 	}
 	if m.opts.CaseInsensitive {
 		lowerRules(rules)
 	}
-	return rules, warnings
+	return rules
 }
 
 // dispatch delivers ws: to the handler if set, otherwise to Warnings().

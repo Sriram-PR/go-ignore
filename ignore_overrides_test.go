@@ -161,3 +161,23 @@ func TestOverrides_AgreeWithRootFile(t *testing.T) {
 		t.Fatalf("only %d root-only scenarios; the comparison would prove little", n)
 	}
 }
+
+// Construction warnings (bad IgnoreFiles names, bad overrides) are capped
+// like any other call.
+func TestOverrides_WarningsCapped(t *testing.T) {
+	const marker = "warning limit reached, further warnings dropped"
+	opts := ignore.MatcherOptions{
+		MaxWarnings: 3,
+		IgnoreFiles: []string{"a/b", "c/d"},
+		Overrides:   []string{"x\ny", "x\ny", "x\ny", "x\ny"},
+	}
+	if w := ignore.NewWithOptions(opts).Warnings(); len(w) != 4 || w[3].Message != marker {
+		t.Errorf("Warnings() = %+v, want 3 warnings and the drop marker", w)
+	}
+	var got []ignore.ParseWarning
+	opts.WarningHandler = func(w ignore.ParseWarning) { got = append(got, w) }
+	ignore.NewWithOptions(opts)
+	if len(got) != 4 || got[3].Message != marker {
+		t.Errorf("handler got %+v, want 3 warnings and the drop marker", got)
+	}
+}

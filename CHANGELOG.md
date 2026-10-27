@@ -4,6 +4,20 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.9.2
+
+Two git-parity fixes and conformance table upkeep, from the 2026-10-27 audit. No exported API changes.
+
+**Fixed**
+
+- **`Files`, `FilesFS` and `RepoFiles` skip FIFOs, sockets and devices** (#9), as their docs said and as `git ls-files` does. They yielded them before, and a caller that opened each path blocked forever on a FIFO. `Entries`, `EntriesFS`, `RepoEntries` and the `WalkDir`/`WalkRepo` callbacks still pass them through with their type, now documented.
+- **A pattern line ends at the first NUL** (#15). git reads each line as a C string, so `keep\0B` is the pattern `keep` and a line starting with NUL is empty. go-ignore kept the NUL as pattern text, so such a rule never matched.
+
+**Tests**
+
+- The conformance table passes sabhiram a trailing slash for directories (#14), the only way its dir-only patterns match and what its users do. Its total goes from 5125 to 5199 of 5555; the other columns are unchanged. Four NUL cases join the Whitespace & escapes row.
+- Dependabot and govulncheck now cover the conformance module (#24).
+
 ### v1.9.1
 
 Fixes and doc corrections from the 2026-10-27 audit. No exported API changes.

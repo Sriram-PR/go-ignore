@@ -11,3 +11,15 @@ updates:
         patterns: ["*"]
     commit-message:
       prefix: ci
+  # Test-only module behind the README comparison table; nothing here ships.
+  - package-ecosystem: gomod
+    directory: /conformance
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      conformance:
+        patterns: ["*"]
+    commit-message:
+      prefix: test

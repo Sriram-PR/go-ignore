@@ -29,3 +29,8 @@ jobs:
       # fixed by a Go patch release rather than a change here.
       - name: Run govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+      # The conformance module has the only third-party dependencies.
+      - name: Run govulncheck (conformance)
+        working-directory: conformance
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

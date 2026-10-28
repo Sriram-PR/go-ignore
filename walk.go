@@ -1,6 +1,7 @@
 package ignore
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"iter"
@@ -79,7 +80,7 @@ type walkBackend struct {
 // during a walk is permitted but will NOT affect the in-progress walk
 // (the walker uses a snapshot taken at WalkDir entry).
 func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
-	return m.walkInternal(osBackend, root, "", false, fn)
+	return m.walkInternal(osBackend, root, "", false, nil, fn)
 }
 
 // WalkDirFS is the fs.FS-backed counterpart to WalkDir. It walks the tree at
@@ -103,7 +104,7 @@ func (m *Matcher) WalkDir(root string, fn fs.WalkDirFunc) error {
 //
 // Thread-safe: see WalkDir's concurrency notes.
 func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error {
-	return m.walkInternal(fsBackend(fsys), root, "", false, fn)
+	return m.walkInternal(fsBackend(fsys), root, "", false, nil, fn)
 }
 
 // walkInternal is the shared engine behind WalkDir, WalkDirFS and Entries.
@@ -111,7 +112,9 @@ func (m *Matcher) WalkDirFS(fsys fs.FS, root string, fn fs.WalkDirFunc) error {
 // that directory below root after loading the rules above it. stopAtRepos
 // makes it list a nested repository as git does, for the repo walkers; the
 // check reads the OS filesystem, so only osBackend may set it.
-func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bool, fn fs.WalkDirFunc) error {
+// rootErr, if non-nil, is joined, first, into the one callback the root
+// gets with an error (the repo walkers' unreadable excludes files).
+func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bool, rootErr error, fn fs.WalkDirFunc) error {
 	// Snapshot rules and opts under the read lock so the walker is unaffected
 	// by concurrent AddPatterns calls on the receiver.
 	m.mu.RLock()
@@ -135,8 +138,24 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bo
 	// load their rules but reach fn only with an error.
 	preloading := false
 
+	// withRootErr adds rootErr to err, once.
+	withRootErr := func(err error) error {
+		e := rootErr
+		rootErr = nil
+		switch {
+		case e == nil:
+			return err
+		case err == nil:
+			return e
+		}
+		return errors.Join(e, err)
+	}
+
 	visit := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
+			if path == root {
+				err = withRootErr(err)
+			}
 			return fn(path, d, err)
 		}
 
@@ -190,6 +209,9 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bo
 			// Load this directory's ignore files into the per-walk child
 			// matcher. Most directories have none, which is not an error.
 			files, readErr := readIgnoreFiles(b.src, b.joinPath, path, child.opts.IgnoreFiles, nil)
+			if rel == "." {
+				readErr = withRootErr(readErr)
+			}
 			if len(files) > 0 {
 				basePath := rel
 				if basePath == "." {
@@ -223,7 +245,7 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bo
 		return b.walkDir(root, visit)
 	}
 	if err := checkStart(start); err != nil {
-		_ = fn("", nil, err)
+		_ = fn("", nil, withRootErr(err))
 		return nil
 	}
 
@@ -238,6 +260,9 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bo
 		fi, statErr := b.src.stat(dir, false)
 		switch {
 		case statErr != nil:
+			if i == 0 {
+				statErr = withRootErr(statErr)
+			}
 			_ = fn(dir, nil, statErr)
 			return nil
 		case i > 0 && fi.Mode()&fs.ModeSymlink != 0:
@@ -325,8 +350,9 @@ func fsBackend(fsys fs.FS) walkBackend {
 // core.excludesFile and info/exclude as LoadRepo does, then walks root.
 // The walker reads root's .gitignore and IgnoreFiles itself, once, so a bad
 // one is reported through fn like any nested ignore file instead of failing
-// the call. A failure loading the other two sources is returned before the
-// walk.
+// the call. A core.excludesFile or info/exclude that can't be read is left
+// out, as git does, and its error comes first in that same one call for
+// root; a fatal error (see LoadRepo) is returned before the walk.
 //
 // Like git ls-files, WalkRepo does not go inside a nested repository: a
 // directory below root whose .git is a git directory, a "gitdir:" file
@@ -338,13 +364,10 @@ func fsBackend(fsys fs.FS) walkBackend {
 // ignored files" behavior without managing the matcher yourself.
 func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error {
 	m, skipped, err := loadRepoConfig(root, opts)
-	if err == nil {
-		err = skipped
-	}
 	if err != nil {
 		return err
 	}
-	return m.walkInternal(osBackend, root, "", true, fn)
+	return m.walkInternal(osBackend, root, "", true, skipped, fn)
 }
 
 // Files returns a range-over-func iterator that yields the OS-native path of
@@ -429,8 +452,9 @@ func filesFromWalker(walker func(fs.WalkDirFunc) error) iter.Seq2[string, error]
 
 // RepoFiles is a convenience that combines LoadRepo and Files, with the root
 // .gitignore handled as in WalkRepo: a bad one is yielded as ("", err) and
-// iteration continues. A failure loading core.excludesFile or info/exclude is
-// yielded once and ends the iteration.
+// iteration continues. A core.excludesFile or info/exclude that can't be read
+// is yielded in that same error, and iteration continues without it; a fatal
+// error (see LoadRepo) is yielded once and ends the iteration.
 //
 // Files inside a nested repository are not yielded; see WalkRepo.
 //
@@ -444,15 +468,12 @@ func filesFromWalker(walker func(fs.WalkDirFunc) error) iter.Seq2[string, error]
 func RepoFiles(root string, opts MatcherOptions) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
 		m, skipped, err := loadRepoConfig(root, opts)
-		if err == nil {
-			err = skipped
-		}
 		if err != nil {
 			yield("", err)
 			return
 		}
 		files := filesFromWalker(func(fn fs.WalkDirFunc) error {
-			return m.walkInternal(osBackend, root, "", true, fn)
+			return m.walkInternal(osBackend, root, "", true, skipped, fn)
 		})
 		for path, walkErr := range files {
 			if !yield(path, walkErr) {
@@ -531,32 +552,30 @@ func (e Entry) SkipDir() {
 //
 // Thread-safe: see WalkDir's concurrency notes.
 func (m *Matcher) Entries(root string, wo WalkOptions) iter.Seq2[Entry, error] {
-	return m.entries(osBackend, root, wo, false)
+	return m.entries(osBackend, root, wo, false, nil)
 }
 
 // EntriesFS is the fs.FS-backed counterpart to Entries: the same walk over
 // fsys, with forward-slash paths.
 func (m *Matcher) EntriesFS(fsys fs.FS, root string, wo WalkOptions) iter.Seq2[Entry, error] {
-	return m.entries(fsBackend(fsys), root, wo, false)
+	return m.entries(fsBackend(fsys), root, wo, false, nil)
 }
 
 // RepoEntries combines LoadRepo's sources and Entries, as WalkRepo does for
-// WalkDir: core.excludesFile and info/exclude are loaded first, and a failure
-// loading them is yielded once and ends the iteration; the walker reads the
-// root's ignore files itself. A nested repository is yielded as a directory
-// with nothing under it, as in WalkRepo, and a WalkOptions.Start at or below
-// one yields nothing.
+// WalkDir: core.excludesFile and info/exclude are loaded first, and the
+// walker reads the root's ignore files itself. One that can't be read is
+// left out, as git does, and the root is yielded once with all their errors;
+// a fatal error (see LoadRepo) is yielded once and ends the iteration. A
+// nested repository is yielded as a directory with nothing under it, as in
+// WalkRepo, and a WalkOptions.Start at or below one yields nothing.
 func RepoEntries(root string, opts MatcherOptions, wo WalkOptions) iter.Seq2[Entry, error] {
 	return func(yield func(Entry, error) bool) {
 		m, skipped, err := loadRepoConfig(root, opts)
-		if err == nil {
-			err = skipped
-		}
 		if err != nil {
 			yield(Entry{}, err)
 			return
 		}
-		for e, walkErr := range m.entries(osBackend, root, wo, true) {
+		for e, walkErr := range m.entries(osBackend, root, wo, true, skipped) {
 			if !yield(e, walkErr) {
 				return
 			}
@@ -564,10 +583,10 @@ func RepoEntries(root string, opts MatcherOptions, wo WalkOptions) iter.Seq2[Ent
 	}
 }
 
-func (m *Matcher) entries(b walkBackend, root string, wo WalkOptions, stopAtRepos bool) iter.Seq2[Entry, error] {
+func (m *Matcher) entries(b walkBackend, root string, wo WalkOptions, stopAtRepos bool, rootErr error) iter.Seq2[Entry, error] {
 	dirs := startDirs(b, root, wo.Start)
 	return entriesFromWalker(dirs[len(dirs)-1], func(fn fs.WalkDirFunc) error {
-		return m.walkInternal(b, root, wo.Start, stopAtRepos, fn)
+		return m.walkInternal(b, root, wo.Start, stopAtRepos, rootErr, fn)
 	})
 }
 

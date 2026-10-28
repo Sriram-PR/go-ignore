@@ -2,6 +2,7 @@ package ignore
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -777,5 +778,119 @@ func TestWalkDir_DescendsIntoNestedRepo(t *testing.T) {
 	}
 	if !slices.Contains(entries, "nested/keep.txt") {
 		t.Errorf("Entries = %q, want nested repo contents", entries)
+	}
+}
+
+// excludeDirRepo is a repo whose info/exclude is a directory, so it can't be
+// read on any platform; badRoot also makes the root .gitignore a directory.
+func excludeDirRepo(t *testing.T, badRoot bool) string {
+	t.Helper()
+	root := t.TempDir()
+	layout := map[string]string{
+		".git/info/exclude": "DIR",
+		".gitignore":        "*.tmp\n",
+		"a.log":             "",
+		"c.tmp":             "",
+		"sub/x.txt":         "",
+	}
+	if badRoot {
+		layout[".gitignore"] = "DIR"
+	}
+	writeTree(t, root, layout)
+	return root
+}
+
+// An info/exclude that can't be read arrives in the root's one callback;
+// nil walks on, SkipDir ends the walk, and a bad root .gitignore shares the
+// call.
+func TestWalkRepo_UnreadableExcludeInRootCallback(t *testing.T) {
+	t.Run("nil walks on", func(t *testing.T) {
+		root := excludeDirRepo(t, false)
+		var rootErrs []error
+		var seen []string
+		err := WalkRepo(root, MatcherOptions{}, func(p string, d fs.DirEntry, err error) error {
+			if p == root {
+				rootErrs = append(rootErrs, err)
+				return nil
+			}
+			seen = append(seen, filepath.Base(p))
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("WalkRepo: %v", err)
+		}
+		if len(rootErrs) != 1 || !errors.Is(rootErrs[0], ErrPatternFileSkipped) ||
+			!strings.Contains(rootErrs[0].Error(), "reading exclude file ") {
+			t.Errorf("root callbacks = %v; want one with the exclude file's ErrPatternFileSkipped", rootErrs)
+		}
+		if !slices.Contains(seen, "a.log") || slices.Contains(seen, "c.tmp") {
+			t.Errorf("visited %v; want a.log and not c.tmp (root .gitignore applies)", seen)
+		}
+	})
+	t.Run("SkipDir ends the walk", func(t *testing.T) {
+		root := excludeDirRepo(t, false)
+		calls := 0
+		err := WalkRepo(root, MatcherOptions{}, func(string, fs.DirEntry, error) error {
+			calls++
+			return fs.SkipDir
+		})
+		if err != nil || calls != 1 {
+			t.Errorf("WalkRepo = %v after %d calls; want nil after 1", err, calls)
+		}
+	})
+	t.Run("bad root .gitignore shares the call", func(t *testing.T) {
+		root := excludeDirRepo(t, true)
+		var rootErrs []error
+		_ = WalkRepo(root, MatcherOptions{}, func(p string, d fs.DirEntry, err error) error {
+			if p == root {
+				rootErrs = append(rootErrs, err)
+			}
+			return nil
+		})
+		if len(rootErrs) != 1 {
+			t.Fatalf("root callbacks = %v; want one", rootErrs)
+		}
+		msg := fmt.Sprint(rootErrs[0])
+		ex, gi := strings.Index(msg, "reading exclude file "), strings.Index(msg, ".gitignore: ")
+		if ex < 0 || gi < 0 || ex > gi {
+			t.Errorf("root err = %q; want the exclude file's error, then the root .gitignore's", msg)
+		}
+	})
+}
+
+// RepoFiles and RepoEntries yield the error once and go on; with Start, the
+// preload of the root carries it.
+func TestRepoIterators_UnreadableExcludeYieldedOnce(t *testing.T) {
+	root := excludeDirRepo(t, false)
+
+	var errs []error
+	var files []string
+	for p, err := range RepoFiles(root, MatcherOptions{}) {
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		files = append(files, filepath.Base(p))
+	}
+	if len(errs) != 1 || !errors.Is(errs[0], ErrPatternFileSkipped) {
+		t.Errorf("RepoFiles errors = %v; want one ErrPatternFileSkipped", errs)
+	}
+	if !slices.Contains(files, "a.log") || !slices.Contains(files, "x.txt") {
+		t.Errorf("RepoFiles yielded %v; want a.log and x.txt", files)
+	}
+
+	errs, files = nil, nil
+	for e, err := range RepoEntries(root, MatcherOptions{}, WalkOptions{Start: "sub"}) {
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		files = append(files, filepath.Base(e.Path))
+	}
+	if len(errs) != 1 || !errors.Is(errs[0], ErrPatternFileSkipped) {
+		t.Errorf("RepoEntries errors = %v; want one ErrPatternFileSkipped", errs)
+	}
+	if !slices.Equal(files, []string{"x.txt"}) {
+		t.Errorf("RepoEntries yielded %v; want [x.txt]", files)
 	}
 }

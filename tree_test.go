@@ -534,3 +534,24 @@ func TestTree_WarningsCappedPerFile(t *testing.T) {
 		t.Errorf("handler got %+v, want 3 warnings and the drop marker for sub", got)
 	}
 }
+
+// An info/exclude that can't be read is reported by OpenTree, once, with a
+// Tree that answers from the other sources.
+func TestOpenTree_UnreadableExcludeSkipped(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		".gitignore":        "*.log\n",
+		".git/info/exclude": "DIR",
+	})
+	tr, err := OpenTree(root, MatcherOptions{})
+	if tr == nil {
+		t.Fatalf("OpenTree returned no Tree (err %v)", err)
+	}
+	if !errors.Is(err, ErrPatternFileSkipped) || !strings.Contains(err.Error(), "reading exclude file ") {
+		t.Errorf("err = %v; want ErrPatternFileSkipped naming the exclude file", err)
+	}
+	res, cerr := tr.Check("a.log")
+	if !res.Ignored || cerr != nil {
+		t.Errorf("Check(a.log) = %+v, %v; want ignored by the root .gitignore, no error", res, cerr)
+	}
+}

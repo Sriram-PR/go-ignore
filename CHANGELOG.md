@@ -10,7 +10,7 @@ The repo loaders go on without a pattern file they can't read, as git does (#17)
 
 **Behavior changes**
 
-- **`LoadRepo` and `OpenTree` return their result together with the error when only pattern files failed** (#17). A core.excludesFile, info/exclude or root `.gitignore` that can't be read (permission denied, not a regular file, over 100 MB) is left out, and the error names it; the matcher or Tree answers as `git check-ignore` does without that file. They used to return nil. A nil result now means a fatal error: a git config failure or a `.git` file that can't be read. Callers that stop on any error behave as before.
+- **`LoadRepo` and `OpenTree` return their result together with the error when only pattern files failed** (#17). A core.excludesFile or info/exclude that can't be read (permission denied, not a regular file, over 100 MB) is left out, and the error names it; for `LoadRepo` the same goes for the root `.gitignore` (`OpenTree` already reported that one per check). The matcher or Tree answers as `git check-ignore` does without that file. They used to return nil. A nil result now means a fatal error: a git config failure or a `.git` file that can't be read. Callers that stop on any error behave as before.
 - **`WalkRepo`, `RepoFiles` and `RepoEntries` report an unreadable core.excludesFile or info/exclude through the root's callback** (#17), in the one call an unreadable root `.gitignore` already got. Returning nil (or continuing the range loop) walks the tree without that file; before, the walk never started.
 
 ### v1.10.0

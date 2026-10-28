@@ -98,16 +98,16 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (m *Matcher, skipped e
 		path = resolveRelative(repoRoot, path)
 	}
 	var errs []error
-	if err := m.addExcludesFile(path, "core.excludesFile"); err != nil {
-		errs = append(errs, err)
+	if readErr := m.addExcludesFile(path, "core.excludesFile"); readErr != nil {
+		errs = append(errs, readErr)
 	}
 	dir, ok, err := resolveExcludeDir(filepath.Join(repoRoot, ".git"))
 	if err != nil {
 		return nil, nil, err
 	}
 	if ok {
-		if err := m.addExcludesFile(filepath.Join(dir, "info", "exclude"), "exclude file"); err != nil {
-			errs = append(errs, err)
+		if readErr := m.addExcludesFile(filepath.Join(dir, "info", "exclude"), "exclude file"); readErr != nil {
+			errs = append(errs, readErr)
 		}
 	}
 	return m, errors.Join(errs...), nil

@@ -894,3 +894,16 @@ func TestRepoIterators_UnreadableExcludeYieldedOnce(t *testing.T) {
 		t.Errorf("RepoEntries yielded %v; want [x.txt]", files)
 	}
 }
+
+// A bad WalkOptions.Start ends RepoEntries before the root is read; its one
+// error still carries the unreadable exclude file.
+func TestRepoEntries_BadStartKeepsExcludeError(t *testing.T) {
+	root := excludeDirRepo(t, false)
+	var errs []error
+	for _, err := range RepoEntries(root, MatcherOptions{}, WalkOptions{Start: "../x"}) {
+		errs = append(errs, err)
+	}
+	if len(errs) != 1 || !errors.Is(errs[0], ErrPatternFileSkipped) || !strings.Contains(errs[0].Error(), "walk start") {
+		t.Errorf("errors = %v; want one carrying the exclude file and the bad start", errs)
+	}
+}

@@ -337,7 +337,10 @@ func fsBackend(fsys fs.FS) walkBackend {
 // Use this when you want the standard "walk a working tree, skipping
 // ignored files" behavior without managing the matcher yourself.
 func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error {
-	m, err := loadRepoConfig(root, opts)
+	m, skipped, err := loadRepoConfig(root, opts)
+	if err == nil {
+		err = skipped
+	}
 	if err != nil {
 		return err
 	}
@@ -440,7 +443,10 @@ func filesFromWalker(walker func(fs.WalkDirFunc) error) iter.Seq2[string, error]
 //	}
 func RepoFiles(root string, opts MatcherOptions) iter.Seq2[string, error] {
 	return func(yield func(string, error) bool) {
-		m, err := loadRepoConfig(root, opts)
+		m, skipped, err := loadRepoConfig(root, opts)
+		if err == nil {
+			err = skipped
+		}
 		if err != nil {
 			yield("", err)
 			return
@@ -542,7 +548,10 @@ func (m *Matcher) EntriesFS(fsys fs.FS, root string, wo WalkOptions) iter.Seq2[E
 // one yields nothing.
 func RepoEntries(root string, opts MatcherOptions, wo WalkOptions) iter.Seq2[Entry, error] {
 	return func(yield func(Entry, error) bool) {
-		m, err := loadRepoConfig(root, opts)
+		m, skipped, err := loadRepoConfig(root, opts)
+		if err == nil {
+			err = skipped
+		}
 		if err != nil {
 			yield(Entry{}, err)
 			return

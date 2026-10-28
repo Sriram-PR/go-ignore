@@ -45,10 +45,14 @@ var gitConfigTimeout = 5 * time.Second
 // convention. Passing absolute paths or paths with a different prefix will
 // produce surprising results.
 //
-// Missing files are silently skipped; only real read failures are returned.
-// Every file must be a regular file of at most 100 MB, and the root
-// .gitignore must not be a symlink (git does not follow one); otherwise the
-// error wraps ErrPatternFileSkipped.
+// Missing files are silently skipped. Every file must be a regular file of
+// at most 100 MB, and the root .gitignore must not be a symlink (git does
+// not follow one); otherwise the error wraps ErrPatternFileSkipped. A file
+// that can't be read or is refused is left out, as git does: LoadRepo
+// returns the matcher built from the other sources together with an error
+// naming each such file (joined with errors.Join). A nil matcher means a
+// fatal error: a git config failure as above, or a .git file that can't be
+// read.
 //
 // With MatcherOptions.IgnoreFiles, the root's extra ignore files are read
 // right after the root .gitignore, under the same rules.
@@ -65,41 +69,48 @@ var gitConfigTimeout = 5 * time.Second
 //
 // Pass a zero-value MatcherOptions{} to accept all defaults.
 func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
-	m, err := loadRepoConfig(repoRoot, opts)
+	m, skipped, err := loadRepoConfig(repoRoot, opts)
 	if err != nil {
 		return nil, err
 	}
-
-	files, err := readIgnoreFiles(osSource{}, filepath.Join, repoRoot, m.opts.IgnoreFiles, nil)
-	if err != nil {
-		return nil, err
-	}
+	files, readErr := readIgnoreFiles(osSource{}, filepath.Join, repoRoot, m.opts.IgnoreFiles, nil)
 	for _, f := range files {
 		m.addPatternsFromSource("", f.content, f.path)
 	}
-	return m, nil
+	return m, errors.Join(skipped, readErr)
 }
 
 // loadRepoConfig loads LoadRepo's sources except the root .gitignore:
 // core.excludesFile and info/exclude. WalkRepo and RepoFiles leave the
 // root .gitignore to the walker, which reports a bad one through fn.
-func loadRepoConfig(repoRoot string, opts MatcherOptions) (*Matcher, error) {
-	m := NewWithOptions(opts)
+//
+// err is fatal (git config, a bad .git file) and comes with a nil m. A
+// pattern file that can't be read is left out, as git does, and its error
+// joined into skipped.
+func loadRepoConfig(repoRoot string, opts MatcherOptions) (m *Matcher, skipped error, err error) {
+	m = NewWithOptions(opts)
 	path, err := effectiveExcludesFile(repoRoot)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// git reads a relative value from the top of the work tree.
 	if path != "" {
 		path = resolveRelative(repoRoot, path)
 	}
+	var errs []error
 	if err := m.addExcludesFile(path, "core.excludesFile"); err != nil {
-		return nil, err
+		errs = append(errs, err)
 	}
-	if err := m.AddExcludePatterns(filepath.Join(repoRoot, ".git")); err != nil {
-		return nil, err
+	dir, ok, err := resolveExcludeDir(filepath.Join(repoRoot, ".git"))
+	if err != nil {
+		return nil, nil, err
 	}
-	return m, nil
+	if ok {
+		if err := m.addExcludesFile(filepath.Join(dir, "info", "exclude"), "exclude file"); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return m, errors.Join(errs...), nil
 }
 
 // AddGlobalPatterns loads the user's global gitignore file and adds its

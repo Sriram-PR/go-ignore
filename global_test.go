@@ -2,6 +2,7 @@ package ignore
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -727,8 +728,8 @@ func TestLoadRepo_UnreadableGitFileErrors(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(gitFile, 0o644) })
 
-	if _, err := LoadRepo(repo, MatcherOptions{}); err == nil {
-		t.Error("LoadRepo succeeded; want an error for an unreadable .git file")
+	if m, err := LoadRepo(repo, MatcherOptions{}); err == nil || m != nil {
+		t.Errorf("LoadRepo = %v, %v; want no matcher and an error for an unreadable .git file", m, err)
 	}
 }
 
@@ -742,11 +743,16 @@ func TestLoadRepo_SymlinkedRootGitignoreRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := t.TempDir()
+	writeTree(t, repo, map[string]string{".git/info/exclude": "*.tmp\n"})
 	if err := os.Symlink(outside, filepath.Join(repo, ".gitignore")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := LoadRepo(repo, MatcherOptions{}); !errors.Is(err, ErrPatternFileSkipped) {
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if !errors.Is(err, ErrPatternFileSkipped) {
 		t.Errorf("LoadRepo err = %v, want ErrPatternFileSkipped", err)
+	}
+	if m == nil || !m.Match("a.tmp", false) || m.Match("a.log", false) {
+		t.Errorf("matcher %v: want a.tmp ignored by info/exclude and a.log not (symlinked .gitignore unread)", m)
 	}
 }
 
@@ -798,5 +804,35 @@ func TestGlobalIgnore_NoHomeDir(t *testing.T) {
 	}
 	if err := New().AddGlobalPatterns(); err != nil {
 		t.Errorf("AddGlobalPatterns: %v", err)
+	}
+}
+
+// info/exclude and the core.excludesFile target as directories are both
+// left out and reported together; the root .gitignore still applies.
+func TestLoadRepo_DirectoryPatternFilesSkipped(t *testing.T) {
+	home := isolateGitConfig(t)
+	repo := t.TempDir()
+	runGit(t, repo, "init", "-q")
+	writeTree(t, repo, map[string]string{".gitignore": "*.log\n"})
+	exclude := filepath.Join(repo, ".git", "info", "exclude")
+	if err := os.RemoveAll(exclude); err != nil {
+		t.Fatal(err)
+	}
+	writeTree(t, repo, map[string]string{".git/info/exclude": "DIR"})
+	writeTree(t, home, map[string]string{"ex-dir": "DIR"})
+	setExcludes(t, filepath.Join(home, "global.cfg"), filepath.Join(home, "ex-dir"))
+
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if m == nil {
+		t.Fatalf("LoadRepo returned no matcher (err %v)", err)
+	}
+	if !errors.Is(err, ErrPatternFileSkipped) {
+		t.Errorf("err = %v; want ErrPatternFileSkipped", err)
+	}
+	if msg := fmt.Sprint(err); !strings.Contains(msg, "ex-dir") || !strings.Contains(msg, "reading exclude file ") {
+		t.Errorf("err = %q; want it to name core.excludesFile's ex-dir and the exclude file", msg)
+	}
+	if !m.Match("a.log", false) {
+		t.Error("a.log not ignored; want the root .gitignore applied")
 	}
 }

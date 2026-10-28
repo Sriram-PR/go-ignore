@@ -82,7 +82,10 @@ func (m *Matcher) TreeFS(fsys fs.FS, root string) *Tree {
 // read is reported by each check, like any nested one. Use it to check single
 // paths the way git check-ignore does.
 func OpenTree(root string, opts MatcherOptions) (*Tree, error) {
-	m, err := loadRepoConfig(root, opts)
+	m, skipped, err := loadRepoConfig(root, opts)
+	if err == nil {
+		err = skipped
+	}
 	if err != nil {
 		return nil, err
 	}

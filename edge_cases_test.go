@@ -4,6 +4,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 // TestEdgeCases_LineEndings tests various line ending formats
@@ -523,6 +524,98 @@ func TestEdgeCases_DeepPath_BoundedByDepthCap(t *testing.T) {
 	}
 	if !m.Match(buildDeepPath(MaxPathDepth-1, "x.log"), false) {
 		t.Errorf("path of exactly MaxPathDepth segments did not match *.log")
+	}
+}
+
+// Glob cost grows with segment length, so a path with a segment longer than
+// MaxSegmentLength short-circuits to no match, wherever the segment is.
+func TestEdgeCases_LongSegment_BoundedBySegmentCap(t *testing.T) {
+	atCap := strings.Repeat("a", MaxSegmentLength)
+	overCap := atCap + "a"
+
+	m := New()
+	m.AddPatterns("", []byte("*\n"))
+	if !m.Match(atCap, false) {
+		t.Errorf("segment of exactly MaxSegmentLength bytes did not match *")
+	}
+	if m.Match(overCap, false) {
+		t.Errorf("segment of %d bytes matched *; past MaxSegmentLength it should short-circuit", MaxSegmentLength+1)
+	}
+
+	m = New()
+	m.AddPatterns("", []byte("*.log\n"))
+	if !m.Match("dir/"+atCap+"/x.log", false) {
+		t.Errorf("middle segment of exactly MaxSegmentLength bytes: x.log did not match *.log")
+	}
+	if m.Match("dir/"+overCap+"/x.log", false) {
+		t.Errorf("middle segment over MaxSegmentLength: x.log matched *.log")
+	}
+	if r := m.MatchWithReason("dir/"+overCap+"/x.log", false); r != (MatchResult{}) {
+		t.Errorf("MatchWithReason over cap = %+v, want zero value", r)
+	}
+	if e := m.Explain("dir/"+overCap+"/x.log", false); e != (Explanation{}) {
+		t.Errorf("Explain over cap = %+v, want zero value", e)
+	}
+}
+
+// Issue #8 repro: one class-heavy rule against a 1 MB segment took 7.1 s.
+func TestEdgeCases_LongSegment_Issue8(t *testing.T) {
+	m := New()
+	m.AddPatterns("", []byte("*"+strings.Repeat("[a]", 1333)+"b\n"))
+	if m.Match(strings.Repeat("a", 1<<20)+"b", false) {
+		t.Error("1 MB segment matched; past MaxSegmentLength it should short-circuit")
+	}
+}
+
+func TestEdgeCases_LongSegment_CaseInsensitive(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{CaseInsensitive: true})
+	m.AddPatterns("", []byte("a*\n"))
+	atCap := "A" + strings.Repeat("b", MaxSegmentLength-1)
+	if !m.Match(atCap, false) {
+		t.Errorf("mixed-case segment of exactly MaxSegmentLength bytes did not match a*")
+	}
+	if m.Match(atCap+"B", false) {
+		t.Errorf("mixed-case segment over MaxSegmentLength matched a*")
+	}
+}
+
+// Tree answers from preparePath too: zero result, no error, no disk access
+// for the over-long name.
+func TestEdgeCases_LongSegment_Tree(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{".gitignore": "*.tmp\n"})
+	tr := New().Tree(root)
+
+	atCap := strings.Repeat("x", MaxSegmentLength-len(".tmp")) + ".tmp"
+	res, err := tr.CheckIsDir(atCap, false)
+	if err != nil || !res.Ignored {
+		t.Errorf("CheckIsDir(at cap) = %+v, %v; want ignored by *.tmp, no error", res, err)
+	}
+	res, err = tr.CheckIsDir("x"+atCap, false)
+	if err != nil || res != (MatchResult{}) {
+		t.Errorf("CheckIsDir(over cap) = %+v, %v; want zero result, no error", res, err)
+	}
+}
+
+// Walkers see an over-cap name as not ignored. Only an fs.FS can hold one.
+func TestEdgeCases_LongSegment_FilesFS(t *testing.T) {
+	long := strings.Repeat("a", MaxSegmentLength+1)
+	fsys := fstest.MapFS{
+		long:    {Data: []byte("x")},
+		"short": {Data: []byte("x")},
+	}
+	m := New()
+	m.AddPatterns("", []byte("*\n"))
+
+	var got []string
+	for path, err := range m.FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("FilesFS: %v", err)
+		}
+		got = append(got, path)
+	}
+	if len(got) != 1 || got[0] != long {
+		t.Errorf("FilesFS yielded %d paths (first %.20q), want only the %d-byte name", len(got), got, len(long))
 	}
 }
 

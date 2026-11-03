@@ -584,6 +584,9 @@ func (m *Matcher) Warnings() []ParseWarning {
 // can re-include it: Match checks each parent directory, shallowest first,
 // before taking the path's own verdict. Cost therefore grows with path depth,
 // one pass over the rules per parent directory.
+//
+// A path deeper than MaxPathDepth, or with a segment longer than
+// MaxSegmentLength, matches nothing.
 // Thread-safe: can be called concurrently.
 func (m *Matcher) Match(path string, isDir bool) bool {
 	result := m.MatchWithReason(path, isDir)
@@ -691,9 +694,10 @@ func parentIgnored(rules, overrides []rule, path string, segs []string) (MatchRe
 
 // preparePath normalizes path and splits it into segments, appending to buf.
 // ok is false for a path that matches nothing: empty, resolving outside the
-// root, or deeper than MaxPathDepth. Under icase, match and segs are lowered
-// once here instead of per segment per rule; disk keeps the caller's
-// spelling, for reading files.
+// root, deeper than MaxPathDepth, or with a segment longer than
+// MaxSegmentLength. Under icase, match and segs are lowered once here
+// instead of per segment per rule; disk keeps the caller's spelling, for
+// reading files.
 func preparePath(path string, icase bool, buf []string) (disk, match string, segs []string, ok bool) {
 	path = normalizePath(path)
 	if path == "" {
@@ -705,6 +709,15 @@ func preparePath(path string, icase bool, buf []string) (disk, match string, seg
 	// pathologically slow. See MaxPathDepth's docs.
 	if len(segs) > MaxPathDepth {
 		return "", "", nil, false
+	}
+	// Glob cost grows with segment length; see MaxSegmentLength. A path no
+	// longer than the cap can't hold an over-long segment.
+	if len(path) > MaxSegmentLength {
+		for _, s := range segs {
+			if len(s) > MaxSegmentLength {
+				return "", "", nil, false
+			}
+		}
 	}
 	disk, match = path, path
 	if icase {

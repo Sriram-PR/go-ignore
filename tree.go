@@ -124,7 +124,8 @@ func (t *Tree) Check(path string) (MatchResult, error) {
 // accurate, as in Match.
 //
 // path is normalized as in Match. One that is empty, resolves outside the
-// root, or is deeper than MaxPathDepth matches nothing.
+// root, is deeper than MaxPathDepth, or has a segment longer than
+// MaxSegmentLength matches nothing.
 //
 // As in git, a path inside an ignored directory is ignored, and the result
 // names the rule that ignored the outermost such directory.

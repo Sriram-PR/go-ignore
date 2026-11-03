@@ -34,6 +34,23 @@ const HardMaxBacktrackIterations = 10_000_000
 // MatcherOptions field.
 const MaxPathDepth = 4096
 
+// MaxSegmentLength is the hard upper bound, in bytes, on any one segment of
+// a path supplied to Match / MatchWithReason / Explain or to a Tree, or met
+// by a walker, measured after normalization. A path with a longer segment
+// short-circuits to "no match" without evaluating any rules, as with
+// MaxPathDepth. The cap exists because glob cost per rule grows with pattern
+// length times segment length, so arbitrarily long segments (constructible
+// by fuzzers or malicious callers) would otherwise be a denial-of-service
+// vector.
+//
+// 4096 is far above any real filesystem name (NAME_MAX is 255 bytes on
+// Linux and macOS; a Windows name of 255 UTF-16 units is at most 765 UTF-8
+// bytes) and equals DefaultMaxPatternLength. With MaxPatternLength -1, a
+// pattern with a literal segment longer than this never matches, since only
+// an over-cap path could. If you have a legitimate use case for longer
+// segments, please open an issue describing it.
+const MaxSegmentLength = 4096
+
 // matchRule checks if a path matches a single rule.
 // path should already be normalized (and pre-lowered if case-insensitive).
 // pathSegments is the path split by "/".

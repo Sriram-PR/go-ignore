@@ -615,7 +615,7 @@ func TestEdgeCases_LongSegment_FilesFS(t *testing.T) {
 		got = append(got, path)
 	}
 	if len(got) != 1 || got[0] != long {
-		t.Errorf("FilesFS yielded %d paths (first %.20q), want only the %d-byte name", len(got), got, len(long))
+		t.Errorf("FilesFS yielded %d paths %.20q, want only the %d-byte name", len(got), got, len(long))
 	}
 }
 

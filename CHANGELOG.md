@@ -4,6 +4,18 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.12.0
+
+Matching cost is bounded in segment length, as it already was in depth (#8). Only additions to the exported API.
+
+**Added**
+
+- **`MaxSegmentLength`** (#8). Exported constant, 4096 bytes, next to `MaxPathDepth`. Like that cap it may be raised, never lowered.
+
+**Behavior changes**
+
+- **A path with a segment longer than 4096 bytes matches nothing** (#8), in `Match`, `MatchWithReason`, `Explain`, `Tree` and the walkers, as a path deeper than `MaxPathDepth` already did. Glob cost per rule grows with pattern length times segment length: one class-heavy rule against a 1 MB segment took 7.1 s. Real filesystems cap a name at 255 bytes (765 UTF-8 bytes on Windows), so only callers passing untrusted paths, or `fs.FS` sources with such names, see a difference. Walkers yield such an entry as not ignored.
+
 ### v1.11.0
 
 The repo loaders go on without a pattern file they can't read, as git does (#17). No exported API changes.
@@ -585,7 +597,7 @@ Use this checklist before tagging a new release.
 #### Stability Audit
 
 - [ ] No breaking changes to the API surface listed in README's "Stability Guarantees" section
-- [ ] If `MaxPathDepth` changed, ensure it was *raised*, never lowered
+- [ ] If `MaxPathDepth` or `MaxSegmentLength` changed, ensure it was *raised*, never lowered
 
 #### Tooling
 

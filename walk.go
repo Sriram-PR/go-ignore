@@ -369,7 +369,8 @@ func fsBackend(fsys fs.FS) walkBackend {
 }
 
 // WalkRepo is a convenience that combines LoadRepo and WalkDir: it loads
-// core.excludesFile and info/exclude as LoadRepo does, then walks root.
+// core.excludesFile and info/exclude, and reads core.ignorecase, as LoadRepo
+// does, then walks root.
 // The walker reads root's .gitignore and IgnoreFiles itself, once, so a bad
 // one is reported through fn like any nested ignore file instead of failing
 // the call. A core.excludesFile or info/exclude that can't be read is left
@@ -584,12 +585,13 @@ func (m *Matcher) EntriesFS(fsys fs.FS, root string, wo WalkOptions) iter.Seq2[E
 }
 
 // RepoEntries combines LoadRepo's sources and Entries, as WalkRepo does for
-// WalkDir: core.excludesFile and info/exclude are loaded first, and the
-// walker reads the root's ignore files itself. One that can't be read is
-// left out, as git does, and the root is yielded once with all their errors;
-// a fatal error (see LoadRepo) is yielded once and ends the iteration. A
-// nested repository is yielded as a directory with nothing under it, as in
-// WalkRepo, and a WalkOptions.Start at or below one yields nothing.
+// WalkDir: core.excludesFile and info/exclude are loaded first (and
+// core.ignorecase read), and the walker reads the root's ignore files itself.
+// One that can't be read is left out, as git does, and the root is yielded
+// once with all their errors; a fatal error (see LoadRepo) is yielded once
+// and ends the iteration. A nested repository is yielded as a directory with
+// nothing under it, as in WalkRepo, and a WalkOptions.Start at or below one
+// yields nothing.
 func RepoEntries(root string, opts MatcherOptions, wo WalkOptions) iter.Seq2[Entry, error] {
 	return func(yield func(Entry, error) bool) {
 		m, skipped, err := loadRepoConfig(root, opts)

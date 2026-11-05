@@ -39,6 +39,10 @@ var gitConfigTimeout = 5 * time.Second
 // without the repository's own config. Any other git config failure, such as a malformed
 // system or global gitconfig, is returned as an error.
 //
+// core.ignorecase is read the same way. When it is true, matching is
+// case-insensitive, as if MatcherOptions.CaseInsensitive were set. A value
+// git rejects, such as "maybe", is an error, as in git.
+//
 // repoRoot locates the repository and the two on-disk files above; it is NOT
 // stripped from paths passed to Match. Paths supplied to Match must be
 // relative to repoRoot (e.g., "build/output.js"), matching git's own
@@ -51,8 +55,8 @@ var gitConfigTimeout = 5 * time.Second
 // that can't be read or is refused is left out, as git does: LoadRepo
 // returns the matcher built from the other sources together with an error
 // naming each such file (joined with errors.Join). A nil matcher means a
-// fatal error: a git config failure as above, or a .git file that can't be
-// read.
+// fatal error: a git config failure as above (core.ignorecase included), or
+// a .git file that can't be read.
 //
 // With MatcherOptions.IgnoreFiles, the root's extra ignore files are read
 // right after the root .gitignore, under the same rules.
@@ -92,6 +96,7 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (m *Matcher, skipped e
 	if err != nil {
 		return nil, nil, err
 	}
+	opts.CaseInsensitive = opts.CaseInsensitive || cfg.ignoreCase
 	m = NewWithOptions(opts)
 	path := cfg.excludesFile
 	// git reads a relative value from the top of the work tree.
@@ -313,6 +318,8 @@ type repoConfig struct {
 	// scope sets it. "" means a value set to the empty string, which loads
 	// nothing.
 	excludesFile string
+	// ignoreCase is core.ignorecase; false when unset.
+	ignoreCase bool
 }
 
 // repoGitConfig reads repoConfig for repoRoot with git config.
@@ -346,7 +353,14 @@ func repoGitConfig(repoRoot string) (repoConfig, error) {
 	if !found {
 		path = xdgGlobalIgnorePath()
 	}
-	return repoConfig{excludesFile: path}, nil
+	// Asked in the mode core.excludesFile settled on, so a rejected
+	// repository's config stays skipped. git exits 128 on a value it can't
+	// parse as a boolean, an error here as it is for git itself.
+	ignoreCase, found, err := get("--type=bool", "--get", "core.ignorecase")
+	if err != nil {
+		return repoConfig{}, fmt.Errorf("reading core.ignorecase: %w", err)
+	}
+	return repoConfig{excludesFile: path, ignoreCase: found && ignoreCase == "true"}, nil
 }
 
 // gitConfigGet runs `git config <args...>` in dir ("" for the current

@@ -76,9 +76,9 @@ func (m *Matcher) TreeFS(fsys fs.FS, root string) *Tree {
 }
 
 // OpenTree returns a Tree for the repository work tree at root, loaded like
-// WalkRepo: core.excludesFile and info/exclude as LoadRepo loads them, then
-// every .gitignore and IgnoreFiles file from root down, read on demand. Use
-// it to check single paths the way git check-ignore does.
+// WalkRepo: core.excludesFile, info/exclude and core.ignorecase as LoadRepo
+// reads them, then every .gitignore and IgnoreFiles file from root down, read
+// on demand. Use it to check single paths the way git check-ignore does.
 //
 // If core.excludesFile or info/exclude can't be read, it is left out, as git
 // does, and OpenTree returns the Tree together with an error naming it; a

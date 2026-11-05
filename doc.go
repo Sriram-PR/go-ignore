@@ -57,8 +57,9 @@
 //
 // # Differences from git
 //
-// With MatcherOptions.CaseInsensitive, the whole pattern is folded to lower
-// case, character classes and escaped letters included. git (core.ignorecase)
+// With MatcherOptions.CaseInsensitive (which the repo loaders turn on when
+// core.ignorecase is true), the whole pattern is folded to lower case,
+// character classes and escaped letters included. git (core.ignorecase)
 // leaves class members and escaped letters as written, so in git [A]x matches
 // neither Ax nor ax and \Fo* matches nothing; its ranges and [:upper:] also
 // accept extra letters in that mode. go-ignore and git both fold ASCII

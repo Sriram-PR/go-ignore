@@ -177,7 +177,7 @@ Full API reference, runnable examples, resource-limit tuning for untrusted input
 Key entry points:
 
 - `New` / `NewWithOptions`: construct a matcher (options cover case sensitivity and resource limits).
-- `LoadRepo`: load `core.excludesFile` (resolved as git does) + `.git/info/exclude` + root `.gitignore` in one call.
+- `LoadRepo`: load `core.excludesFile` (resolved as git does) + `.git/info/exclude` + root `.gitignore` in one call, honoring `core.ignorecase`.
 - `WalkDir` / `WalkRepo` / `Files` / `RepoFiles` / `WalkDirFS` / `FilesFS`: walk a tree (OS or `fs.FS`), skipping ignored files.
 - `Entries` / `EntriesFS` / `RepoEntries`: iterate files and directories, with `SkipDir` and a `Start` subdirectory.
 - `OpenTree` / `Tree.Check`: answer for one path as `git check-ignore` does, reading nested `.gitignore` files on demand.

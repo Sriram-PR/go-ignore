@@ -292,3 +292,174 @@ func TestAddSystemPatterns_FollowsInclude(t *testing.T) {
 		t.Error("a.inc not ignored; want the included core.excludesFile loaded")
 	}
 }
+
+// repoLoaderVerdicts reports, for each repo loader, whether rel (a file under
+// repo) is ignored: by Match or Check, or by a walker not yielding it.
+func repoLoaderVerdicts(t *testing.T, repo, rel string) map[string]bool {
+	t.Helper()
+	target := filepath.Join(repo, filepath.FromSlash(rel))
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	tr, err := OpenTree(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("OpenTree: %v", err)
+	}
+	res, err := tr.Check(rel)
+	if err != nil {
+		t.Fatalf("Check(%q): %v", rel, err)
+	}
+	walkIgnored := true
+	err = WalkRepo(repo, MatcherOptions{}, func(p string, _ fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if p == target {
+			walkIgnored = false
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WalkRepo: %v", err)
+	}
+	filesIgnored := true
+	for p, err := range RepoFiles(repo, MatcherOptions{}) {
+		if err != nil {
+			t.Fatalf("RepoFiles: %v", err)
+		}
+		if p == target {
+			filesIgnored = false
+		}
+	}
+	entriesIgnored := true
+	for e, err := range RepoEntries(repo, MatcherOptions{}, WalkOptions{}) {
+		if err != nil {
+			t.Fatalf("RepoEntries: %v", err)
+		}
+		if e.Path == target {
+			entriesIgnored = false
+		}
+	}
+	return map[string]bool{
+		"LoadRepo":    m.Match(rel, false),
+		"OpenTree":    res.Ignored,
+		"WalkRepo":    walkIgnored,
+		"RepoFiles":   filesIgnored,
+		"RepoEntries": entriesIgnored,
+	}
+}
+
+// Every repo loader folds case when core.ignorecase is true, as git does,
+// and not when it is false. false is set explicitly: git init writes true on
+// macOS and Windows.
+func TestRepoLoaders_FollowCoreIgnorecase(t *testing.T) {
+	for _, value := range []string{"true", "false"} {
+		t.Run(value, func(t *testing.T) {
+			home := isolateGitConfig(t)
+			runGit(t, home, "init", "-q", "repo")
+			repo := filepath.Join(home, "repo")
+			runGit(t, repo, "config", "core.ignorecase", value)
+			writeTree(t, home, map[string]string{"repo/.gitignore": "*.log\n", "repo/A.LOG": ""})
+
+			want := value == "true"
+			if git := gitIgnores(t, repo, "A.LOG"); git != want {
+				t.Fatalf("git ignores A.LOG = %v, want %v", git, want)
+			}
+			for name, ignored := range repoLoaderVerdicts(t, repo, "A.LOG") {
+				if ignored != want {
+					t.Errorf("%s: A.LOG ignored = %v, want %v", name, ignored, want)
+				}
+			}
+		})
+	}
+}
+
+// Without a repository or any config, matching stays case-sensitive.
+func TestLoadRepo_NoRepoIsCaseSensitive(t *testing.T) {
+	home := isolateGitConfig(t)
+	writeTree(t, home, map[string]string{"repo/.gitignore": "*.log\n"})
+	m, err := LoadRepo(filepath.Join(home, "repo"), MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if m.Match("A.LOG", false) {
+		t.Error("A.LOG ignored by *.log with no core.ignorecase; want case-sensitive")
+	}
+}
+
+// CaseInsensitive in the options still applies when core.ignorecase is false.
+func TestLoadRepo_CaseInsensitiveOptionWins(t *testing.T) {
+	home := isolateGitConfig(t)
+	runGit(t, home, "init", "-q", "repo")
+	repo := filepath.Join(home, "repo")
+	runGit(t, repo, "config", "core.ignorecase", "false")
+	writeTree(t, home, map[string]string{"repo/.gitignore": "*.log\n"})
+	m, err := LoadRepo(repo, MatcherOptions{CaseInsensitive: true})
+	if err != nil {
+		t.Fatalf("LoadRepo: %v", err)
+	}
+	if !m.Match("A.LOG", false) {
+		t.Error("A.LOG not ignored with CaseInsensitive: true; want the option to apply")
+	}
+}
+
+// core.ignorecase is read from every scope, as git does, and still from the
+// user's config when git rejects the repository.
+func TestLoadRepo_GlobalCoreIgnorecase(t *testing.T) {
+	for _, name := range []string{"no repository", "rejected repository"} {
+		t.Run(name, func(t *testing.T) {
+			home := isolateGitConfig(t)
+			files := map[string]string{
+				"global.cfg":      "[core]\n\tignorecase = true\n",
+				"repo/.gitignore": "*.log\n",
+			}
+			if name == "rejected repository" {
+				files["repo/.git"] = "not a pointer\n"
+			}
+			writeTree(t, home, files)
+			m, err := LoadRepo(filepath.Join(home, "repo"), MatcherOptions{})
+			if err != nil {
+				t.Fatalf("LoadRepo: %v", err)
+			}
+			if !m.Match("A.LOG", false) {
+				t.Error("A.LOG not ignored; want the global core.ignorecase applied")
+			}
+		})
+	}
+}
+
+// git dies on a core.ignorecase it can't parse, so the repo loaders fail.
+func TestRepoLoaders_BadCoreIgnorecase(t *testing.T) {
+	home := isolateGitConfig(t)
+	runGit(t, home, "init", "-q", "repo")
+	repo := filepath.Join(home, "repo")
+	runGit(t, repo, "config", "core.ignorecase", "maybe")
+
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if m != nil || err == nil || !strings.Contains(err.Error(), "core.ignorecase") {
+		t.Errorf("LoadRepo = %v, %v; want nil and an error naming core.ignorecase", m, err)
+	}
+	tr, err := OpenTree(repo, MatcherOptions{})
+	if tr != nil || err == nil || !strings.Contains(err.Error(), "core.ignorecase") {
+		t.Errorf("OpenTree = %v, %v; want nil and an error naming core.ignorecase", tr, err)
+	}
+}
+
+// Without git, core.ignorecase can't be read and counts as false.
+func TestLoadRepo_NoGitIsCaseSensitive(t *testing.T) {
+	home := isolateGitConfig(t)
+	runGit(t, home, "init", "-q", "repo")
+	repo := filepath.Join(home, "repo")
+	runGit(t, repo, "config", "core.ignorecase", "true")
+	writeTree(t, home, map[string]string{"repo/.gitignore": "*.log\n"})
+	t.Setenv("PATH", t.TempDir())
+
+	m, err := LoadRepo(repo, MatcherOptions{})
+	if err != nil {
+		t.Fatalf("LoadRepo without git: %v", err)
+	}
+	if m.Match("A.LOG", false) {
+		t.Error("A.LOG ignored without git; want core.ignorecase treated as unset")
+	}
+}

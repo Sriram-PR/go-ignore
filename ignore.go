@@ -121,7 +121,12 @@ type MatcherOptions struct {
 
 	// CaseInsensitive enables case-insensitive matching. Only ASCII letters
 	// are folded, as in git.
-	// Default: false (case-sensitive, matching Git's default behavior).
+	// Default: false. The repo loaders (LoadRepo, WalkRepo, RepoFiles,
+	// RepoEntries, OpenTree) also turn it on when the repository's
+	// core.ignorecase is true, as git does; git init sets that on
+	// case-insensitive filesystems, the default on macOS and Windows.
+	// Options can't turn it off then: set core.ignorecase=false in git
+	// config, as with git.
 	// Note: This affects pattern matching only, not filesystem behavior.
 	CaseInsensitive bool
 

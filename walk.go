@@ -314,13 +314,35 @@ var osBackend = walkBackend{
 	walkDir:  filepath.WalkDir,
 	src:      osSource{},
 	joinPath: filepath.Join,
-	relPath: func(root, p string) (string, error) {
-		rel, err := filepath.Rel(root, p)
+	relPath:  osRelPath,
+}
+
+// osRelPath is filepath.Rel for the paths filepath.WalkDir builds: root as
+// given, then children Join'ed onto it, so prefixed by Clean(root). Stripping
+// that prefix avoids Rel's cost on every entry; anything else falls back to Rel.
+func osRelPath(root, p string) (string, error) {
+	if p == root {
+		return ".", nil
+	}
+	clean := filepath.Clean(root)
+	var rel string
+	switch {
+	case clean == ".":
+		rel = p
+	case !strings.HasPrefix(p, clean):
+	case clean[len(clean)-1] == filepath.Separator:
+		rel = p[len(clean):]
+	case len(p) > len(clean) && p[len(clean)] == filepath.Separator:
+		rel = p[len(clean)+1:]
+	}
+	if rel == "" {
+		r, err := filepath.Rel(root, p)
 		if err != nil {
 			return "", err
 		}
-		return filepath.ToSlash(rel), nil
-	},
+		rel = r
+	}
+	return filepath.ToSlash(rel), nil
 }
 
 // fsBackend builds a walkBackend over the given fs.FS. fs.WalkDir paths are

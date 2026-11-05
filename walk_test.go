@@ -907,3 +907,26 @@ func TestRepoEntries_BadStartKeepsExcludeError(t *testing.T) {
 		t.Errorf("errors = %v; want one carrying the exclude file and the bad start", errs)
 	}
 }
+
+// osBackend.relPath strips the root prefix instead of calling filepath.Rel
+// per entry; it must agree with Rel for every root filepath.WalkDir accepts,
+// on the paths WalkDir builds from it (root as given, then Join'ed children).
+func TestOSBackendRelPath(t *testing.T) {
+	roots := []string{".", "./", "a", "a/", "./a", "a/../b", "a//b", t.TempDir()}
+	if runtime.GOOS != "windows" {
+		roots = append(roots, "/")
+	}
+	for _, root := range roots {
+		paths := []string{root, filepath.Join(root, "x"), filepath.Join(root, "x", "y.txt")}
+		for _, p := range paths {
+			want, err := filepath.Rel(root, p)
+			if err != nil {
+				t.Fatalf("filepath.Rel(%q, %q): %v", root, p, err)
+			}
+			got, err := osBackend.relPath(root, p)
+			if err != nil || got != filepath.ToSlash(want) {
+				t.Errorf("relPath(%q, %q) = %q, %v; want %q", root, p, got, err, filepath.ToSlash(want))
+			}
+		}
+	}
+}

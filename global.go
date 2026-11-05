@@ -88,11 +88,12 @@ func LoadRepo(repoRoot string, opts MatcherOptions) (*Matcher, error) {
 // pattern file that can't be read is left out, as git does, and its error
 // joined into skipped.
 func loadRepoConfig(repoRoot string, opts MatcherOptions) (m *Matcher, skipped error, err error) {
-	m = NewWithOptions(opts)
-	path, err := effectiveExcludesFile(repoRoot)
+	cfg, err := repoGitConfig(repoRoot)
 	if err != nil {
 		return nil, nil, err
 	}
+	m = NewWithOptions(opts)
+	path := cfg.excludesFile
 	// git reads a relative value from the top of the work tree.
 	if path != "" {
 		path = resolveRelative(repoRoot, path)
@@ -143,7 +144,7 @@ func loadRepoConfig(repoRoot string, opts MatcherOptions) (m *Matcher, skipped e
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddGlobalPatterns() error {
-	path, found, err := gitConfigGet("", "--global", "--includes", "--get", "core.excludesFile")
+	path, found, err := gitConfigGet("", "--path", "--global", "--includes", "--get", "core.excludesFile")
 	if err != nil && !isExitError(err) {
 		return fmt.Errorf("resolving global gitignore path: %w", err)
 	}
@@ -176,7 +177,7 @@ func (m *Matcher) AddGlobalPatterns() error {
 //
 // Thread-safe: can be called concurrently with Match.
 func (m *Matcher) AddSystemPatterns() error {
-	path, _, err := gitConfigGet("", "--system", "--includes", "--get", "core.excludesFile")
+	path, _, err := gitConfigGet("", "--path", "--system", "--includes", "--get", "core.excludesFile")
 	if err != nil && !isExitError(err) {
 		return fmt.Errorf("resolving system gitignore path: %w", err)
 	}
@@ -305,11 +306,17 @@ func resolveRelative(base, p string) string {
 	return filepath.Join(base, p)
 }
 
-// effectiveExcludesFile returns the core.excludesFile git uses for repoRoot:
-// the last value across every config scope, includes followed, or the XDG
-// default when no scope sets it. "" means a value set to the empty string,
-// which loads nothing.
-func effectiveExcludesFile(repoRoot string) (string, error) {
+// repoConfig is the git config the repo loaders read for a repository.
+type repoConfig struct {
+	// excludesFile is the core.excludesFile git uses: the last value across
+	// every config scope, includes followed, or the XDG default when no
+	// scope sets it. "" means a value set to the empty string, which loads
+	// nothing.
+	excludesFile string
+}
+
+// repoGitConfig reads repoConfig for repoRoot with git config.
+func repoGitConfig(repoRoot string) (repoConfig, error) {
 	// git cannot run in a directory that does not exist, and LoadRepo
 	// tolerates a missing repoRoot, so ask from its nearest existing ancestor.
 	dir := repoRoot
@@ -323,25 +330,28 @@ func effectiveExcludesFile(repoRoot string) (string, error) {
 		}
 		dir = parent
 	}
-	path, found, err := gitConfigGet(dir, "--get", "core.excludesFile")
+	get := func(args ...string) (string, bool, error) { return gitConfigGet(dir, args...) }
+	path, found, err := get("--path", "--get", "core.excludesFile")
 	if isExitError(err) {
 		// git refuses to run in a repository whose .git it rejects (a
 		// malformed .git file, a gitdir pointer to a non-repository). Ask
 		// again without the repository, so its config alone is skipped; a
 		// malformed system or global config still fails here.
-		path, found, err = gitConfigGetNoRepo("--get", "core.excludesFile")
+		get = gitConfigGetNoRepo
+		path, found, err = get("--path", "--get", "core.excludesFile")
 	}
 	if err != nil {
-		return "", fmt.Errorf("resolving core.excludesFile: %w", err)
+		return repoConfig{}, fmt.Errorf("resolving core.excludesFile: %w", err)
 	}
-	if found {
-		return path, nil
+	if !found {
+		path = xdgGlobalIgnorePath()
 	}
-	return xdgGlobalIgnorePath(), nil
+	return repoConfig{excludesFile: path}, nil
 }
 
-// gitConfigGet runs `git config --path <args...>` in dir ("" for the current
-// directory). --path makes git expand ~ and ~user. found is false when the
+// gitConfigGet runs `git config <args...>` in dir ("" for the current
+// directory). Callers pass --path for a path value, so git expands ~ and
+// ~user. found is false when the
 // key is unset (exit 1), git is not installed, or the call timed out: each
 // means "use the default". Any other exit is an error wrapping
 // *exec.ExitError, with git's message.
@@ -363,7 +373,7 @@ func gitConfigGetNoRepo(args ...string) (value string, found bool, err error) {
 func runGitConfig(dir string, env, args []string) (value string, found bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", append([]string{"config", "--path"}, args...)...)
+	cmd := exec.CommandContext(ctx, "git", append([]string{"config"}, args...)...)
 	cmd.Dir = dir
 	cmd.Env = env
 	// Killing git does not close stdout if a child of it still holds the pipe;

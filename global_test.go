@@ -66,7 +66,7 @@ func TestGitConfigGet_GlobalValue(t *testing.T) {
 	}
 
 	// Step 1: Verify gitConfigGet reads the path correctly
-	path, found, err := gitConfigGet("", "--global", "--get", "core.excludesFile")
+	path, found, err := gitConfigGet("", "--path", "--global", "--get", "core.excludesFile")
 	if err != nil {
 		t.Fatalf("gitConfigGet: %v", err)
 	}
@@ -595,7 +595,7 @@ func TestGitConfigGet_TimeoutBoundsHungChild(t *testing.T) {
 	t.Cleanup(func() { gitConfigTimeout = old })
 
 	start := time.Now()
-	path, found, err := gitConfigGet("", "--global", "--get", "core.excludesFile")
+	path, found, err := gitConfigGet("", "--path", "--global", "--get", "core.excludesFile")
 	elapsed := time.Since(start)
 
 	if err != nil || found {

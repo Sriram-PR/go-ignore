@@ -15,7 +15,7 @@ import (
 func TestGitConfigGet_Outcomes(t *testing.T) {
 	home := isolateGitConfig(t)
 	get := func() (string, bool, error) {
-		return gitConfigGet("", "--global", "--get", "core.excludesFile")
+		return gitConfigGet("", "--path", "--global", "--get", "core.excludesFile")
 	}
 
 	if v, found, err := get(); err != nil || found {

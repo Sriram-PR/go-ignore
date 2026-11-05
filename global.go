@@ -39,9 +39,10 @@ var gitConfigTimeout = 5 * time.Second
 // without the repository's own config. Any other git config failure, such as a malformed
 // system or global gitconfig, is returned as an error.
 //
-// core.ignorecase is read the same way. When it is true, matching is
-// case-insensitive, as if MatcherOptions.CaseInsensitive were set. A value
-// git rejects, such as "maybe", is an error, as in git.
+// core.ignorecase is read the same way, and counts as false when unset or
+// when git is unavailable. When it is true, matching is case-insensitive, as
+// if MatcherOptions.CaseInsensitive were set. A value git rejects, such as
+// "maybe", is an error, as in git.
 //
 // repoRoot locates the repository and the two on-disk files above; it is NOT
 // stripped from paths passed to Match. Paths supplied to Match must be
@@ -365,10 +366,9 @@ func repoGitConfig(repoRoot string) (repoConfig, error) {
 
 // gitConfigGet runs `git config <args...>` in dir ("" for the current
 // directory). Callers pass --path for a path value, so git expands ~ and
-// ~user. found is false when the
-// key is unset (exit 1), git is not installed, or the call timed out: each
-// means "use the default". Any other exit is an error wrapping
-// *exec.ExitError, with git's message.
+// ~user. found is false when the key is unset (exit 1), git is not installed,
+// or the call timed out: each means "use the default". Any other exit is an
+// error wrapping *exec.ExitError, with git's message.
 func gitConfigGet(dir string, args ...string) (value string, found bool, err error) {
 	// dir, not an inherited GIT_DIR or GIT_WORK_TREE, decides which
 	// repository's config is read.

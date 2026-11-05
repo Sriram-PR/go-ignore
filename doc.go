@@ -22,10 +22,10 @@
 //
 // LoadRepo pre-loads the standard gitignore sources for a working tree:
 // core.excludesFile as git resolves it, .git/info/exclude, and the root
-// .gitignore. WalkDir and WalkRepo walk a tree, auto-discovering nested
-// .gitignore files and pruning ignored (and .git/) directories; Files and
-// RepoFiles are their range-over-func form, and WalkDirFS/FilesFS operate
-// over an fs.FS. Entries, EntriesFS and RepoEntries yield files and
+// .gitignore, and follows core.ignorecase. WalkDir and WalkRepo walk a tree,
+// auto-discovering nested .gitignore files and pruning ignored (and .git/)
+// directories; Files and RepoFiles are their range-over-func form, and
+// WalkDirFS/FilesFS operate over an fs.FS. Entries, EntriesFS and RepoEntries yield files and
 // directories, with Entry.SkipDir to prune, and can start below root with
 // the rules above it loaded (WalkOptions.Start). WalkRepo, RepoFiles and
 // RepoEntries list a nested repository as git ls-files does, without going

@@ -4,6 +4,18 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.13.0
+
+The repo loaders follow core.ignorecase, as git does (#7), and walks cost less per entry (#28). No exported API changes.
+
+**Behavior changes**
+
+- **`LoadRepo`, `OpenTree`, `WalkRepo`, `RepoFiles` and `RepoEntries` match case-insensitively when the repository's `core.ignorecase` is true** (#7), as git does. `git init` sets it on case-insensitive filesystems, the default on macOS and Windows, so there `*.log` now ignores `A.LOG` through these loaders, as `git check-ignore` does. It's read like core.excludesFile (every scope, includes followed), with one more `git config` call (about 2 ms on Linux). `MatcherOptions.CaseInsensitive: true` still turns it on; to keep case-sensitive matching in such a repository, set `core.ignorecase=false` in git config, as with git. A value git rejects, such as `core.ignorecase=maybe`, is a fatal error, as in git. `New`, `WalkDir` and the other non-repo APIs are unchanged.
+
+**Performance**
+
+- **The filesystem walkers (`WalkDir`, `Files`, `Entries` and the repo walkers) strip the root prefix instead of calling `filepath.Rel` for every entry** (#28): about 151 ns down to 44 ns per entry.
+
 ### v1.12.0
 
 Matching cost is bounded in segment length, as it already was in depth (#8). Only additions to the exported API.

@@ -929,4 +929,12 @@ func TestOSBackendRelPath(t *testing.T) {
 			}
 		}
 	}
+
+	// Paths not under root fall back to filepath.Rel, error included.
+	if got, err := osBackend.relPath("a", filepath.Join("b", "x")); err != nil || got != "../b/x" {
+		t.Errorf("relPath outside root = %q, %v; want \"../b/x\"", got, err)
+	}
+	if got, err := osBackend.relPath(t.TempDir(), "x"); err == nil {
+		t.Errorf("relPath(absolute root, relative path) = %q, nil; want filepath.Rel's error", got)
+	}
 }

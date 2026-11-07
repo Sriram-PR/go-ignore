@@ -4,6 +4,14 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.13.1
+
+A Tree no longer remembers directories that don't exist (#19). No exported API changes.
+
+**Behavior changes**
+
+- **`Tree` caches only directories that exist** (#19). Every directory a check walked through got a cache entry, missing ones included, and none was dropped: 10,000 distinct `nonexistN/q` paths grew the heap by 1.4 MB, and one 4000-segment path added 4000 entries. Now a check stops at the first missing directory and caches nothing for it, so a long-lived Tree grows only with the directories on disk. Answers are unchanged. A directory created after a check is read the next time a check needs it. A check through a missing directory does one lstat per call: `Check` already did, while repeat `CheckIsDir` and `Explain` calls on such a path did none (about 1.2 µs instead of 0.2 µs on Linux). Checks through existing directories cost the same.
+
 ### v1.13.0
 
 The repo loaders follow core.ignorecase, as git does (#7), and walks cost less per entry (#28). No exported API changes.

@@ -510,8 +510,8 @@ func TestTree_LeadingSlash(t *testing.T) {
 func TestTree_DeepPathNoNestedFiles(t *testing.T) {
 	m := New()
 	m.AddPatterns("", []byte("*.log\nbuild/\n"))
-	tr := m.TreeFS(fstest.MapFS{}, ".")
 	p := strings.Repeat("a/", 99) + "f.go"
+	tr := m.TreeFS(fstest.MapFS{p: file("")}, ".")
 	if _, err := tr.CheckIsDir(p, false); err != nil {
 		t.Fatal(err)
 	}

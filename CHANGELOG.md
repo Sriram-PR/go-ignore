@@ -4,6 +4,14 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.13.2
+
+A git that Go won't run counts as no git (#26). No exported API changes.
+
+**Behavior changes**
+
+- **A `git` found only through a relative PATH entry is treated as unavailable** (#26). With `PATH=.:$PATH` and a `git` in the current directory, Go refuses to run it (`exec.ErrDot`), and `LoadRepo`, `OpenTree`, `WalkRepo`, `RepoFiles`, `RepoEntries`, `AddGlobalPatterns` and `AddSystemPatterns` failed with `cannot run executable found relative to current directory`. They now fall back to the defaults, as when git is not installed: the XDG default for core.excludesFile, core.ignorecase false. Go stops at the first `git` on PATH, so a real git listed after the relative entry is not used either.
+
 ### v1.13.1
 
 A Tree no longer remembers directories that don't exist (#19). No exported API changes.

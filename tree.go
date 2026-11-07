@@ -130,7 +130,8 @@ func (m *Matcher) newTree(root string, src patternSource, join func(...string) s
 // trailing slash (or backslash on Windows) means a directory; otherwise path
 // is a directory only if lstat says so, so a symlink to a directory, a path
 // that does not exist, one that can't be stat'ed, and one past a symlinked
-// directory count as files. lstat runs only when the answer needs it.
+// directory count as files. path itself is lstat'd only when the answer
+// needs it.
 func (t *Tree) Check(path string) (MatchResult, error) {
 	isDir := strings.HasSuffix(path, "/") || runtime.GOOS == "windows" && strings.HasSuffix(path, `\`)
 	return t.check(path, isDir, !isDir, nil)
@@ -164,7 +165,7 @@ func (t *Tree) CheckIsDir(path string, isDir bool) (MatchResult, error) {
 // Explain returns CheckIsDir's verdict and error for path with why it was
 // reached, as Matcher.Explain does: the ignored parent directory that
 // decided it, if any, and the path's own verdict. isDir must be accurate, as
-// in CheckIsDir; Explain does not lstat.
+// in CheckIsDir; Explain does not lstat path itself.
 //
 // When a parent is ignored, Own counts the rules git reads: the Tree's
 // snapshot, Overrides, and the .gitignore files from the root down to the
@@ -252,9 +253,10 @@ func evaluateGroups(groups [][]rule, overrides []rule, path string, segs []strin
 }
 
 // load returns dir's entry ("" is the root), reading its .gitignore on first
-// use, or missingDir, uncached, when dir doesn't exist. chain is the rule count of the snapshot and dir's ancestors' files.
-// Warnings go to the handler after the entry is ready, so the handler may
-// call back into the Tree.
+// use, or missingDir, uncached, when dir doesn't exist. chain is the rule
+// count of the snapshot and dir's ancestors' files. Warnings go to the
+// handler after the entry is ready, so the handler may call back into the
+// Tree.
 func (t *Tree) load(dir string, chain int) *dirRules {
 	t.mu.RLock()
 	d, ok := t.dirs[dir]

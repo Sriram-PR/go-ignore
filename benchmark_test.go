@@ -473,7 +473,8 @@ func siblingTree() fstest.MapFS {
 	for i := range 200 {
 		fsys[fmt.Sprintf("d%d/.gitignore", i)] = &fstest.MapFile{Data: []byte(siblingTreeDir)}
 	}
-	// The benchmarks' path; its directories exist, as on disk.
+	// d150/src/main.go is the path the Tree benchmarks check; its directories
+	// exist, as they would on disk.
 	fsys["d150/src/main.go"] = &fstest.MapFile{}
 	return fsys
 }

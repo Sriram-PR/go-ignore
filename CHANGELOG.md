@@ -10,7 +10,7 @@ A Tree no longer remembers directories that don't exist (#19). No exported API c
 
 **Behavior changes**
 
-- **`Tree` caches only directories that exist** (#19). Every directory a check walked through got a cache entry, missing ones included, and none was dropped: 10,000 distinct `nonexistN/q` paths grew the heap by 1.4 MB, and one 4000-segment path added 4000 entries. Now a check stops at the first missing directory and caches nothing for it, so a long-lived Tree grows only with the directories on disk. Answers are unchanged. A directory created after a check is read the next time a check needs it. A check through a missing directory does one lstat per call: `Check` already did, while repeat `CheckIsDir` and `Explain` calls on such a path did none (about 1.2 µs instead of 0.2 µs on Linux). Checks through existing directories cost the same.
+- **`Tree` caches only directories that exist** (#19). Every directory a check walked through got a cache entry, missing ones included, and none was dropped: 10,000 distinct `nonexistN/q` paths grew the heap by 1.4 MB, and one 4000-segment path added 4000 entries. Now a check stops at the first missing directory and caches nothing for it, so a long-lived Tree grows only with the directories on disk. Answers are unchanged. A directory created after a check is read the next time a check needs it. A check through a missing directory does one lstat per call: `Check` already did, while repeat `CheckIsDir` and `Explain` calls on such a path did none. On Linux such a repeat call now takes about 1.2 µs and 5 small allocations, where a cache hit took 0.2 µs and none; a cold check of a deep missing path does one lstat instead of one per level. Checks through existing directories cost the same.
 
 ### v1.13.0
 

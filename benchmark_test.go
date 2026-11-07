@@ -508,6 +508,18 @@ func BenchmarkTree_CheckCold(b *testing.B) {
 	}
 }
 
+// BenchmarkTree_CheckMissingDir measures a repeat check under a directory
+// that doesn't exist: one lstat per call, as missing directories aren't
+// cached.
+func BenchmarkTree_CheckMissingDir(b *testing.B) {
+	tr := New().TreeFS(siblingTree(), ".")
+	_, _ = tr.CheckIsDir("d150/gone/main.go", false)
+	b.ReportAllocs()
+	for b.Loop() {
+		_, _ = tr.CheckIsDir("d150/gone/main.go", false)
+	}
+}
+
 // BenchmarkMatch_DeepPathFloatingRules measures the parent walk with many
 // floating rules on a deep path (1000 rules, 1000 segments).
 func BenchmarkMatch_DeepPathFloatingRules(b *testing.B) {

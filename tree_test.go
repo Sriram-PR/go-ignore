@@ -555,3 +555,102 @@ func TestOpenTree_UnreadableExcludeSkipped(t *testing.T) {
 		t.Errorf("Check(a.log) = %+v, %v; want ignored by the root .gitignore, no error", res, cerr)
 	}
 }
+
+// A directory that doesn't exist is not cached, so a Tree fed paths that
+// don't exist doesn't grow; one that exists is.
+func TestTree_MissingDirsNotCached(t *testing.T) {
+	tr := New().TreeFS(fstest.MapFS{"real/f": file("")}, ".")
+	for i := range 1000 {
+		mustCheck(t, tr, fmt.Sprintf("nonexist%d/q", i))
+	}
+	if n := len(tr.dirs); n != 1 {
+		t.Errorf("after 1000 missing paths, %d cached directories; want 1 (the root)", n)
+	}
+	mustCheck(t, tr, "real/f")
+	if n := len(tr.dirs); n != 2 {
+		t.Errorf("after real/f, %d cached directories; want 2", n)
+	}
+}
+
+// A deep path that doesn't exist adds no entries.
+func TestTree_DeepMissingPathNotCached(t *testing.T) {
+	tr := New().TreeFS(fstest.MapFS{}, ".")
+	mustCheck(t, tr, strings.Repeat("d/", 3999)+"f")
+	if n := len(tr.dirs); n != 1 {
+		t.Errorf("after a 4000-segment missing path, %d cached directories; want 1", n)
+	}
+}
+
+// Under a missing directory, Check, CheckIsDir and Explain answer as a
+// Matcher holding the same rules does.
+func TestTree_MissingDirAnswers(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore":     file("*.log\nbuild/\n!keep.log\n"),
+		"src/.gitignore": file("*.tmp\n"),
+		"src/real.go":    file(""),
+		"link":           &fstest.MapFile{Data: []byte("src"), Mode: fs.ModeSymlink},
+	}
+	tr := New().TreeFS(fsys, ".")
+	m := New()
+	m.AddPatterns("", []byte("*.log\nbuild/\n!keep.log\n"))
+	m.AddPatterns("src", []byte("*.tmp\n"))
+	same := func(a, b MatchResult) bool {
+		return a.Ignored == b.Ignored && a.Matched == b.Matched && a.Rule == b.Rule && a.BasePath == b.BasePath && a.Line == b.Line
+	}
+	for _, path := range []string{
+		"gone/a.log",      // rule above the missing directory
+		"gone/build/x.go", // ignored parent below the missing directory
+		"build/gone/x.go", // ignored parent above it
+		"gone/keep.log",   // negation
+		"gone/build/",     // trailing slash: a directory
+		"src/gone/x.tmp",  // a nested .gitignore above it
+		"link/gone/a.log", // past a symlinked directory
+	} {
+		isDir := strings.HasSuffix(path, "/")
+		res, err := tr.Check(path)
+		if err != nil || !same(res, m.MatchWithReason(path, isDir)) {
+			t.Errorf("Check(%q) = %+v, %v; want %+v", path, res, err, m.MatchWithReason(path, isDir))
+		}
+		res, err = tr.CheckIsDir(path, isDir)
+		if err != nil || !same(res, m.MatchWithReason(path, isDir)) {
+			t.Errorf("CheckIsDir(%q) = %+v, %v; want %+v", path, res, err, m.MatchWithReason(path, isDir))
+		}
+		e, err := tr.Explain(path, isDir)
+		me := m.Explain(path, isDir)
+		if err != nil || e.Parent != me.Parent || !same(e.Own, me.Own) || !same(e.Result, me.Result) {
+			t.Errorf("Explain(%q) = %+v, %v; want %+v", path, e, err, me)
+		}
+	}
+}
+
+// A directory missing at one check and created before the next is read.
+func TestTree_DirCreatedLaterIsRead(t *testing.T) {
+	fsys := fstest.MapFS{}
+	tr := New().TreeFS(fsys, ".")
+	if res := mustCheck(t, tr, "new/x"); res.Matched {
+		t.Fatalf("Check(new/x) with no new/ = %+v; want no match", res)
+	}
+	fsys["new/.gitignore"] = file("x\n")
+	if res := mustCheck(t, tr, "new/x"); !res.Ignored || res.Source != "new/.gitignore" {
+		t.Errorf("Check(new/x) after creating new/.gitignore = %+v; want ignored by new/.gitignore", res)
+	}
+}
+
+// A check through a missing directory lstats once, at the first missing
+// directory, cold or warm.
+func TestTree_MissingDirOneLstat(t *testing.T) {
+	tr := New().TreeFS(fstest.MapFS{}, ".")
+	var n int
+	lstat := tr.lstat
+	tr.lstat = func(name string) (fs.FileInfo, error) {
+		n++
+		return lstat(name)
+	}
+	for _, when := range []string{"cold", "warm"} {
+		n = 0
+		mustCheck(t, tr, "a/b/c/d/f")
+		if n != 1 {
+			t.Errorf("%s Check(a/b/c/d/f): %d lstats; want 1", when, n)
+		}
+	}
+}

@@ -20,7 +20,10 @@ import (
 //
 // Each directory's .gitignore is read the first time a check needs it, and
 // kept for the Tree's lifetime, a read failure included: later edits are not
-// seen, so make a new Tree to see them. A .gitignore inside an ignored
+// seen, so make a new Tree to see them. A directory that doesn't exist is
+// not kept, so a Tree grows only with the directories on disk: one created
+// later is read when a check next needs it, and a check through a missing
+// directory lstats it on every call. A .gitignore inside an ignored
 // directory is never read, as in git. Reads follow WalkDir's rules: a
 // .gitignore that is a symlink, is not a regular file, or is larger than 100
 // MB is not read. The IgnoreFiles named in MatcherOptions are read with each
@@ -49,6 +52,20 @@ type dirRules struct {
 	// outside: lstat says the directory is a symlink or another
 	// non-directory, so nothing at or past it is read.
 	outside bool
+	// missing: lstat says the directory doesn't exist, so nothing at or
+	// below it is read. Only missingDir has it, and it is never cached.
+	missing bool
+}
+
+// missingDir stands for every directory that doesn't exist. Not caching one
+// keeps a Tree fed arbitrary paths bounded by the directories on disk.
+var missingDir = &dirRules{missing: true}
+
+// missingPath reports whether an lstat error means nothing exists at the
+// path: a name too long or a parent that is not a directory can't exist
+// either.
+func missingPath(err error) bool {
+	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENAMETOOLONG) || errors.Is(err, syscall.ENOTDIR)
 }
 
 // Tree returns a Tree for the work tree at root on the OS filesystem. Paths
@@ -184,7 +201,8 @@ func (t *Tree) check(path string, isDir, stat bool, ex *Explanation) (MatchResul
 	// disk and match have their slashes at the same segment boundaries, so
 	// walk both: disk names the directory to read, match is what rules see.
 	di, mi := 0, 0
-	outside := false
+	// Set at a symlinked or missing directory: nothing at or below it is read.
+	stopped := false
 	for k := 1; k < len(segs); k++ {
 		di += strings.IndexByte(disk[di:], '/')
 		mi += strings.IndexByte(match[mi:], '/')
@@ -197,9 +215,9 @@ func (t *Tree) check(path string, isDir, stat bool, ex *Explanation) (MatchResul
 			}
 			return res, errors.Join(errs...)
 		}
-		if !outside {
+		if !stopped {
 			d = t.load(disk[:di], d.chain)
-			outside = d.outside
+			stopped = d.outside || d.missing
 			if len(d.rules) > 0 {
 				groups = append(groups, d.rules)
 			}
@@ -210,7 +228,7 @@ func (t *Tree) check(path string, isDir, stat bool, ex *Explanation) (MatchResul
 		di++
 		mi++
 	}
-	if stat && !outside {
+	if stat && !stopped {
 		fi, err := t.lstat(t.join(t.root, disk))
 		isDir = err == nil && fi.IsDir()
 	}
@@ -234,14 +252,22 @@ func evaluateGroups(groups [][]rule, overrides []rule, path string, segs []strin
 }
 
 // load returns dir's entry ("" is the root), reading its .gitignore on first
-// use. chain is the rule count of the snapshot and dir's ancestors' files.
+// use, or missingDir, uncached, when dir doesn't exist. chain is the rule count of the snapshot and dir's ancestors' files.
 // Warnings go to the handler after the entry is ready, so the handler may
 // call back into the Tree.
 func (t *Tree) load(dir string, chain int) *dirRules {
 	t.mu.RLock()
 	d, ok := t.dirs[dir]
 	t.mu.RUnlock()
+	var fi fs.FileInfo
+	var statErr error
 	if !ok {
+		if dir != "" {
+			fi, statErr = t.lstat(t.join(t.root, dir))
+			if missingPath(statErr) {
+				return missingDir
+			}
+		}
 		t.mu.Lock()
 		if d, ok = t.dirs[dir]; !ok {
 			d = &dirRules{}
@@ -250,7 +276,7 @@ func (t *Tree) load(dir string, chain int) *dirRules {
 		t.mu.Unlock()
 	}
 	var warnings []ParseWarning
-	d.once.Do(func() { warnings = t.read(d, dir, chain) })
+	d.once.Do(func() { warnings = t.read(d, dir, chain, fi, statErr) })
 	if h := t.opts.WarningHandler; h != nil {
 		for _, w := range warnings {
 			h(w)
@@ -260,13 +286,18 @@ func (t *Tree) load(dir string, chain int) *dirRules {
 }
 
 // read fills d from dir's .gitignore and IgnoreFiles and returns the parse
-// warnings when a handler wants them.
-func (t *Tree) read(d *dirRules, dir string, chain int) []ParseWarning {
+// warnings when a handler wants them. fi and statErr are load's lstat of
+// dir, both zero when load found d already cached.
+func (t *Tree) read(d *dirRules, dir string, chain int, fi fs.FileInfo, statErr error) []ParseWarning {
 	d.chain = chain
 	if dir != "" {
+		if fi == nil && statErr == nil {
+			// Another goroutine cached d and this one won the once.
+			fi, statErr = t.lstat(t.join(t.root, dir))
+		}
 		// The OS would follow a symlinked dir to its target's .gitignore,
 		// which may be outside the work tree.
-		if fi, err := t.lstat(t.join(t.root, dir)); err == nil && !fi.IsDir() {
+		if statErr == nil && !fi.IsDir() {
 			d.outside = true
 			return nil
 		}

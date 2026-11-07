@@ -108,3 +108,36 @@ func TestLoadRepo_UnreadableExcludeSkipped(t *testing.T) {
 		}
 	}
 }
+
+// A git found only through a relative PATH entry is one Go refuses to run
+// (exec.ErrDot), so it counts as git being unavailable: the defaults apply
+// and the loaders don't fail.
+func TestGitConfig_RelativePathGitIsUnavailable(t *testing.T) {
+	home := isolateGitConfig(t)
+	writeTree(t, home, map[string]string{
+		".config/git/ignore": "*.xdg\n",
+		"repo/.gitignore":    "*.log\n",
+	})
+	bin := t.TempDir()
+	marker := filepath.Join(bin, "ran")
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(bin)
+	t.Setenv("PATH", ".")
+
+	m := New()
+	if err := m.AddGlobalPatterns(); err != nil {
+		t.Errorf("AddGlobalPatterns: %v; want the XDG default loaded", err)
+	}
+	if !m.Match("a.xdg", false) {
+		t.Error("a.xdg not ignored; want the XDG default file loaded")
+	}
+	lm, err := LoadRepo(filepath.Join(home, "repo"), MatcherOptions{})
+	if err != nil || lm == nil || !lm.Match("a.log", false) || !lm.Match("a.xdg", false) {
+		t.Errorf("LoadRepo = %v, %v; want a matcher with the root .gitignore and the XDG default", lm, err)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("the relative-PATH git ran")
+	}
+}

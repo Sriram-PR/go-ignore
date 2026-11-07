@@ -33,11 +33,12 @@ var gitConfigTimeout = 5 * time.Second
 //  3. <repoRoot>/.gitignore (root scope)
 //
 // The value comes from running "git config" in repoRoot, with GIT_DIR and
-// GIT_WORK_TREE removed from its environment. If git is not installed or does
-// not answer within 5 seconds, the XDG default is used. If git rejects the
+// GIT_WORK_TREE removed from its environment. If git is not installed, is
+// found only through a relative PATH entry (which Go won't run), or does not
+// answer within 5 seconds, the XDG default is used. If git rejects the
 // repository (a malformed .git file or .git/config, say), the value is read
-// without the repository's own config. Any other git config failure, such as a malformed
-// system or global gitconfig, is returned as an error.
+// without the repository's own config. Any other git config failure, such as
+// a malformed system or global gitconfig, is returned as an error.
 //
 // core.ignorecase is read the same way, and counts as false when unset or
 // when git is unavailable. When it is true, matching is case-insensitive, as
@@ -366,9 +367,10 @@ func repoGitConfig(repoRoot string) (repoConfig, error) {
 
 // gitConfigGet runs `git config <args...>` in dir ("" for the current
 // directory). Callers pass --path for a path value, so git expands ~ and
-// ~user. found is false when the key is unset (exit 1), git is not installed,
-// or the call timed out: each means "use the default". Any other exit is an
-// error wrapping *exec.ExitError, with git's message.
+// ~user. found is false when the key is unset (exit 1), git is not installed
+// or only found through a relative PATH entry, or the call timed out: each
+// means "use the default". Any other exit is an error wrapping
+// *exec.ExitError, with git's message.
 func gitConfigGet(dir string, args ...string) (value string, found bool, err error) {
 	// dir, not an inherited GIT_DIR or GIT_WORK_TREE, decides which
 	// repository's config is read.
@@ -395,7 +397,9 @@ func runGitConfig(dir string, env, args []string) (value string, found bool, err
 	cmd.WaitDelay = time.Second
 	out, err := cmd.Output()
 	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, exec.ErrNotFound) {
+		// ErrDot: the git on PATH is relative to the current directory, which
+		// Go refuses to run; there is no git it will run.
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, exec.ErrNotFound) || errors.Is(err, exec.ErrDot) {
 			return "", false, nil
 		}
 		var exitErr *exec.ExitError

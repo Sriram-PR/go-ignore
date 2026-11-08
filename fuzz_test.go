@@ -44,19 +44,20 @@ func FuzzAddPatterns(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, content []byte) {
 		m := New()
-
-		// Should never panic
 		m.AddPatterns("", content)
-
-		// Warnings should return without panic
 		_ = m.Warnings()
 
-		// RuleCount should work
-		_ = m.RuleCount()
-
-		// Multiple AddPatterns calls should work
+		// At most one rule per line, and the same content gives the same
+		// rules under any base path, up to the MaxPatterns cap.
+		n := m.RuleCount()
+		if lines := bytes.Count(content, []byte("\n")) + 1; n > lines {
+			t.Errorf("RuleCount = %d for %d lines", n, lines)
+		}
 		m.AddPatterns("src", content)
 		m.AddPatterns("src/lib", content)
+		if got, want := m.RuleCount(), min(3*n, DefaultMaxPatterns); got != want {
+			t.Errorf("RuleCount after three loads = %d, want %d (one load: %d)", got, want, n)
+		}
 	})
 }
 
@@ -334,30 +335,32 @@ func FuzzNormalizeContent(f *testing.F) {
 	})
 }
 
-// FuzzConcurrentAccess fuzzes concurrent matcher access
+// FuzzConcurrentAccess checks that concurrent Match and MatchWithReason calls
+// give the answer a lone call gives.
 func FuzzConcurrentAccess(f *testing.F) {
 	f.Add([]byte("*.log\nbuild/\n"), "test.log", false)
 
 	f.Fuzz(func(t *testing.T, content []byte, path string, isDir bool) {
 		m := New()
 		m.AddPatterns("", content)
+		want := m.MatchWithReason(path, isDir)
 
-		// Run concurrent operations
 		done := make(chan bool, 10)
-
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			go func() {
-				m.Match(path, isDir)
+				if got := m.Match(path, isDir); got != want.Ignored {
+					t.Errorf("concurrent Match(%q, %v) = %v, alone %v", path, isDir, got, want.Ignored)
+				}
 				done <- true
 			}()
 			go func() {
-				m.MatchWithReason(path, isDir)
+				if got := m.MatchWithReason(path, isDir); got != want {
+					t.Errorf("concurrent MatchWithReason(%q, %v) = %+v, alone %+v", path, isDir, got, want)
+				}
 				done <- true
 			}()
 		}
-
-		// Wait for all goroutines
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			<-done
 		}
 	})

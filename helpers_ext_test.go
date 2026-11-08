@@ -82,6 +82,70 @@ func scenarioFS(s paritycases.Scenario) fstest.MapFS {
 	return fsys
 }
 
+// checkWalkAgreesWithMatch checks the walker, which skips Match's
+// parent-directory check, against Match on s: FilesFS must yield exactly the
+// files Match reports as not ignored, and no path under an ignored directory
+// may be reported as not ignored.
+func checkWalkAgreesWithMatch(t *testing.T, s paritycases.Scenario) {
+	t.Helper()
+	fsys := scenarioFS(s)
+	m := parityMatcher(s)
+
+	want := map[string]bool{}
+	for p, f := range fsys {
+		if !f.Mode.IsDir() && !m.Match(p, false) {
+			want[p] = true
+		}
+	}
+	got := map[string]bool{}
+	for p, err := range ignore.NewWithOptions(parityOptions(s)).FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("%s: FilesFS: %v", s.Name, err)
+		}
+		got[p] = true
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("%s: FilesFS = %q, want %q\nfiles: %q", s.Name,
+			slices.Sorted(maps.Keys(got)), slices.Sorted(maps.Keys(want)), s.Files)
+	}
+
+	for p, f := range fsys {
+		parts := strings.Split(p, "/")
+		for k := 1; k < len(parts); k++ {
+			parent := strings.Join(parts[:k], "/")
+			if m.Match(parent, true) && !m.Match(p, f.Mode.IsDir()) {
+				t.Errorf("%s: %q is ignored but %q under it is not\nfiles: %q", s.Name, parent, p, s.Files)
+				break
+			}
+		}
+	}
+}
+
+// checkTreeAgreesWithMatcher checks that a Tree over s answers exactly as a
+// matcher preloaded with every .gitignore of s, and never ignores a file the
+// walker visits.
+func checkTreeAgreesWithMatcher(t *testing.T, s paritycases.Scenario) {
+	t.Helper()
+	fsys := scenarioFS(s)
+	pre := parityMatcher(s)
+	tr := ignore.NewWithOptions(parityOptions(s)).TreeFS(fsys, ".")
+	for p, f := range fsys {
+		want := pre.MatchWithReason(p, f.Mode.IsDir())
+		got, err := tr.Check(p)
+		if err != nil || got != want {
+			t.Errorf("%s: Check(%q) = %+v, %v; preloaded matcher %+v", s.Name, p, got, err, want)
+		}
+	}
+	for p, err := range ignore.NewWithOptions(parityOptions(s)).FilesFS(fsys, ".") {
+		if err != nil {
+			t.Fatalf("%s: FilesFS: %v", s.Name, err)
+		}
+		if res, err := tr.Check(p); res.Ignored || err != nil {
+			t.Errorf("%s: the walker visits %q, but Check = %+v, %v", s.Name, p, res, err)
+		}
+	}
+}
+
 // filesSet collects an iterator's paths, failing on any error.
 func filesSet(t *testing.T, seq iter.Seq2[string, error]) map[string]bool {
 	t.Helper()

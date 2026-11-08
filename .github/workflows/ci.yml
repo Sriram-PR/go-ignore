@@ -225,7 +225,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && contains(fromJson('["fuzz-long"]'), github.event.inputs.job) }}
     runs-on: ubuntu-latest
     # 30m per fuzzer plus build time; raise it when adding fuzzers.
-    timeout-minutes: 330
+    timeout-minutes: 360
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

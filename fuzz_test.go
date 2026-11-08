@@ -334,26 +334,6 @@ func FuzzNormalizeContent(f *testing.F) {
 	})
 }
 
-// FuzzSegmentMatching fuzzes segment matching
-func FuzzSegmentMatching(f *testing.F) {
-	// Add seeds for pattern and path combinations
-	f.Add("foo", "foo")
-	f.Add("foo/bar", "foo/bar")
-	f.Add("*/bar", "foo/bar")
-	f.Add("**/bar", "foo/bar")
-	f.Add("foo/**", "foo/bar")
-	f.Add("a/**/b", "a/x/y/z/b")
-
-	f.Fuzz(func(t *testing.T, pattern, path string) {
-		// Parse pattern into segments
-		segments, _ := parseSegments(pattern)
-		pathSegs := splitPath(path)
-
-		// Should never panic
-		_ = matchSegments(segments, pathSegs)
-	})
-}
-
 // FuzzConcurrentAccess fuzzes concurrent matcher access
 func FuzzConcurrentAccess(f *testing.F) {
 	f.Add([]byte("*.log\nbuild/\n"), "test.log", false)

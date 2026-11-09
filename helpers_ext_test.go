@@ -39,11 +39,13 @@ func parityMatcher(s paritycases.Scenario) *ignore.Matcher {
 	return m
 }
 
+// parityOptions lifts the limits git doesn't have.
 func parityOptions(s paritycases.Scenario) ignore.MatcherOptions {
 	return ignore.MatcherOptions{
-		CaseInsensitive: s.ICase,
-		MaxPatterns:     -1,
-		WarningHandler:  func(ignore.ParseWarning) {},
+		CaseInsensitive:  s.ICase,
+		MaxPatterns:      -1,
+		MaxPatternLength: -1,
+		WarningHandler:   func(ignore.ParseWarning) {},
 	}
 }
 

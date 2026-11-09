@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"maps"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
@@ -341,23 +340,6 @@ func TestCheckBaselineDiff(t *testing.T) {
 	}
 	if !slices.Equal(resolved, []string{"walk d"}) {
 		t.Errorf("resolved = %q, want [walk d]", resolved)
-	}
-}
-
-// requireParity skips when GOIGNORE_PARITY is unset, and fails when it is set
-// to anything but 1 or git is missing, so CI cannot pass without running the
-// comparison.
-func requireParity(tb testing.TB) {
-	tb.Helper()
-	switch v := os.Getenv("GOIGNORE_PARITY"); v {
-	case "":
-		tb.Skip("set GOIGNORE_PARITY=1 to run the git parity harness")
-	case "1":
-	default:
-		tb.Fatalf("GOIGNORE_PARITY must be 1, got %q", v)
-	}
-	if _, err := exec.LookPath("git"); err != nil {
-		tb.Fatal("GOIGNORE_PARITY=1 but git is not on PATH")
 	}
 }
 

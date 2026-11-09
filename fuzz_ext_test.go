@@ -5,11 +5,13 @@ import (
 	"io/fs"
 	"maps"
 	"path"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
 
+	ignore "github.com/Sriram-PR/go-ignore"
 	"github.com/Sriram-PR/go-ignore/internal/paritycases"
 )
 
@@ -240,5 +242,111 @@ func FuzzTreeWalkMatch(f *testing.F) {
 		}
 		checkWalkAgreesWithMatch(t, s)
 		checkTreeAgreesWithMatcher(t, s)
+	})
+}
+
+func TestGitParitySkip(t *testing.T) {
+	for p, skip := range map[string]bool{
+		":x":      true,
+		":(top)a": true,
+		"x/:a":    false,
+		"a":       false,
+		"a:b":     false,
+	} {
+		if got := gitParitySkip(p) != ""; got != skip {
+			t.Errorf("gitParitySkip(%q) skips = %v, want %v", p, got, skip)
+		}
+	}
+}
+
+// gitParitySkip returns why path p is left out of the git comparison, or "".
+// A reason starting with an issue number is a known go-ignore bug; any other
+// is a git or harness quirk no go-ignore change can fix.
+func gitParitySkip(p string) string {
+	if strings.HasPrefix(p, ":") {
+		return "check-ignore reads a leading ':' as pathspec magic and refuses literal pathspecs"
+	}
+	return ""
+}
+
+// nameMax is Linux's NAME_MAX: Materialize can't create a longer name.
+const nameMax = 255
+
+// checkGitParity writes s to a fresh git repository and checks that Match
+// gives git check-ignore's verdict for every path, and Tree.Check its
+// verdict, source and line.
+func checkGitParity(t *testing.T, s paritycases.Scenario) {
+	t.Helper()
+	for _, p := range slices.Concat(slices.Collect(maps.Keys(s.Paths)), slices.Collect(maps.Keys(s.Files))) {
+		for seg := range strings.SplitSeq(p, "/") {
+			if len(seg) > nameMax {
+				t.Skip("a name is longer than NAME_MAX")
+			}
+		}
+	}
+	dir := t.TempDir()
+	if err := paritycases.InitRepo(dir, s); err != nil {
+		t.Fatal(err)
+	}
+	isDir, err := paritycases.Materialize(dir, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, p := range slices.Sorted(maps.Keys(isDir)) {
+		if path.Base(p) != ".gitignore" && gitParitySkip(p) == "" {
+			paths = append(paths, p)
+		}
+	}
+	git, err := paritycases.GitVerdicts(dir, s, paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := parityMatcher(s)
+	tr := ignore.NewWithOptions(parityOptions(s)).Tree(dir)
+	for _, p := range paths {
+		g, ok := git[p]
+		if !ok {
+			t.Errorf("git did not report %q\nfiles: %q", p, s.Files)
+			continue
+		}
+		if lib := m.MatchWithReason(p, isDir[p]); lib.Ignored != g.Ignored {
+			t.Errorf("%q dir=%v: git ignored=%v (%s:%d), Match %+v\nfiles: %q", p, isDir[p], g.Ignored, g.Source, g.Line, lib, s.Files)
+			continue
+		}
+		res, err := tr.Check(p)
+		if err != nil {
+			t.Errorf("Check(%q): %v", p, err)
+			continue
+		}
+		src := ""
+		if res.Matched {
+			rel, err := filepath.Rel(dir, res.Source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			src = filepath.ToSlash(rel)
+		}
+		if res.Ignored != g.Ignored || src != g.Source || res.Line != g.Line {
+			t.Errorf("%q dir=%v: git ignored=%v %s:%d, Tree ignored=%v %s:%d\nfiles: %q", p, isDir[p], g.Ignored, g.Source, g.Line, res.Ignored, src, res.Line, s.Files)
+		}
+	}
+}
+
+// FuzzGitParity compares go-ignore with git check-ignore on scenarios decoded
+// from the input. Runs only with GOIGNORE_PARITY=1.
+func FuzzGitParity(f *testing.F) {
+	requireParity(f)
+	for _, s := range paritycases.Curated() {
+		if root, sub, subDir, paths, ok := fuzzSeedArgs(s); ok {
+			f.Add(root, sub, subDir, paths)
+		}
+	}
+	f.Fuzz(func(t *testing.T, root, sub, subDir, paths string) {
+		s, ok := scenarioFromFuzz(root, sub, subDir, paths)
+		if !ok {
+			t.Skip()
+		}
+		checkGitParity(t, s)
 	})
 }

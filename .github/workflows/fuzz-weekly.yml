@@ -26,6 +26,8 @@ jobs:
           go-version: stable
 
       - name: Run fuzz tests
+        env:
+          GOIGNORE_PARITY: "1"
         run: make fuzz FUZZTIME=10m
 
       - name: Upload failing inputs

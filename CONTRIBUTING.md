@@ -88,6 +88,8 @@ Two kinds of test compare go-ignore with git:
 
 CI runs the harness on every push. To look for new divergence classes, dispatch the workflow with `parity-explore`, which runs a fresh seed and only reports.
 
+`FuzzGitParity` fuzzes go-ignore against git when `GOIGNORE_PARITY=1` is set (`GOIGNORE_PARITY=1 go test -run '^$' -fuzz='^FuzzGitParity$' .`); the weekly fuzz workflow runs it. A failure is either a git or harness quirk, which gets an entry in `gitParitySkip` in `fuzz_ext_test.go`, or a go-ignore bug, which gets an issue.
+
 ### Conformance table
 
 The comparison table in the README and `conformance/RESULTS.md` come from the `conformance/` module, which runs other Go gitignore libraries on the parity scenarios in `internal/paritycases` and compares them with git. Adding or changing a curated case changes the table: run `make conformance-update` and commit `conformance/RESULTS.md` and `README.md` with the change. CI fails when they are stale.
@@ -96,8 +98,9 @@ The comparison table in the README and `conformance/RESULTS.md` come from the `c
 
 `make fuzz` runs every `Fuzz*` function in the package for 30s each and
 `make fuzz-long` for 30m each; `make fuzz FUZZTIME=1m` sets another time.
-Every fuzzer runs even if one fails. To fuzz only the surface your change
-touches:
+Every fuzzer runs even if one fails. `FuzzGitParity` skips unless
+`GOIGNORE_PARITY=1` is set (see Parity harness). To fuzz only the surface
+your change touches:
 
 ```bash
 go test -list '^Fuzz' .                              # list the fuzzers

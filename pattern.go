@@ -72,7 +72,7 @@ func parseLines(basePath string, content []byte, maxPatternLength, maxRules int,
 		text = rest
 		line = lineText(line)
 
-		if maxPatternLength >= 0 && len(line) > maxPatternLength {
+		if maxPatternLength >= 0 && len(line) > maxPatternLength && !strings.HasPrefix(line, "#") {
 			ws.add(ParseWarning{
 				Line:     lineNum,
 				Pattern:  line,

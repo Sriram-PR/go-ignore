@@ -102,6 +102,17 @@ func TestAddPatterns_MaxPatternLengthAfterNULAndTrim(t *testing.T) {
 	}
 }
 
+// Comments are not patterns, so a long one is not over the cap. An escaped
+// \# line is a pattern and still is.
+func TestAddPatterns_MaxPatternLengthComment(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{MaxPatternLength: 10})
+	m.AddPatterns("", []byte("#"+strings.Repeat("c", 20)+"\n\\#"+strings.Repeat("e", 20)+"\n"))
+	w := m.Warnings()
+	if len(w) != 1 || w[0].Line != 2 {
+		t.Errorf("warnings = %v, want one for line 2", w)
+	}
+}
+
 func TestAddPatterns_MaxPatternsUnlimited(t *testing.T) {
 	m := NewWithOptions(MatcherOptions{MaxPatterns: -1})
 

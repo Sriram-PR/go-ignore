@@ -141,7 +141,8 @@ type MatcherOptions struct {
 
 	// MaxPatternLength limits the length of individual pattern lines,
 	// measured as git reads the line: up to a NUL, trailing spaces trimmed.
-	// Lines exceeding this limit are skipped with a parse warning.
+	// Lines exceeding this limit are skipped with a parse warning; comment
+	// lines are not checked.
 	// Default: DefaultMaxPatternLength (4096). Set to -1 for unlimited.
 	// See MaxPatterns for the memory these two limits allow.
 	MaxPatternLength int

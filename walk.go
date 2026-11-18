@@ -241,8 +241,32 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bo
 		return fn(path, d, nil)
 	}
 
+	// The repo walkers follow a symlinked root, as git does when run in it:
+	// a trailing separator makes the walk's lstat of root follow the link,
+	// and fn still sees root as given.
+	walkDir := b.walkDir
+	rootLink := false
+	if stopAtRepos {
+		fi, err := b.src.stat(root, false)
+		rootLink = err == nil && fi.Mode()&fs.ModeSymlink != 0
+	}
+	if rootLink {
+		walkDir = func(dir string, fn fs.WalkDirFunc) error {
+			if dir != root {
+				return b.walkDir(dir, fn)
+			}
+			linked := root + string(filepath.Separator)
+			return b.walkDir(linked, func(p string, d fs.DirEntry, err error) error {
+				if p == linked {
+					p = root
+				}
+				return fn(p, d, err)
+			})
+		}
+	}
+
 	if start == "" {
-		return b.walkDir(root, visit)
+		return walkDir(root, visit)
 	}
 	if err := checkStart(start); err != nil {
 		_ = fn("", nil, withRootErr(err))
@@ -257,7 +281,7 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bo
 	dirs := startDirs(b, root, start)
 	last := len(dirs) - 1
 	for i, dir := range dirs {
-		fi, statErr := b.src.stat(dir, false)
+		fi, statErr := b.src.stat(dir, i == 0 && rootLink)
 		switch {
 		case statErr != nil:
 			if i == 0 {
@@ -279,7 +303,7 @@ func (m *Matcher) walkInternal(b walkBackend, root, start string, stopAtRepos bo
 		}
 	}
 	preloading = false
-	return b.walkDir(dirs[last], visit)
+	return walkDir(dirs[last], visit)
 }
 
 // startDirs returns root and each directory down to start, joined as the
@@ -383,6 +407,10 @@ func fsBackend(fsys fs.FS) walkBackend {
 // directory, which is then skipped and its ignore files are not read. An
 // empty or broken .git does not count.
 //
+// A root that is a symlink to a directory is followed, as git follows it
+// when run there; paths passed to fn start with root as given. Symlinks
+// below root are not followed.
+//
 // Use this when you want the standard "walk a working tree, skipping
 // ignored files" behavior without managing the matcher yourself.
 func WalkRepo(root string, opts MatcherOptions, fn fs.WalkDirFunc) error {
@@ -479,7 +507,8 @@ func filesFromWalker(walker func(fs.WalkDirFunc) error) iter.Seq2[string, error]
 // is yielded in that same error, and iteration continues without it; a fatal
 // error (see LoadRepo) is yielded once and ends the iteration.
 //
-// Files inside a nested repository are not yielded; see WalkRepo.
+// Files inside a nested repository are not yielded, and a symlinked root is
+// followed; see WalkRepo.
 //
 // Use it for the standard one-line "iterate the non-ignored files in this
 // repo" pattern:
@@ -591,7 +620,7 @@ func (m *Matcher) EntriesFS(fsys fs.FS, root string, wo WalkOptions) iter.Seq2[E
 // once with all their errors; a fatal error (see LoadRepo) is yielded once
 // and ends the iteration. A nested repository is yielded as a directory with
 // nothing under it, as in WalkRepo, and a WalkOptions.Start at or below one
-// yields nothing.
+// yields nothing. A symlinked root is followed, as in WalkRepo.
 func RepoEntries(root string, opts MatcherOptions, wo WalkOptions) iter.Seq2[Entry, error] {
 	return func(yield func(Entry, error) bool) {
 		m, skipped, err := loadRepoConfig(root, opts)

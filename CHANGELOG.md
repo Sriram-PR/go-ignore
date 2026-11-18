@@ -4,6 +4,22 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.13.3
+
+Fixes and doc corrections from the 2026-11-18 audit. No exported API changes.
+
+**Fixed**
+
+- **`.git` files and `commondir` are read as git reads them** (#29). Only trailing CR and LF are dropped, and a `.git` file must start with `gitdir: `. The walkers dropped just one trailing newline from `commondir`, so a nested worktree whose `commondir` ended in `\n\n` was walked into, while `git ls-files` stops there. `LoadRepo`, `OpenTree` and the repo walkers trimmed all whitespace and took `gitdir:` without the space, so they loaded the `info/exclude` of a layout git rejects.
+- **`WalkRepo`, `RepoFiles` and `RepoEntries` follow a root that is a symlink to a directory** (#30), as git does when run there and as `LoadRepo` and `OpenTree` already did. They yielded only the link itself, and dropped an unreadable `info/exclude` error. Paths still start with the root as given. `WalkDir`, `Files` and `Entries` keep `filepath.WalkDir`'s behavior and don't follow it.
+- **A repo root that is a file, or below one, fails with `repo root: <path> is not a directory`** (#31) instead of `running git config: fork/exec /usr/bin/git: not a directory`. It is still a fatal error, as in git.
+- **`MaxPatternLength` is checked on the pattern git reads** (#32): the line up to a NUL, trailing spaces trimmed. A line under the cap after that was skipped as too long.
+
+**Docs**
+
+- The `Tree` doc says each spelling of a directory is read and kept separately on a case-insensitive filesystem (#33).
+- The package doc and walker docs say a path over `MaxPathDepth` or `MaxSegmentLength` matches nothing, so the walkers list it; `MaxPathDepth` names Explain and the walkers; `AddPatterns` lists the NUL rule; `MatchResult.Source` lists `Tree` and `TreeFS` (#34).
+
 ### v1.13.2
 
 A git that Go won't run counts as no git (#26). No exported API changes.

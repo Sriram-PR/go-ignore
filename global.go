@@ -57,8 +57,8 @@ var gitConfigTimeout = 5 * time.Second
 // that can't be read or is refused is left out, as git does: LoadRepo
 // returns the matcher built from the other sources together with an error
 // naming each such file (joined with errors.Join). A nil matcher means a
-// fatal error: a git config failure as above (core.ignorecase included), or
-// a .git file that can't be read.
+// fatal error: a git config failure as above (core.ignorecase included), a
+// .git file that can't be read, or a repoRoot that is a file or below one.
 //
 // With MatcherOptions.IgnoreFiles, the root's extra ignore files are read
 // right after the root .gitignore, under the same rules.
@@ -328,9 +328,13 @@ type repoConfig struct {
 func repoGitConfig(repoRoot string) (repoConfig, error) {
 	// git cannot run in a directory that does not exist, and LoadRepo
 	// tolerates a missing repoRoot, so ask from its nearest existing ancestor.
+	// That being a file is an error, as it is for git.
 	dir := repoRoot
 	for {
-		if _, err := os.Stat(dir); err == nil {
+		if fi, err := os.Stat(dir); err == nil {
+			if !fi.IsDir() {
+				return repoConfig{}, fmt.Errorf("repo root: %s is not a directory", dir)
+			}
 			break
 		}
 		parent := filepath.Dir(dir)

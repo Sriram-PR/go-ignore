@@ -2,6 +2,7 @@ package ignore
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os/exec"
 	"path/filepath"
@@ -208,6 +209,27 @@ func TestLoadRepo_MissingRootSucceeds(t *testing.T) {
 	home := isolateGitConfig(t)
 	if _, err := LoadRepo(filepath.Join(home, "no", "such", "repo"), MatcherOptions{}); err != nil {
 		t.Errorf("LoadRepo: %v", err)
+	}
+}
+
+// A repoRoot that is a file, or below one, is an error naming the file, not
+// a failure to run git there.
+func TestLoadRepo_FileRootErrors(t *testing.T) {
+	home := isolateGitConfig(t)
+	writeTree(t, home, map[string]string{"plain": "x"})
+	file := filepath.Join(home, "plain")
+	for _, root := range []string{file, filepath.Join(file, "sub")} {
+		m, err := LoadRepo(root, MatcherOptions{})
+		if m != nil || err == nil || !strings.Contains(err.Error(), file+" is not a directory") || strings.Contains(err.Error(), "running git") {
+			t.Errorf("LoadRepo(%q) = %v, %v; want nil and an error that %s is not a directory", root, m, err, file)
+		}
+	}
+	var errs []error
+	for _, err := range RepoFiles(file, MatcherOptions{}) {
+		errs = append(errs, err)
+	}
+	if len(errs) != 1 || !strings.Contains(fmt.Sprint(errs[0]), "is not a directory") {
+		t.Errorf("RepoFiles errors = %v; want one not-a-directory error", errs)
 	}
 }
 

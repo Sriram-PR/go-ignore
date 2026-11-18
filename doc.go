@@ -25,16 +25,17 @@
 // .gitignore, and follows core.ignorecase. WalkDir and WalkRepo walk a tree,
 // auto-discovering nested .gitignore files and pruning ignored (and .git/)
 // directories; Files and RepoFiles are their range-over-func form, and
-// WalkDirFS/FilesFS operate over an fs.FS. Entries, EntriesFS and RepoEntries yield files and
-// directories, with Entry.SkipDir to prune, and can start below root with
-// the rules above it loaded (WalkOptions.Start). WalkRepo, RepoFiles and
-// RepoEntries list a nested repository as git ls-files does, without going
-// inside it. MatcherOptions.IgnoreFiles names extra per-directory ignore
-// files, such as .ignore or .aiignore, read after each .gitignore, and
-// MatcherOptions.Overrides holds patterns checked after every other rule. To
-// check single paths with nested .gitignore files applied, as git
-// check-ignore does, use a Tree: OpenTree for a repository, or Matcher.Tree
-// and Matcher.TreeFS. See each function's own documentation for details.
+// WalkDirFS/FilesFS operate over an fs.FS. Entries, EntriesFS and
+// RepoEntries yield files and directories, with Entry.SkipDir to prune, and
+// can start below root with the rules above it loaded (WalkOptions.Start).
+// WalkRepo, RepoFiles and RepoEntries list a nested repository as git
+// ls-files does, without going inside it. MatcherOptions.IgnoreFiles names
+// extra per-directory ignore files, such as .ignore or .aiignore, read after
+// each .gitignore, and MatcherOptions.Overrides holds patterns checked after
+// every other rule. To check single paths with nested .gitignore files
+// applied, as git check-ignore does, use a Tree: OpenTree for a repository,
+// or Matcher.Tree and Matcher.TreeFS. See each function's own documentation
+// for details.
 //
 // # Match provenance
 //
@@ -80,6 +81,8 @@
 //
 // MatcherOptions bounds the pattern count, line length and parse warnings
 // for safe handling of untrusted input; see MatcherOptions and the Default*
-// constants. Matching itself needs no limit: it costs polynomial time for any
-// pattern and path.
+// constants. Matching costs polynomial time for any pattern and path, and
+// two fixed caps bound it: a path deeper than MaxPathDepth segments, or with
+// a segment longer than MaxSegmentLength bytes, matches nothing, so the
+// walkers list it and go into it.
 package ignore

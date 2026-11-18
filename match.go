@@ -20,12 +20,12 @@ const DefaultMaxBacktrackIterations = 10000
 const HardMaxBacktrackIterations = 10_000_000
 
 // MaxPathDepth is the hard upper bound on the segment count of a path
-// supplied to Match / MatchWithReason or to a Tree. Paths exceeding this depth
-// short-circuit to "no match" without evaluating any rules. The cap exists
-// because Match checks every parent directory against every rule, so its cost
-// grows with N segments times M rules. Arbitrarily deep inputs (constructible
-// by fuzzers or malicious callers) would otherwise be a denial-of-service
-// vector.
+// supplied to Match / MatchWithReason / Explain or to a Tree, or met by a
+// walker. Paths exceeding this depth short-circuit to "no match" without
+// evaluating any rules. The cap exists because Match checks every parent
+// directory against every rule, so its cost grows with N segments times M
+// rules. Arbitrarily deep inputs (constructible by fuzzers or malicious
+// callers) would otherwise be a denial-of-service vector.
 //
 // 4096 was chosen as ~the byte limit of PATH_MAX on Linux, vastly more than
 // any realistic filesystem depth (typical: <30, deeply nested: <100). If

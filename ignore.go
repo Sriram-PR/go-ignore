@@ -21,11 +21,11 @@ type MatchResult struct {
 	// the path of the originating .gitignore when the matcher knows it, set
 	// automatically by AddGlobalPatterns, AddSystemPatterns,
 	// AddExcludePatterns, AddPatternsFromFile, LoadRepo, and the nested
-	// .gitignore and IgnoreFiles discovery inside WalkDir (an OS path, as
-	// given) and WalkDirFS (an fs.FS path). It is "overrides" for a rule
-	// from MatcherOptions.Overrides. For rules added via AddPatterns or
-	// AddPatternsReader, which carry only an in-memory blob, Source is "".
-	// Empty if Matched == false.
+	// .gitignore and IgnoreFiles discovery inside WalkDir and Tree (an OS
+	// path, joined to the root as given) and WalkDirFS and TreeFS (an fs.FS
+	// path). It is "overrides" for a rule from MatcherOptions.Overrides. For
+	// rules added via AddPatterns or AddPatternsReader, which carry only an
+	// in-memory blob, Source is "". Empty if Matched == false.
 	Source string
 
 	// BasePath is the directory containing the .gitignore that had the matching rule.
@@ -366,6 +366,7 @@ func (m *Matcher) effectiveMaxWarnings() int {
 //   - One leading UTF-8 BOM is stripped
 //   - A CR before LF or at the end of content is dropped; any other CR is
 //     pattern text
+//   - A line ends at its first NUL, as git reads it as a C string
 //   - Unescaped trailing spaces on each line are trimmed; tabs are kept
 //
 // Both nil and empty content produce no rules. Nil content returns immediately

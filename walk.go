@@ -49,6 +49,9 @@ type walkBackend struct {
 //     .gitignore that is a symlink is not read, as in git.
 //   - FIFOs, sockets and devices are passed to fn with their type, though
 //     git never lists them; Files skips them.
+//   - A path deeper than MaxPathDepth, or with a segment longer than
+//     MaxSegmentLength, matches no rule, so it is passed to fn, and a
+//     directory is walked, whatever the rules say.
 //   - A .gitignore that cannot be read (unreadable, a symlink, not a regular
 //     file, or larger than 100 MB) gets exactly one call for its directory,
 //     fn(dir, d, err), with err wrapping ErrPatternFileSkipped or the read

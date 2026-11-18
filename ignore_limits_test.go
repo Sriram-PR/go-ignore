@@ -89,6 +89,19 @@ func TestAddPatterns_MaxPatternLength(t *testing.T) {
 	}
 }
 
+// The cap applies to the pattern git reads: the line up to a NUL, trailing
+// spaces trimmed.
+func TestAddPatterns_MaxPatternLengthAfterNULAndTrim(t *testing.T) {
+	m := NewWithOptions(MatcherOptions{MaxPatternLength: 10})
+	m.AddPatterns("", []byte("a\x00"+strings.Repeat("b", 20)+"\nc"+strings.Repeat(" ", 20)+"\n"))
+	if !m.Match("a", false) || !m.Match("c", false) {
+		t.Errorf("a ignored = %v, c ignored = %v; want both", m.Match("a", false), m.Match("c", false))
+	}
+	if w := m.Warnings(); len(w) != 0 {
+		t.Errorf("warnings = %v, want none", w)
+	}
+}
+
 func TestAddPatterns_MaxPatternsUnlimited(t *testing.T) {
 	m := NewWithOptions(MatcherOptions{MaxPatterns: -1})
 

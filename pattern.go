@@ -70,6 +70,7 @@ func parseLines(basePath string, content []byte, maxPatternLength, maxRules int,
 	for lineNum := 1; ; lineNum++ {
 		line, rest, more := strings.Cut(text, "\n")
 		text = rest
+		line = lineText(line)
 
 		if maxPatternLength >= 0 && len(line) > maxPatternLength {
 			ws.add(ParseWarning{
@@ -110,19 +111,23 @@ func ruleLines(text string) int {
 	return n
 }
 
+// lineText is the part of a line git reads as the pattern: up to the first
+// NUL, as git reads each line as a C string, with trailing whitespace
+// trimmed.
+func lineText(line string) string {
+	if i := strings.IndexByte(line, 0); i >= 0 {
+		line = line[:i]
+	}
+	return trimTrailingWhitespace(line)
+}
+
 // parseLine parses a single line from a .gitignore file.
 // Returns nil rule for empty lines, comments, and malformed patterns.
 // Returns a warning for patterns that become empty after processing, and for
 // patterns git never matches (see parseSegments).
 // source is propagated onto the returned rule for provenance reporting.
 func parseLine(line string, lineNum int, basePath, source string) (*rule, *ParseWarning) {
-	// git reads each line as a C string.
-	if i := strings.IndexByte(line, 0); i >= 0 {
-		line = line[:i]
-	}
-
-	// Trim trailing whitespace (Git behavior)
-	line = trimTrailingWhitespace(line)
+	line = lineText(line)
 
 	// Skip empty lines (no warning)
 	if line == "" {

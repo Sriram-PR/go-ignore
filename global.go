@@ -286,17 +286,17 @@ func resolveExcludeDir(gitPath string) (dir string, ok bool, err error) {
 		if readErr != nil {
 			return "", false, fmt.Errorf("reading %s: %w", gitPath, readErr)
 		}
-		target, found := strings.CutPrefix(strings.TrimSpace(string(content)), "gitdir:")
+		target, found := gitdirTarget(content)
 		if !found {
 			return "", false, nil
 		}
-		gitDir = resolveRelative(filepath.Dir(gitPath), strings.TrimSpace(target))
+		gitDir = resolveRelative(filepath.Dir(gitPath), target)
 	}
 
 	common, err := readPatternFile(osSource{}, filepath.Join(gitDir, "commondir"), true, maxPatternFileSize)
 	switch {
 	case err == nil:
-		return resolveRelative(gitDir, strings.TrimSpace(string(common))), true, nil
+		return commonDir(gitDir, common), true, nil
 	case errors.Is(err, os.ErrNotExist):
 		return gitDir, true, nil
 	default:

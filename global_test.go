@@ -682,6 +682,44 @@ func TestLoadRepo_MalformedGitFileSkipsExclude(t *testing.T) {
 	}
 }
 
+// The .git file and commondir are read as git reads them: an exact "gitdir: "
+// prefix, and only trailing CR and LF dropped. A layout git rejects loads no
+// exclude file.
+func TestLoadRepo_GitFileParsedAsGit(t *testing.T) {
+	tests := []struct {
+		name      string
+		gitFile   string
+		commondir string
+		want      bool
+	}{
+		{"commondir trailing newlines", "gitdir: ../main/.git/worktrees/wt\n", "../..\n\n", true},
+		{"commondir CR CR LF", "gitdir: ../main/.git/worktrees/wt\n", "../..\r\r\n", true},
+		{"gitdir CR CR LF", "gitdir: ../main/.git/worktrees/wt\r\r\n", "../..\n", true},
+		{"commondir trailing space", "gitdir: ../main/.git/worktrees/wt\n", "../.. \n", false},
+		{"commondir leading space", "gitdir: ../main/.git/worktrees/wt\n", " ../..\n", false},
+		{"gitdir without space", "gitdir:../main/.git/worktrees/wt\n", "../..\n", false},
+		{"gitdir leading space", " gitdir: ../main/.git/worktrees/wt\n", "../..\n", false},
+		{"gitdir trailing space", "gitdir: ../main/.git/worktrees/wt \n", "../..\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			base := t.TempDir()
+			writeTree(t, base, map[string]string{
+				"main/.git/info/exclude":           "*.secret\n",
+				"main/.git/worktrees/wt/commondir": tt.commondir,
+				"wt/.git":                          tt.gitFile,
+			})
+			m, err := LoadRepo(filepath.Join(base, "wt"), MatcherOptions{})
+			if err != nil {
+				t.Fatalf("LoadRepo: %v", err)
+			}
+			if got := m.Match("key.secret", false); got != tt.want {
+				t.Errorf("key.secret ignored = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // Confirms the hand-built layouts above match what git actually creates.
 func TestLoadRepo_RealGitWorktree(t *testing.T) {
 	if !gitAvailable() {

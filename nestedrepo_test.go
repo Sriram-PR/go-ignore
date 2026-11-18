@@ -38,6 +38,20 @@ func TestIsNestedRepo(t *testing.T) {
 			"main/objects":               "DIR",
 			"main/refs":                  "DIR",
 		}, true},
+		{"worktree commondir trailing newlines", map[string]string{
+			"d/.git":                     "gitdir: ../main/worktrees/d\n",
+			"main/worktrees/d/HEAD":      "ref: refs/heads/wt\n",
+			"main/worktrees/d/commondir": "../..\n\n",
+			"main/objects":               "DIR",
+			"main/refs":                  "DIR",
+		}, true},
+		{"worktree commondir CR CR LF", map[string]string{
+			"d/.git":                     "gitdir: ../main/worktrees/d\n",
+			"main/worktrees/d/HEAD":      "ref: refs/heads/wt\n",
+			"main/worktrees/d/commondir": "../..\r\r\n",
+			"main/objects":               "DIR",
+			"main/refs":                  "DIR",
+		}, true},
 
 		{"no .git", map[string]string{"d/f": "x"}, false},
 		{"empty .git dir", map[string]string{"d/.git": "DIR"}, false},

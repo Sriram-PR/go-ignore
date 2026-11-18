@@ -30,11 +30,25 @@ func isNestedRepo(dir string) bool {
 	if err != nil {
 		return !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, ErrPatternFileSkipped)
 	}
-	target, ok := strings.CutPrefix(strings.TrimRight(string(content), "\r\n"), "gitdir: ")
-	if !ok || target == "" {
+	target, ok := gitdirTarget(content)
+	if !ok {
 		return false
 	}
 	return isGitDirectory(resolveRelative(dir, target))
+}
+
+// gitdirTarget is the path in a .git file, read as git's read_gitfile_gently
+// reads it: content starting "gitdir: ", trailing CR and LF dropped. ok is
+// false when content is not such a pointer.
+func gitdirTarget(content []byte) (target string, ok bool) {
+	target, ok = strings.CutPrefix(strings.TrimRight(string(content), "\r\n"), "gitdir: ")
+	return target, ok && target != ""
+}
+
+// commonDir resolves the content of gitDir/commondir as git's get_common_dir
+// does: trailing CR and LF dropped, a relative path taken from gitDir.
+func commonDir(gitDir string, content []byte) string {
+	return resolveRelative(gitDir, strings.TrimRight(string(content), "\r\n"))
 }
 
 // isGitDirectory is git's is_git_directory: a valid HEAD, and objects and
@@ -45,12 +59,8 @@ func isGitDirectory(gitDir string) bool {
 		return false
 	}
 	common := gitDir
-	if c, err := readPatternFile(osSource{}, filepath.Join(gitDir, "commondir"), true, maxGitFileSize); err == nil && len(c) > 0 {
-		dir := string(c)
-		if d, ok := strings.CutSuffix(dir, "\n"); ok {
-			dir = strings.TrimSuffix(d, "\r")
-		}
-		common = resolveRelative(gitDir, dir)
+	if c, err := readPatternFile(osSource{}, filepath.Join(gitDir, "commondir"), true, maxGitFileSize); err == nil {
+		common = commonDir(gitDir, c)
 	}
 	return isDirPath(filepath.Join(common, "objects")) && isDirPath(filepath.Join(common, "refs"))
 }

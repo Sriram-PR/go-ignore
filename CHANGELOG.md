@@ -4,6 +4,14 @@ Release history for go-ignore. The maintainer release checklist follows the vers
 
 ## Version History
 
+### v1.13.4
+
+One parse fix. No exported API changes.
+
+**Fixed**
+
+- **Comment lines are not checked against `MaxPatternLength`**. A `#` line over the cap gave a "pattern exceeds maximum length" warning, though git never reads it as a pattern. A `\#` line is a pattern and is still checked.
+
 ### v1.13.3
 
 Fixes and doc corrections from the 2026-11-18 audit. No exported API changes.

@@ -23,11 +23,14 @@ import (
 // seen, so make a new Tree to see them. A directory that doesn't exist is
 // not kept, so a Tree grows only with the directories on disk: one created
 // later is read when a check next needs it, and a check through a missing
-// directory lstats it on every call. A .gitignore inside an ignored
-// directory is never read, as in git. Reads follow WalkDir's rules: a
-// .gitignore that is a symlink, is not a regular file, or is larger than 100
-// MB is not read. The IgnoreFiles named in MatcherOptions are read with each
-// directory's .gitignore, right after it.
+// directory lstats it on every call. Directories are kept by path as
+// spelled, so on a case-insensitive filesystem each spelling of one
+// directory (foo, FOO) is read and kept separately; for untrusted paths
+// there, normalize their case first or replace the Tree from time to time.
+// A .gitignore inside an ignored directory is never read, as in git. Reads
+// follow WalkDir's rules: a .gitignore that is a symlink, is not a regular
+// file, or is larger than 100 MB is not read. The IgnoreFiles named in
+// MatcherOptions are read with each directory's .gitignore, right after it.
 //
 // A Tree is safe for concurrent use.
 type Tree struct {
@@ -58,7 +61,8 @@ type dirRules struct {
 }
 
 // missingDir stands for every directory that doesn't exist. Not caching one
-// keeps a Tree fed arbitrary paths bounded by the directories on disk.
+// keeps a Tree fed arbitrary paths bounded by the directories on disk, per
+// spelling (see Tree).
 var missingDir = &dirRules{missing: true}
 
 // missingPath reports whether an lstat error means nothing exists at the

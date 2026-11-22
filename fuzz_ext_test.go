@@ -22,13 +22,15 @@ const (
 
 // wellFormed reports whether name is a relative slash path with no empty,
 // "." or ".." segment and no NUL, which no filesystem allows and Match
-// answers as no match. Other bytes, invalid UTF-8 included, are allowed.
+// answers as no match, and no segment over MaxSegmentLength, which Match also
+// answers as no match though the walker prunes its ignored parent. Other
+// bytes, invalid UTF-8 included, are allowed.
 func wellFormed(name string) bool {
 	if name == "" || strings.IndexByte(name, 0) >= 0 {
 		return false
 	}
 	for seg := range strings.SplitSeq(name, "/") {
-		if seg == "" || seg == "." || seg == ".." {
+		if seg == "" || seg == "." || seg == ".." || len(seg) > ignore.MaxSegmentLength {
 			return false
 		}
 	}
